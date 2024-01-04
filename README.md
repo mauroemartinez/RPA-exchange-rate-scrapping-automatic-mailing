@@ -4,16 +4,16 @@ Este proyecto utiliza Python para obtener datos de varias webs y la API del Banc
 ## 📚 Librerías utilizadas
 Las librerías utilizadas en este proyecto son:
 
-**time** y **datetime**: para manejar el tiempo y las fechas.
-**locale**: para aplicar el formato de fecha en español.
-**pandas** y **numpy**: para manipular los datos y realizar cálculos.
-**json** y **requests**: para manejar la API del **BCRA**.
-**selenium**: para realizar el web scraping.
-**matplotlib** y **seaborn**: para crear gráficos.
-**getpass**: para ocultar la contraseña durante la entrada del usuario.
-**mimetypes**, **email.message**, **email.mime**: para personalizar el correo electrónico.
-**smtplib** y **ssl**: para manejar la seguridad del envío automático de correos electrónicos.
-**tabulate**: para personalizar el dataframe como una tabla HTML.
+- **time** y **datetime**: para manejar el tiempo y las fechas.
+- **locale**: para aplicar el formato de fecha en español.
+- **pandas** y **numpy**: para manipular los datos y realizar cálculos.
+- **json** y **requests**: para manejar la API del **BCRA**.
+- **selenium**: para realizar el web scraping.
+- **matplotlib** y **seaborn**: para crear gráficos.
+- **getpass**: para ocultar la contraseña durante la entrada del usuario.
+- **mimetypes**, **email.message**, **email.mime**: para personalizar el correo electrónico.
+- **smtplib** y **ssl**: para manejar la seguridad del envío automático de correos electrónicos.
+- **tabulate**: para personalizar el dataframe como una tabla HTML.
 
 ## 🤖 Web Scraping
 El proceso de web scraping se realiza utilizando Selenium para interactuar con las páginas web y recopilar los datos necesarios. Los datos se procesan y se convierten en un DataFrame de pandas para su posterior análisis.
