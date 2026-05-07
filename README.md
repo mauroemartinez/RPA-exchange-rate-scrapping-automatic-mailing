@@ -35,6 +35,8 @@ This project is a portfolio-grade RPA system for Argentine exchange rate trackin
 13. Started tracking Fed interest rates and calculating forward exchange rate projections based on Irving Fisher (look up the economist name if needed!).
 14. Added more charts for country risk, interest rates, and inflation.
 15. Added inflation tables for recent months and interaction metrics for bimonthly, quarterly, and year-over-year comparisons to support salary update decisions.
+16. Added CSS (95% AI scripted) to give it a much more professional look.
+17. Implemented SQLAlchemy lines to save everything in an SQL Server database.
 
 ## 🔐 Security Notes
 
