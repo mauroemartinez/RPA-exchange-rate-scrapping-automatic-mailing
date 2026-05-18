@@ -37,6 +37,7 @@ This project is a portfolio-grade RPA system for Argentine exchange rate trackin
 15. Added inflation tables for recent months and interaction metrics for bimonthly, quarterly, and year-over-year comparisons to support salary update decisions.
 16. Added CSS (95% AI scripted) to give it a much more professional look.
 17. Implemented SQLAlchemy lines to save everything in an SQL Server database.
+18. Migrated to SQL 2025 + SSMS 22.
 
 ## 🔐 Security Notes
 
