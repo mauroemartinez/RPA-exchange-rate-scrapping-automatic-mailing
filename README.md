@@ -6,7 +6,9 @@
 ### 🏗️ System Architecture & Data Pipeline Blueprint
 Below is the end-to-end blueprint of the production data life cycle, including current infrastructure and upcoming integration layers.
 
-![System Architecture](assets/Architecture.jpeg)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/main/Assets/Architecture.jpeg" width="900" alt="Project Architecture">
+</p>
 
 ---
 
