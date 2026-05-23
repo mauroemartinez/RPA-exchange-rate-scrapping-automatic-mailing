@@ -22,6 +22,7 @@ The system automates the ingestion of highly volatile financial variables, ensur
 * **Data Ingestion (ETL/ELT):** Requests (REST APIs), Selenium / Playwright (Web Scraping).
 * **Processing & Relational Mapping:** Pandas (Data Manipulation), SQLAlchemy (ORM).
 * **Data Warehouse:** Microsoft SQL Server 2022 (Staging & Analytical Layers).
+* **Generative AI:** Google Gemini 2.5 Flash API (Contextual Macro Narrative Generation).
 * **Data Visualization & Delivery:** Matplotlib, Seaborn, Jinja2 HTML/CSS templates, Tabula PDF Parsing, SMTP Service.
 
 ---
@@ -37,13 +38,14 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 * **Macro Indicators Expansion:** Expanded the ingestion spectrum to track sovereign country risk indices, central bank interest rates, and multi-tier historical timelines (BNA, MEP). Integrated Federal Reserve rates to execute forward-rate projections based on the *Irving Fisher* hypothesis.
 * **Relational Enterprise Architecture (2025-2026):** Deprecated flat-file persistence in favor of a permanent data warehouse model leveraging **Microsoft SQL Server 2022**. Engineered robust Upsert mechanisms using **SQLAlchemy** to guarantee strict data integrity and eliminate duplicate records.
 * **Automated Repository Preview Synchronization (2026):** Implemented automated Git versioning workflows directly from the Python orchestration layer. The system now detects modified visualization assets inside the `/Previews` directory and automatically executes staged Git commits and pushes to GitHub, ensuring the repository always reflects the latest generated analytical outputs without manual intervention.
+* **Generative AI Narrative Layer (2026):** Shipped a production-grade AI insights module powered by **Google Gemini 2.5 Flash**. The engine queries the SQL Server data warehouse, computes daily and 25-session rolling variations for all key macro indicators (FX rates, country risk, BCRA & FED effective rates), and dynamically composes a contextualized financial narrative paragraph injected directly into the HTML email report. The module features multi-API-key failover logic with automatic rotation on quota exhaustion (HTTP 429), persists the generated output back to the data warehouse via `UPDATE` for historical auditability, and is fully decoupled from the orchestration layer as an independent `ia_generator` module.
+
 ---
 
 ## 🚀 Roadmap & Upcoming Features (In Development)
 
 The following modules are mapped in the architecture blueprint and are undergoing staging checks prior to production deployment:
 
-* **Generative AI Insights Integration:** Connecting the **Gemini 1.5 Flash API** to dynamically evaluate active analytical tables and produce contextualized macro narrative paragraphs prior to delivery.
 * **Automated Executive PowerPoint Reporting:** Developing a fully automated `.pptx` executive summary generation layer containing macroeconomic charts, spreads, and key indicators. The generated presentations will be versioned and automatically pushed to GitHub alongside analytical preview assets through integrated Git automation workflows.
 * **Data Validation Layer (Pydantic):** Implementing strict schema validation models via **Pydantic** to enforce data types at the raw ingestion gate before loading to Staging.
 * **Crypto Asset Monitoring Expansion:** Scaling the ingestion engine to track historical and live **Bitcoin (BTC)** pricing trends and liquidity pools.
@@ -56,12 +58,13 @@ The following modules are mapped in the architecture blueprint and are undergoin
 
 * **Credential Management:** All API keys, connection strings, and sensitive tokens are fully decoupled via environment variables using `.env` files (explicitly excluded via `.gitignore`).
 * **Resilience:** Built with basic exception-handling blocks to prevent operational failure during scraping anomalies without exposing server secrets in standard logs.
+* **AI Failover:** The Gemini integration implements multi-key rotation on quota exhaustion, ensuring uninterrupted report generation even under API rate limits.
 
 ---
 
 ## 📬 Contact & Feedback
 
-This is an educational portfolio project designed under modern analytics engineering best practices. For email susbscription, collaboration, architectural inquiries, or technical feedback:
+This is an educational portfolio project designed under modern analytics engineering best practices. For email subscription, collaboration, architectural inquiries, or technical feedback:
 
 * **Email:** martinezmauroezequiel@gmail.com
 * **LinkedIn:** [linkedin.com/in/mauroemartinez](https://www.linkedin.com/in/mauroemartinez)
