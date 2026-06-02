@@ -38,19 +38,14 @@ def generar_con_failover(prompt):
 
 def procesar_y_guardar_parrafo(engine):
     """
-    Extrae el historial de SQL Server, calcula variaciones, llama a Gemini 
+    Extrae el historial de la base de datos, calcula variaciones, llama a Gemini 
     con control de failover, guarda el resultado en la base de datos 
     y retorna el texto final para el orquestador principal.
     """
     try:
-        query = """
-            SELECT 
-                Fecha, TCV_MEP, TCV_Blue, TCV_Billete, riesgo_pais, bcra_tea, fed_tea 
-            FROM Fact_Mercado_Macro 
-            ORDER BY Fecha ASC;
-        """
-        
-        print("🔌 [IA Subprocess] Conectando a SQL Server para extraer historial...")
+        query = 'SELECT "Fecha", "TCV_MEP", "TCV_Blue", "TCV_Billete", "riesgo_pais", "bcra_tea", "fed_tea" FROM "Fact_Mercado_Macro" ORDER BY "Fecha" ASC'
+
+        print("🔌 [IA Subprocess] Conectando a Supabase para extraer historial...")
         df = pd.read_sql(query, con=engine)
         
         # Limpieza estándar
@@ -134,13 +129,14 @@ def procesar_y_guardar_parrafo(engine):
         print(f"🤖 Analizando datos del {contexto_masticado['fecha']}...")
         reporte = generar_con_failover(prompt_final)
         
-        # Guardado en SQL Server apuntando a la fecha actual recuperada
-        print(f"💾 Guardando reporte en SQL Server para la fecha {hoy['Fecha'].date()}...")
+        # Guardado en SQL apuntando a la fecha actual recuperada
+        print(f"💾 Guardando reporte en Supabase para la fecha {hoy['Fecha'].date()}...")
         update_query = text("""
-            UPDATE Fact_Mercado_Macro 
-            SET ai_paragraph = :parrafo 
-            WHERE Fecha = :fecha
-        """)
+        UPDATE "Fact_Mercado_Macro" 
+        SET "ai_paragraph" = :parrafo 
+        WHERE "Fecha"::date = :fecha
+        """
+        )
         
         with engine.begin() as conexion:
             conexion.execute(update_query, {"parrafo": reporte, "fecha": hoy['Fecha'].date()})

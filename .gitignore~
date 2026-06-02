@@ -1,5 +1,0 @@
-*.csv
-.env
-ipynb_checkpoints/
-venv/
-.ipynb_checkpoint
