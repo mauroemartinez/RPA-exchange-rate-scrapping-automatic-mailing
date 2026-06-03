@@ -5,14 +5,11 @@ from google import genai
 from sqlalchemy import text
 
 # Configuración Inicial (Solo variables de entorno)
-load_dotenv()
+load_dotenv(override=True)  
 API_KEYS = [os.getenv("GEMINI_API_KEY_1"), os.getenv("GEMINI_API_KEY_2")]
 
 def generar_con_failover(prompt):
-    """
-    Intenta generar el reporte. Si recibe un error 429, rota a la siguiente Key.
-    Si el error es de otro tipo o se agotan las Keys, detiene la ejecución.
-    """
+    print(f"DEBUG API_KEYS: {API_KEYS}")  # ← agregá esto
     for i, key in enumerate(API_KEYS):
         if not key: 
             continue
@@ -20,9 +17,12 @@ def generar_con_failover(prompt):
         try:
             client = genai.Client(api_key=key)
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+            print(f"DEBUG response: {response}")
+            print(f"DEBUG response.text: {response.text}")
+
             return response.text 
 
         except Exception as e:
@@ -131,6 +131,9 @@ def procesar_y_guardar_parrafo(engine):
         
         # Guardado en SQL apuntando a la fecha actual recuperada
         print(f"💾 Guardando reporte en Supabase para la fecha {hoy['Fecha'].date()}...")
+        print(f"DEBUG reporte es None?: {reporte is None}")
+        print(f"DEBUG reporte tipo: {type(reporte)}")
+
         update_query = text("""
         UPDATE "Fact_Mercado_Macro" 
         SET "ai_paragraph" = :parrafo 
@@ -139,10 +142,11 @@ def procesar_y_guardar_parrafo(engine):
         )
         
         with engine.begin() as conexion:
-            conexion.execute(update_query, {"parrafo": reporte, "fecha": hoy['Fecha'].date()})
-        
+            result = conexion.execute(update_query, {"parrafo": reporte, "fecha": hoy['Fecha'].date()})
+            print(f"DEBUG rows afectadas: {result.rowcount}")
+
         print("✅ Base de datos actualizada con el párrafo de IA.")
-        return reporte # Retorno clave para interceptar el string desde el .ipynb
+        return reporte
 
     except Exception as e:
         print(f"\n❌ Proceso de IA interrumpido: {e}")
