@@ -4,148 +4,107 @@ from dotenv import load_dotenv
 from google import genai
 from sqlalchemy import text
 
-# Configuración Inicial (Solo variables de entorno)
-load_dotenv(override=True)  
-API_KEYS = [os.getenv("GEMINI_API_KEY_1"), os.getenv("GEMINI_API_KEY_2")]
-
 def generar_con_failover(prompt):
-    print(f"DEBUG API_KEYS: {API_KEYS}")  # ← agregá esto
-    for i, key in enumerate(API_KEYS):
-        if not key: 
-            continue
-        
+    """
+    Carga las keys en el momento de la llamada (no al importar el módulo).
+    Rota a la siguiente key si recibe error 429.
+    """
+    load_dotenv(override=True)
+    api_keys = [k for k in [os.getenv("GEMINI_API_KEY_1"), os.getenv("GEMINI_API_KEY_2")] if k]
+
+    if not api_keys:
+        raise Exception("❌ No hay API keys de Gemini en el .env (GEMINI_API_KEY_1 / GEMINI_API_KEY_2).")
+
+    for i, key in enumerate(api_keys):
         try:
             client = genai.Client(api_key=key)
             response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
-            print(f"DEBUG response: {response}")
-            print(f"DEBUG response.text: {response.text}")
-
-            return response.text 
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+            return response.text
 
         except Exception as e:
             if "429" in str(e) or "quota" in str(e).lower() or "resource exhausted" in str(e).lower():
                 print(f"⚠️ Key {i+1} agotada (Cuota excedida).")
-                if i == len(API_KEYS) - 1:
-                    raise Exception("❌ Se agotaron todas las API Keys por límite de cuota (429).")
+                if i == len(api_keys) - 1:
+                    raise Exception("❌ Se agotaron todas las API Keys (429).")
                 print("🔄 Reintentando con la siguiente API Key...")
                 continue
             else:
-                print(f"❌ Error técnico inesperado en Gemini: {e}")
+                print(f"❌ Error técnico en Gemini: {e}")
                 raise e
+
 
 def procesar_y_guardar_parrafo(engine):
     """
-    Extrae el historial de la base de datos, calcula variaciones, llama a Gemini 
-    con control de failover, guarda el resultado en la base de datos 
-    y retorna el texto final para el orquestador principal.
+    Extrae historial de Supabase, calcula variaciones, genera párrafo con Gemini,
+    guarda en la DB y retorna el texto.
     """
     try:
-        query = 'SELECT "Fecha", "TCV_MEP", "TCV_Blue", "TCV_Billete", "riesgo_pais", "bcra_tea", "fed_tea" FROM "Fact_Mercado_Macro" ORDER BY "Fecha" ASC'
-
         print("🔌 [IA Subprocess] Conectando a Supabase para extraer historial...")
-        df = pd.read_sql(query, con=engine)
-        
-        # Limpieza estándar
+        df = pd.read_sql("""
+            SELECT "Fecha", "TCV_MEP", "TCV_Blue", "TCV_Billete",
+                   "riesgo_pais", "bcra_tea", "fed_tea"
+            FROM "Fact_Mercado_Macro"
+            ORDER BY "Fecha" ASC
+        """, con=engine)
+
         df.columns = df.columns.str.strip()
-        df['Fecha'] = pd.to_datetime(df['Fecha']) 
+        df['Fecha'] = pd.to_datetime(df['Fecha'])
 
-        # Validación única de historial mínimo (25 ruedas = 1 mes hábil)
         if len(df) < 26:
-            raise Exception(f"Historial insuficiente en base de datos. La tabla solo tiene {len(df)} registros.")
+            raise Exception(f"Historial insuficiente: {len(df)} registros.")
 
-        # Definición de puntos de control
-        hoy = df.iloc[-1]       
-        ayer = df.iloc[-2]      
-        hace_25 = df.iloc[-26]  
-        
-        # Variables clave
-        mep_hoy = hoy['TCV_MEP']
-        blue_hoy = hoy['TCV_Blue']
-        tea_hoy = hoy['bcra_tea']
-        fed_tea_hoy = hoy['fed_tea']
-     
-        brecha_valor = abs(((blue_hoy / mep_hoy) - 1) * 100)
-        mas_bajo = "Blue" if blue_hoy < mep_hoy else "MEP"
-        
-        def calc_var(actual, previo):
-            return ((actual / previo) - 1) * 100
+        hoy  = df.iloc[-1]
+        ayer = df.iloc[-2]
+        mes  = df.iloc[-26]
 
-        contexto_masticado = {
-            "fecha": hoy['Fecha'].strftime('%d/%m/%Y'),
-            "blue_val": f"${blue_hoy}",
-            "blue_stats": f"(Día: {calc_var(blue_hoy, ayer['TCV_Blue']):+.2f}% | Mes: {calc_var(blue_hoy, hace_25['TCV_Blue']):+.2f}%)",
-            "mep_val": f"${mep_hoy}",
-            "brecha_porc": f"{brecha_valor:.2f}%",
-            "opcion_barata": mas_bajo,
-            "riesgo_pais": {
-                "actual": f"{hoy['riesgo_pais']} pts",
-                "dif_diaria": f"{hoy['riesgo_pais'] - ayer['riesgo_pais']:+} pts",
-                "dif_25_ruedas": f"{hoy['riesgo_pais'] - hace_25['riesgo_pais']:+} pts"
-            },
-            "billete": {
-                "actual": f"${hoy['TCV_Billete']}",
-                "var_diaria": f"{calc_var(hoy['TCV_Billete'], ayer['TCV_Billete']):+.2f}%",
-                "var_25_ruedas": f"{calc_var(hoy['TCV_Billete'], hace_25['TCV_Billete']):+.2f}%"
-            },
-            "tea": {
-                "actual": f"{tea_hoy:.2f}%",
-                "var_diaria": f"{calc_var(tea_hoy, ayer['bcra_tea']):+.2f}%",
-                "var_25_ruedas": f"{calc_var(tea_hoy, hace_25['bcra_tea']):+.2f}%"
-            },
-            "fed_tea": {
-                "actual": f"{fed_tea_hoy:.2f}%",
-                "var_diaria": f"{calc_var(fed_tea_hoy, ayer['fed_tea']):+.2f}%"
-            }
-        }
+        blue    = hoy['TCV_Blue']
+        mep     = hoy['TCV_MEP']
+        billete = hoy['TCV_Billete']
+        rp      = hoy['riesgo_pais']
+        tea     = hoy['bcra_tea']
+        fed     = hoy['fed_tea']
+        brecha  = abs(((blue / mep) - 1) * 100)
+        barato  = "Blue" if blue < mep else "MEP"
 
-        # Validaciones de cambios significativos para composición dinámica del prompt
-        tea_var_diaria = calc_var(tea_hoy, ayer['bcra_tea'])
-        tea_strong_change = abs(tea_var_diaria) > 0.2    
-        fed_var_diaria = calc_var(fed_tea_hoy, ayer['fed_tea'])
-        fed_any_change = abs(fed_var_diaria) > 0
-        
-        prompt_final = f"""
-        Actuá como analista financiero Senior. Redactá un párrafo de 3-4 líneas.
-        DATOS REALES AL {contexto_masticado['fecha']}:
-        - Blue: {contexto_masticado['blue_val']} {contexto_masticado['blue_stats']}
-        - MEP: {contexto_masticado['mep_val']}
-        - Brecha: {contexto_masticado['brecha_porc']}
-        - Más barato hoy: {contexto_masticado['opcion_barata']}
-        - Billete: {contexto_masticado['billete']['actual']} (Día: {contexto_masticado['billete']['var_diaria']} | Mes: {contexto_masticado['billete']['var_25_ruedas']})
-        - Riesgo País: {contexto_masticado['riesgo_pais']['actual']} (Día: {contexto_masticado['riesgo_pais']['dif_diaria']} | Mes: {contexto_masticado['riesgo_pais']['dif_25_ruedas']})
-    {f"- TEA BCRA: {contexto_masticado['tea']['actual']} (Día: {contexto_masticado['tea']['var_diaria']} | Mes: {contexto_masticado['tea']['var_25_ruedas']})" if tea_strong_change else ""}
-    {f"- TEA FED: {contexto_masticado['fed_tea']['actual']} (Día: {contexto_masticado['fed_tea']['var_diaria']})" if fed_any_change else ""}
+        def var(a, b):
+            return ((a / b) - 1) * 100
 
-        Instrucciones obligatorias:
-        1. Al mencionar la brecha, escribí explícitamente los valores de ambos, ejemplo: "entre el Blue ({contexto_masticado['blue_val']}) y el MEP ({contexto_masticado['mep_val']})".
-        2. Para la comparativa de precios, usá la frase "siendo la opción más económica de las dos".
-        3. Mantené el análisis de tendencia de 25 ruedas para Blue, Billete y Riesgo País{f", y Tasa Efectiva del BCRA" if tea_strong_change else ""} cuando sea significativo{f". Para la Tasa Efectiva de la FED, mencionála únicamente si cambió, sin requerir análisis de tendencia mensual" if fed_any_change else ""}.
-        4. Tono seco, profesional y recordá que no somos asesores financieros.
-        """
-        
-        print(f"🤖 Analizando datos del {contexto_masticado['fecha']}...")
-        reporte = generar_con_failover(prompt_final)
-        
-        # Guardado en SQL apuntando a la fecha actual recuperada
-        print(f"💾 Guardando reporte en Supabase para la fecha {hoy['Fecha'].date()}...")
-        print(f"DEBUG reporte es None?: {reporte is None}")
-        print(f"DEBUG reporte tipo: {type(reporte)}")
+        tea_cambio = abs(var(tea, ayer['bcra_tea'])) > 0.2
+        fed_cambio = abs(var(fed, ayer['fed_tea'])) > 0
 
-        update_query = text("""
-        UPDATE "Fact_Mercado_Macro" 
-        SET "ai_paragraph" = :parrafo 
-        WHERE "Fecha"::date = :fecha
-        """
-        )
-        
-        with engine.begin() as conexion:
-            result = conexion.execute(update_query, {"parrafo": reporte, "fecha": hoy['Fecha'].date()})
-            print(f"DEBUG rows afectadas: {result.rowcount}")
+        prompt = f"""
+Actuá como analista financiero Senior. Redactá un párrafo de 3-4 líneas.
+DATOS REALES AL {hoy['Fecha'].strftime('%d/%m/%Y')}:
+- Blue: ${blue} (Día: {var(blue, ayer['TCV_Blue']):+.2f}% | Mes: {var(blue, mes['TCV_Blue']):+.2f}%)
+- MEP: ${mep}
+- Brecha: {brecha:.2f}% entre el Blue (${blue}) y el MEP (${mep})
+- Más barato: {barato}, siendo la opción más económica de las dos
+- Billete: ${billete} (Día: {var(billete, ayer['TCV_Billete']):+.2f}% | Mes: {var(billete, mes['TCV_Billete']):+.2f}%)
+- Riesgo País: {rp} pts (Día: {rp - ayer['riesgo_pais']:+.0f} pts | Mes: {rp - mes['riesgo_pais']:+.0f} pts)
+{f"- TEA BCRA: {tea:.2f}% (Día: {var(tea, ayer['bcra_tea']):+.2f}% | Mes: {var(tea, mes['bcra_tea']):+.2f}%)" if tea_cambio else ""}
+{f"- TEA FED: {fed:.2f}% (Día: {var(fed, ayer['fed_tea']):+.2f}%)" if fed_cambio else ""}
 
-        print("✅ Base de datos actualizada con el párrafo de IA.")
+Instrucciones:
+1. Mencioná la brecha con los valores explícitos de Blue y MEP.
+2. Usá la frase "siendo la opción más económica de las dos" al comparar.
+3. Analizá tendencia mensual para Blue, Billete y Riesgo País cuando sea relevante.
+4. Tono seco, profesional. No somos asesores financieros.
+"""
+
+        print(f"🤖 Analizando datos del {hoy['Fecha'].strftime('%d/%m/%Y')}...")
+        reporte = generar_con_failover(prompt)
+
+        print(f"💾 Guardando en Supabase para la fecha {hoy['Fecha'].date()}...")
+        with engine.begin() as conn:
+            result = conn.execute(
+                text('UPDATE "Fact_Mercado_Macro" SET "ai_paragraph" = :p WHERE "Fecha" = :f'),
+                {"p": reporte, "f": hoy['Fecha'].date()}
+            )
+            print(f"✅ Guardado. Filas afectadas: {result.rowcount}")
+
         return reporte
 
     except Exception as e:
