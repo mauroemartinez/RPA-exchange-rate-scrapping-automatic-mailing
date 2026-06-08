@@ -15,25 +15,42 @@ def generar_con_failover(prompt):
     if not api_keys:
         raise Exception("❌ No hay API keys de Gemini en el .env (GEMINI_API_KEY_1 / GEMINI_API_KEY_2).")
 
-    for i, key in enumerate(api_keys):
-        try:
-            client = genai.Client(api_key=key)
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
-            return response.text
+    models = ["gemini-3.5-flash", "gemini-2.5-flash"]
 
-        except Exception as e:
-            if "429" in str(e) or "quota" in str(e).lower() or "resource exhausted" in str(e).lower():
-                print(f"⚠️ Key {i+1} agotada (Cuota excedida).")
-                if i == len(api_keys) - 1:
-                    raise Exception("❌ Se agotaron todas las API Keys (429).")
-                print("🔄 Reintentando con la siguiente API Key...")
-                continue
-            else:
+    for i, key in enumerate(api_keys):
+        for model in models:
+            try:
+                client = genai.Client(api_key=key)
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt
+                )
+                return response.text, model
+
+            except Exception as e:
+                error_text = str(e).lower()
+                if "429" in error_text or "quota" in error_text or "resource exhausted" in error_text:
+                    print(f"⚠️ Key {i+1} agotada (Cuota excedida).")
+                    break
+
+                if "503" in error_text or "unavailable" in error_text:
+                    if model == models[0]:
+                        print("⚠️ Gemini 3.5 está saturado. Intentando gemini-2.5-flash...")
+                        continue
+                    print("❌ Gemini 2.5 también está indisponible. Intenta más tarde.")
+                    raise Exception(f"❌ Error técnico en Gemini: {e}")
+
                 print(f"❌ Error técnico en Gemini: {e}")
                 raise e
+
+        else:
+            # No model-specific break, continue to next key only if a key-specific error didn't occur.
+            continue
+
+        # If quota/error de key occurred, try next API key.
+        if i == len(api_keys) - 1:
+            raise Exception("❌ Se agotaron todas las API Keys (429).")
+        print("🔄 Reintentando con la siguiente API Key...")
 
 
 def procesar_y_guardar_parrafo(engine):
@@ -95,13 +112,13 @@ Instrucciones:
 """
 
         print(f"🤖 Analizando datos del {hoy['Fecha'].strftime('%d/%m/%Y')}...")
-        reporte = generar_con_failover(prompt)
+        reporte, modelo = generar_con_failover(prompt)
 
-        print(f"💾 Guardando en Supabase para la fecha {hoy['Fecha'].date()}...")
+        print(f"💾 Guardando en Supabase para la fecha {hoy['Fecha'].date()}, usando: {modelo}...")
         with engine.begin() as conn:
             result = conn.execute(
-                text('UPDATE "Fact_Mercado_Macro" SET "ai_paragraph" = :p WHERE "Fecha" = :f'),
-                {"p": reporte, "f": hoy['Fecha'].date()}
+                text('UPDATE "Fact_Mercado_Macro" SET "ai_paragraph" = :p, "ai_model" = :m WHERE "Fecha" = :f'),
+                {"p": reporte, "m": modelo, "f": hoy['Fecha'].date()}
             )
             print(f"✅ Guardado. Filas afectadas: {result.rowcount}")
 
