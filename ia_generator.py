@@ -100,7 +100,7 @@ DATOS REALES AL {hoy['Fecha'].strftime('%d/%m/%Y')}:
 - Brecha: {brecha:.2f}% entre el Blue (${blue}) y el MEP (${mep})
 - Más barato: {barato}, siendo la opción más económica de las dos
 - Billete: ${billete} (Día: {var(billete, ayer['TCV_Billete']):+.2f}% | Mes: {var(billete, mes['TCV_Billete']):+.2f}%)
-- Riesgo País: {rp} pts (Día: {rp - ayer['riesgo_pais']:+.0f} pts | Mes: {rp - mes['riesgo_pais']:+.0f} pts)
+- Riesgo País: {rp:.0f} pts (Día: {rp - ayer['riesgo_pais']:+.0f} pts | Mes: {rp - mes['riesgo_pais']:+.0f} pts)
 {f"- TEA BCRA: {tea:.2f}% (Día: {var(tea, ayer['bcra_tea']):+.2f}% | Mes: {var(tea, mes['bcra_tea']):+.2f}%)" if tea_cambio else ""}
 {f"- TEA FED: {fed:.2f}% (Día: {var(fed, ayer['fed_tea']):+.2f}%)" if fed_cambio else ""}
 
