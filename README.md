@@ -1,10 +1,10 @@
 # 🤖 Argentinian Macroeconomic Automatic Mailing System
-> **A high-performance Analytics Engineering, Data Pipeline, and RPA infrastructure designed to systematically untangle, model, and monitor Argentina's volatile financial chaos.**
+> **An Analytics Engineering, Data Pipeline, and AI Automation infrastructure designed to systematically untangle, model, and monitor Argentina's volatile macroeconomic chaos with an automated mailing report.**
 
 ---
 
 ### 🏗️ System Architecture & Data Pipeline Blueprint
-Below is the end-to-end blueprint of the production data life cycle, including current infrastructure and upcoming integration layers.
+Below is the end-to-end blueprint of the production data life cycle.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/main/Assets/Architecture.jpeg" width="900" alt="Project Architecture">
@@ -19,9 +19,9 @@ This repository features a robust, portfolio-grade Robotic Process Automation (R
 The system automates the ingestion of highly volatile financial variables, ensures data integrity within a centralized data warehouse, runs mathematical macro-projections, and distributes dynamic, highly-styled financial reports to a private subscriber list.
 
 ### 🛠️ Core Tech Stack & Frameworks
-* **Data Ingestion (ETL/ELT):** Requests (REST APIs), Selenium / Playwright (Web Scraping).
+* **Data Ingestion (ETL):** Requests (REST APIs), Selenium / Playwright (Web Scraping).
 * **Processing & Relational Mapping:** Pandas (Data Manipulation), SQLAlchemy (ORM).
-* **Data Warehouse:** Microsoft SQL Server 2022 (Staging & Analytical Layers), migrated to **Supabase PostgreSQL** for cloud-hosted analytics.
+* **Data Warehouse:** **Supabase PostgreSQL** for cloud-hosted analytics and persistency. Before Supabase, I used Microsoft SQL Server 2022, Microsoft SQL Server 2019.
 * **Generative AI:** Google Gemini 2.5 Flash API (Contextual Macro Narrative Generation).
 * **Data Visualization & Delivery:** Matplotlib, Seaborn, Jinja2 HTML/CSS templates, Tabula PDF Parsing, SMTP Service.
 
@@ -40,6 +40,7 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 * **Cloud Migration Milestone:** Successfully migrated the data warehouse from **SQL Server 2022 to Supabase PostgreSQL**, completing the planned transition to cloud-hosted analytics.
 * **Automated Repository Preview Synchronization (2026):** Implemented automated Git versioning workflows directly from the Python orchestration layer. The system now detects modified visualization assets inside the `/Previews` directory and automatically executes staged Git commits and pushes to GitHub, ensuring the repository always reflects the latest generated analytical outputs without manual intervention.
 * **Generative AI Narrative Layer (2026):** Shipped a production-grade AI insights module powered by **Google Gemini 2.5 Flash**. The engine queries the SQL Server data warehouse, computes daily and 25-session rolling variations for all key macro indicators (FX rates, country risk, BCRA & FED effective rates), and dynamically composes a contextualized financial narrative paragraph injected directly into the HTML email report. The module features multi-API-key failover logic with automatic rotation on quota exhaustion (HTTP 429), persists the generated output back to the data warehouse via `UPDATE` for historical auditability, and is fully decoupled from the orchestration layer as an independent `ia_generator` module.
+* **Threading Milestone (2026):** Added a threading piece of script so both email variants (with and without attached CSV) are sent in parallel. This reduces total send time significantly, since email delivery is the heaviest part of the project.
 
 ---
 
@@ -47,10 +48,13 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 
 The following modules are mapped in the architecture blueprint and are undergoing staging checks prior to production deployment:
 
+* **Selenium to Playwright Migration:** Migrate the web scraping layer from Selenium to Playwright to improve stability, performance, and long-term maintainability.
+* **Project Modularization:** Reorganize the architecture to move beyond the notebook and convert the codebase into reusable, scalable modules that are deployment-ready.
+* **API Data Persistence in Supabase:** Store API data in Supabase instead of re-consuming the full dataset on every execution.
+* **Data Validation Layer (Pydantic):** Implement strict schema validation models via **Pydantic** to enforce data types at the raw ingestion gate before loading to staging.
 * **Automated Executive PowerPoint Reporting:** Developing a fully automated `.pptx` executive summary generation layer containing macroeconomic charts, spreads, and key indicators. The generated presentations will be versioned and automatically pushed to GitHub alongside analytical preview assets through integrated Git automation workflows.
-* **Data Validation Layer (Pydantic):** Implementing strict schema validation models via **Pydantic** to enforce data types at the raw ingestion gate before loading to Staging.
-* **Crypto Asset Monitoring Expansion:** Scaling the ingestion engine to track historical and live **Bitcoin (BTC)** pricing trends and liquidity pools.
 * **Workflow Orchestration & Automation:** Migrating from local execution to serverless execution via **GitHub Actions**.
+* **Streamlit Dashboard:** Build a Streamlit dashboard so users can consume the full Supabase dataset interactively.
 
 ---
 
@@ -58,7 +62,7 @@ The following modules are mapped in the architecture blueprint and are undergoin
 
 * **Credential Management:** All API keys, connection strings, and sensitive tokens are fully decoupled via environment variables using `.env` files (explicitly excluded via `.gitignore`).
 * **Resilience:** Built with basic exception-handling blocks to prevent operational failure during scraping anomalies without exposing server secrets in standard logs.
-* **AI Failover:** The Gemini integration implements multi-key rotation on quota exhaustion, ensuring uninterrupted report generation even under API rate limits.
+* **AI Failover:** The Gemini integration implements multi-key rotation on quota exhaustion, ensuring uninterrupted report generation even under API rate limits. Also, if the model rejects the bot because of the high traffick, it moves on to the next model.
 
 ---
 
