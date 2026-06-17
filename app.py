@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI()
-API_KEY = os.getenv("API_KEY", "")
+API_KEY = os.getenv("API_KEY_EASY_PANEL", "")
 
 NOTEBOOK = "Argentinian_Macroeconomic_Automatic_Mailing.ipynb"
 
