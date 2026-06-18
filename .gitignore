@@ -18,3 +18,10 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Claude / Anthropic local files
+.claude/
+claude/
+CLAUDE.md
+*.claude
+*.anthropic
