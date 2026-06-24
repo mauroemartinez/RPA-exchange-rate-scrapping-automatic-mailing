@@ -17,39 +17,41 @@ def generar_con_failover(prompt):
 
     models = ["gemini-3.5-flash", "gemini-2.5-flash"]
 
+    attempts = 0
     for i, key in enumerate(api_keys):
         for model in models:
+            attempts += 1
             try:
                 client = genai.Client(api_key=key)
                 response = client.models.generate_content(
                     model=model,
                     contents=prompt
                 )
-                return response.text, model
+                return response.text, model, attempts
 
             except Exception as e:
                 error_text = str(e).lower()
                 if "429" in error_text or "quota" in error_text or "resource exhausted" in error_text:
                     print(f"⚠️ Key {i+1} agotada (Cuota excedida).")
+                    # stop trying models for this key and move to next key
                     break
 
                 if "503" in error_text or "unavailable" in error_text:
                     if model == models[0]:
                         print("⚠️ Gemini 3.5 está saturado. Intentando gemini-2.5-flash...")
+                        # try next model with same key (counts as an additional sub-intento)
                         continue
                     print("❌ Gemini 2.5 también está indisponible. Intenta más tarde.")
-                    raise Exception(f"❌ Error técnico en Gemini: {e}")
+                    # return failure with attempts consumed so far
+                    return None, None, attempts
 
                 print(f"❌ Error técnico en Gemini: {e}")
-                raise e
+                return None, None, attempts
 
-        else:
-            # No model-specific break, continue to next key only if a key-specific error didn't occur.
-            continue
-
-        # If quota/error de key occurred, try next API key.
+        # If we broke the inner loop due to quota, try next API key.
         if i == len(api_keys) - 1:
-            raise Exception("❌ Se agotaron todas las API Keys (429).")
+            print("❌ Se agotaron todas las API Keys (429).")
+            return None, None, attempts
         print("🔄 Reintentando con la siguiente API Key...")
 
 
@@ -112,7 +114,32 @@ Instrucciones:
 """
 
         print(f"🤖 Analizando datos del {hoy['Fecha'].strftime('%d/%m/%Y')}...")
-        reporte, modelo = generar_con_failover(prompt)
+
+        max_total_attempts = 3
+        total_attempts = 0
+        reporte = None
+        modelo = None
+
+        while total_attempts < max_total_attempts:
+            resp, mod, used = generar_con_failover(prompt)
+            # generar_con_failover may raise only for missing API keys; otherwise returns attempts used
+            attempts_used = used if used is not None else 1
+            total_attempts += attempts_used
+
+            if resp is not None:
+                reporte = resp
+                modelo = mod
+                break
+
+            if total_attempts >= max_total_attempts:
+                print(f"❌ Se alcanzó el máximo de reintentos ({max_total_attempts}). Avanzando sin información.")
+                break
+
+            print(f"⚠️ Intentos consumidos: {total_attempts}. Quedan {max_total_attempts - total_attempts}. Reintentando...")
+
+        if reporte is None:
+            reporte = ""
+            modelo = None
 
         print(f"💾 Guardando en Supabase para la fecha {hoy['Fecha'].date()}, usando: {modelo}...")
         with engine.begin() as conn:
