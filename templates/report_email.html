@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* RESET Y BASE */
+        body { background-color: #2c3e50; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+
+        /* CONTENEDOR PRINCIPAL - clave para mobile */
+        .container {
+            max-width: 800px;
+            width: 100% !important;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        /* TIPOGRAFÍA */
+        p, div, b, span { font-size: 13px !important; color: #1a252f; line-height: 1.6; text-align: left !important; }
+
+        /* TABLAS - scroll horizontal en mobile */
+        .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table { border-collapse: collapse; width: 100%; min-width: 400px; margin: 12px 0; border: 1px solid #dcdde1; }
+        table td, table th { font-size: 8px !important; padding: 4px 2px; text-align: center; border: 1px solid #dcdde1; }
+        th { background-color: #2c3e50; color: #ffffff; text-transform: uppercase; }
+        tr:nth-child(even) { background-color: #f8f9fa; }
+
+        /* HEADER */
+        .header-box { background: #2c3e50; color: white; padding: 20px 15px; text-align: center; }
+        .header-box h2 { color: white; font-size: 18px; margin: 0; }
+
+        /* PÁRRAFO IA */
+        .ai-box {
+            background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%);
+            border-left: 4px solid #f39c12;
+            border-radius: 6px;
+            padding: 16px 18px;
+            margin: 20px 0;
+        }
+        .ai-box .ai-label {
+            font-size: 10px !important;
+            color: #f39c12;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-align: left !important;
+        }
+        .ai-box p {
+            color: #ecf0f1 !important;
+            font-size: 13px !important;
+            line-height: 1.7;
+            margin: 0;
+            text-align: left !important;
+        }
+
+        /* FOOTER */
+        .footer { font-size: 10px !important; color: #7f8c8d; border-top: 1px solid #dcdde1; margin-top: 30px; padding-top: 15px; }
+
+        /* MOBILE */
+        @media only screen and (max-width: 600px) {
+            .container { border-radius: 0 !important; }
+            .inner-pad { padding: 14px !important; text-align: left !important; }
+            .header-box h2 { font-size: 15px !important; }
+            .ai-box p { font-size: 12px !important; }
+            p, div, b, span { font-size: 12px !important; text-align: left !important; }
+        }
+    </style>
+</head>
+<body style="margin:0; padding:0; background-color:#2c3e50; font-family:Arial,sans-serif;">
+<table width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#2c3e50">
+  <tr>
+    <td align="center" style="padding:20px 10px;">
+      <table class="container" width="800" border="0" cellspacing="0" cellpadding="0" bgcolor="#ffffff" style="max-width:800px; width:100%; border-radius:8px; overflow:hidden;">
+
+        <!-- HEADER -->
+        <tr>
+          <td class="header-box" style="background-color:#2c3e50; padding:20px; text-align:center;">
+            <h2 style="margin:0; color:white;">📊 Reporte Macroeconómico Diario</h2>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+            <!-- RESUMEN EJECUTIVO -->
+            <p style="margin:0 0 15px 0; font-size:14px !important; color:#2c3e50;">📅 <b>RESUMEN EJECUTIVO DE MERCADO</b></p>
+
+            <div style="margin-bottom:15px;">
+              <span style="font-size:11px; color:#7f8c8d; text-transform:uppercase;">💰 Oportunidad de Arbitraje (Cupo USD {{ cantidad_usd }})</span><br>
+              • Costo Blue: <span style="color:#c0392b; font-weight:bold;">$ {{ '{:,.2f}'.format(costo_blue) }}</span><br>
+              • Costo Oficial (impuestos inc.): $ {{ '{:,.2f}'.format(costo_oficial) }}<br>
+              • <b>{{ label_ahorro }}: <span style="color:{{ color_ahorro }}; font-size:14px;">$ {{ '{:,.2f}'.format(ahorro_valor) }}</span></b>
+            </div>
+
+            <div style="margin-bottom:15px;">
+              <span style="font-size:11px; color:#7f8c8d; text-transform:uppercase;">📊 Variaciones y Brechas</span><br>
+              • Dólar Blue 💵: <b>{{ '{:.2f}'.format(var_blue) }}%</b> (Brecha: {{ '{:.2f}'.format(brecha_solidario) }}%)<br>
+              • Dólar Divisas: {{ '{:.2f}'.format(var_divisas) }}%<br>
+              • Euro Blue 💶: {{ '{:.2f}'.format(var_euro) }}% (Brecha c/ Dólar Blue: {{ '{:.2f}'.format(brecha_euro_blue) }}%)
+            </div>
+
+            <div style="margin-bottom:20px;">
+              <span style="font-size:11px; color:#7f8c8d; text-transform:uppercase;">🔮 Proyecciones y Riesgo</span><br>
+              • Fwd Oficial: <b>$ {{ '{:,.2f}'.format(fwd_oficial) }}</b> | Fwd Blue 💸: <b>$ {{ '{:,.2f}'.format(fwd_blue) }}</b><br>
+              • Riesgo País ☣️: <b>{{ '{:,.0f}'.format(riesgo_pts) }} pts</b> (Sobretasa: {{ '{:.2f}'.format(sobretasa) }}%)
+            </div>
+
+            <!-- PÁRRAFO IA -->
+            <div class="ai-box" style="background:linear-gradient(135deg,#1a252f 0%,#2c3e50 100%); border-left:4px solid #f39c12; border-radius:6px; padding:16px 18px; margin:20px 0;">
+              <div class="ai-label" style="font-size:10px; color:#f39c12; text-transform:uppercase; letter-spacing:1px; font-weight:bold; margin-bottom:8px;">🤖 Análisis IA · Gemini</div>
+              <p style="color:#ecf0f1 !important; font-size:13px !important; line-height:1.7; margin:0;">{{ parrafo_ia }}</p>
+            </div>
+
+            <!-- GRÁFICOS -->
+            <div style="text-align:center; width:100%; margin:20px 0;">
+              <img src='cid:image1' style="max-width:100%; height:auto; display:block; margin:0 auto 15px auto; border:1px solid #dcdde1; border-radius:4px;">
+              <img src='cid:image2' style="max-width:100%; height:auto; display:block; margin:0 auto 15px auto; border:1px solid #dcdde1; border-radius:4px;">
+              <img src='cid:image3' style="max-width:100%; height:auto; display:block; margin:0 auto 15px auto; border:1px solid #dcdde1; border-radius:4px;">
+              <img src='cid:image4' style="max-width:100%; height:auto; display:block; margin:0 auto 15px auto; border:1px solid #dcdde1; border-radius:4px;">
+            </div>
+
+            <!-- TABLA COTIZACIONES -->
+            <p style="color:#2c3e50;">📊 <b><u>Monitoreo de Mercado:</u></b><br>
+            Las siguientes tablas muestran las últimas {{ cotizaciones_a_mostrar }} cotizaciones de dólares, euro, riesgo país y las tasas de referencia (BCRA 🇦🇷 y FED 🇺🇸).<br>
+            Analizalas tranquilo mientras te cebás unos mates 🧉:</p>
+            <div class="table-wrapper" style="width:100%; overflow-x:auto;">{{ tabla_cotizaciones | safe }}</div>
+
+            <!-- TABLA VARIACIONES -->
+            <p style="color:#2c3e50; margin-top:20px;">🔄 <b><u>Brechas y Variaciones:</u></b><br>
+            Acá podés ver cómo se están moviendo los arbitrajes entre los distintos tipos de cambio y qué tanto terreno ganó o perdió cada uno en las últimas jornadas.</p>
+            <div class="table-wrapper" style="width:100%; overflow-x:auto;">{{ tabla_variaciones | safe }}</div>
+
+            <!-- TABLA INFLACIÓN -->
+            <p style="color:#2c3e50; margin-top:20px;">📈 <b><u>Termómetro de Inflación:</u></b><br>
+            La siguiente tabla muestra las últimas 12 publicaciones del IPC. Tené en cuenta que la <b>inflación interanual es del {{ inflacion_interanual }}</b>:</p>
+            <div class="table-wrapper" style="width:100%; overflow-x:auto;">{{ tabla_inflacion | safe }}</div>
+
+            <!-- FUENTES -->
+            <div style="margin-top:30px; font-size:12px; color:#7f8c8d; border-top:1px solid #eee; padding-top:15px;">
+              <p><b><u>📚 Las fuentes consultadas fueron:</u></b><br>
+              <b>Cotizaciones oficiales: </b>{{ web_bna }}<br>
+              <b>Cotizaciones paralelas: </b>{{ web_dolarhoy }}<br>
+              <b>Cotización Dólar MEP: </b>{{ web_mep }}<br>
+              <b>Riesgo País: </b>{{ web_ambito_riesgo_pais }}<br>
+              <b>Cotización Euro Blue: </b>{{ web_euro }}<br>
+              <b>Tasa Efectiva Anual EEUU: </b>{{ fed_api_url }}<br>
+              <b>Tasa Efectiva Anual e Inflación Mensual argentina: </b>{{ bcra_api_url }}
+              <b>BTC/USD: </b>finance.yahoo.com</p>
+            </div>
+
+            <!-- CIERRE -->
+            <div style="margin-top:30px; border-top:1px solid #dcdde1; padding-top:20px;">
+              <p style="font-size:14px !important; color:#2c3e50;">🤓 <b>Muchas gracias por leer,</b><br>
+              🤑 Ojalá esta información te sea de gran utilidad para tus decisiones.</p>
+
+              <div style="background-color:#f8f9fa; padding:15px; border-radius:8px; margin:20px 0;">
+                <p style="margin:5px 0;">
+                  <a href="https://linkedin.com/in/mauroemartinez/" style="text-decoration:none; color:#0077b5;"><b>LinkedIn</b></a>
+                  | <a href="https://github.com/mauroemartinez/" style="text-decoration:none; color:#24292e;"><b>GitHub</b></a>
+                </p>
+                <p style="margin:5px 0; font-size:11px !important; color:#7f8c8d;">
+                  ☕ Si este reporte te ahorró tiempo y/o dinero, podés apoyar el proyecto al alias: <b style="color:#2c3e50;">mauroemartinezmp</b>
+                </p>
+              </div>
+
+              <div style="font-size:11px; color:#bdc3c7; line-height:1.5;">
+                🤖 <i>Este es un proceso de RPA desarrollado íntegramente en Python por <b>Mauro E. Martinez</b>.</i><br>
+                ⏱️ <b>Performance:</b> El script procesó los datos y generó este envío en {{ '{:.2f}'.format(performance_segundos) }} segundos.<br>
+                📧 <i>Consultas, desuscripciones o propuestas: <a href="mailto:martinezmauroezequiel@gmail.com" style="color:#7f8c8d; text-decoration:underline;">martinezmauroezequiel@gmail.com</a></i>
+              </div>
+            </div>
+
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>
