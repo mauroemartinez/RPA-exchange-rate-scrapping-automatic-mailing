@@ -7,7 +7,7 @@
 Below is the end-to-end blueprint of the production data life cycle.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/main/Assets/Architecture.jpeg" width="900" alt="Project Architecture">
+  <img src="https://raw.githubusercontent.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/main/Assets/Architecture.png" width="900" alt="Project Architecture">
 </p>
 
 ---
@@ -19,7 +19,7 @@ This repository features a robust, portfolio-grade Robotic Process Automation (R
 The system automates the ingestion of highly volatile financial variables, ensures data integrity within a centralized data warehouse, runs mathematical macro-projections, and distributes dynamic, highly-styled financial reports to a private subscriber list.
 
 ### 🛠️ Core Tech Stack & Frameworks
-* **Data Ingestion (ETL):** httpx (REST APIs), Selenium (Web Scraping).
+* **Data Ingestion (ETL):** httpx (REST APIs), Playwright (async Web Scraping).
 * **Processing & Relational Mapping:** Pandas (Data Manipulation), SQLAlchemy (ORM).
 * **Data Validation:** Pydantic for strict schema validation before data is persisted.
 * **Data Warehouse:** **Supabase PostgreSQL** for cloud-hosted analytics and persistency. Before Supabase, I used Microsoft SQL Server 2022, Microsoft SQL Server 2019.
@@ -46,6 +46,8 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 * **Scraping Performance Optimization (2026):** Replaced the per-request browser lifecycle (open → scrape → close, repeated for each site) with a single persistent WebDriver instance shared across all scrapers. This eliminated redundant browser startup overhead and reduced total scraping time by ~50%.
 * **HTTP Client Modernization (2026):** Migrated from `requests` to `httpx` for all REST API calls (BCRA, St. Louis FED). `httpx` is the modern standard, offering native async support and HTTP/2 compatibility while maintaining a fully compatible API surface.
 * **Automated WebDriver Version Management (2026):** Replaced the manually managed `msedgedriver` binary with `webdriver-manager`. The library auto-detects the installed Edge version, downloads the matching driver on first run, and caches it locally, eliminating manual updates on every browser upgrade.
+* **Selenium to Playwright Migration (2026):** Migrated the entire web scraping layer (BNA, DolarHoy, Ambito MEP/riesgo país/euro) from Selenium to Playwright's async API, replacing brittle, deep XPath chains with short, semantic CSS/id-based selectors. All four scrapers now run concurrently via `asyncio.gather()` instead of sequentially through a single shared WebDriver, further reducing total scraping time. Each scraper raises a structured `ScraperError` with site and step context on failure, so a broken selector fails loudly through the existing Pydantic validation gate instead of silently persisting bad data. This also unified browser handling between local Windows development and the Dockerized production environment, removing the previous Edge-vs-Chromium branching in driver setup.
+* **Jinja2 Templating for the Email Report (2026):** Extracted the report's HTML/CSS out of the Python orchestration script into a standalone `templates/report_email.html` Jinja2 template, replacing a large inline f-string. The notebook now only computes values and renders the template; markup, styling, and the responsive mobile media query live in one dedicated, readable file instead of being interleaved with business logic.
 
 ---
 
@@ -53,7 +55,6 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 
 The following modules are mapped in the architecture blueprint and are undergoing staging checks prior to production deployment:
 
-* **Selenium to Playwright Migration:** Migrate the web scraping layer from Selenium to Playwright to improve stability, performance, and long-term maintainability.
 * **Project Modularization:** Reorganize the architecture to move beyond the notebook and convert the codebase into reusable, scalable modules that are deployment-ready.
 * **API Data Persistence in Supabase:** Store API data in Supabase instead of re-consuming the full dataset on every execution.
 * **Automated Executive PowerPoint Reporting:** Developing a fully automated `.pptx` executive summary generation layer containing macroeconomic charts, spreads, and key indicators. The generated presentations will be versioned and automatically pushed to GitHub alongside analytical preview assets through integrated Git automation workflows.
@@ -72,7 +73,7 @@ The following modules are mapped in the architecture blueprint and are undergoin
 
 ## 📬 Contact & Feedback
 
-This is an educational portfolio project designed under modern analytics engineering best practices. For email subscription, collaboration, architectural inquiries, or technical feedback:
+For email subscription, unsubscription and other inquiries:
 
 * **Email:** martinezmauroezequiel@gmail.com
 * **LinkedIn:** [linkedin.com/in/mauroemartinez](https://www.linkedin.com/in/mauroemartinez)
