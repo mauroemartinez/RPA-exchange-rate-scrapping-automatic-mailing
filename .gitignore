@@ -1,5 +1,7 @@
 *.csv
 .env
+.env.*
+!.env.example
 .ipynb_checkpoints/
 venv/
 
@@ -11,6 +13,7 @@ __pycache__/
 # IDEs
 .vscode/
 .idea/
+.vs/
 
 # OS files
 .DS_Store
