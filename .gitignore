@@ -28,3 +28,6 @@ claude/
 CLAUDE.md
 *.claude
 *.anthropic
+
+# Apuntes personales de estudio del código
+APUNTES.md
