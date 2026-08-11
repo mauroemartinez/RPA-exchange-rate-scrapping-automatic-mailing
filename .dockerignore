@@ -1,0 +1,35 @@
+# Lo que NO se copia a la imagen.
+# El Dockerfile hace `COPY . .`; sin este archivo, todo lo de abajo termina
+# adentro de la imagen. Lo crítico es .env: quedaría con las claves horneadas
+# en una capa, visible para cualquiera que haga `docker history`.
+
+# === SECRETOS ===
+.env
+.env.*
+!.env.example
+
+# === ENTORNOS LOCALES ===
+venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# === HISTORIAL Y METADATA ===
+.git/
+.gitignore
+.gitattributes
+
+# === COSAS QUE NO CORREN EN PRODUCCIÓN ===
+Assets/
+Previews/
+sql_scripts/
+*.csv
+APUNTES.md
+README.md
+
+# === IDEs ===
+.vscode/
+.idea/
+.vs/
+.claude/
+CLAUDE.md
