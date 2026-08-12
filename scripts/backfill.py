@@ -21,6 +21,13 @@ Uso:
 """
 
 import argparse
+import sys
+from pathlib import Path
+
+# Este script vive en scripts/ pero importa del proyecto, que está un nivel
+# arriba. Sin esto, 'from config import settings' solo funcionaría si se lo
+# ejecuta parado justo en la raíz del repo.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
 from sqlalchemy import create_engine, text

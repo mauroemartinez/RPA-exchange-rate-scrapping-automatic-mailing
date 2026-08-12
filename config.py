@@ -15,6 +15,10 @@ from typing import Annotated
 from pydantic import EmailStr, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+# La carpeta del proyecto, deducida de dónde está este archivo. Sirve para
+# resolver rutas relativas del .env sin depender del directorio de trabajo.
+RAIZ_PROYECTO = Path(__file__).resolve().parent
+
 # Lista de mails separada por comas en el .env
 # NoDecode evita que pydantic-settings intente parsearla como JSON
 # con cualquier list[...]. Cada dirección se valida individualmente.
@@ -22,7 +26,7 @@ CommaEmails = Annotated[list[EmailStr], NoDecode]
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=Path(__file__).parent / ".env",
+        env_file=RAIZ_PROYECTO / ".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -48,6 +52,17 @@ class Settings(BaseSettings):
     # Opcionales: hoy ningún módulo las lee, así que su ausencia no debe frenar una corrida.
     service_route: str | None = None
     api_key_easy_panel: SecretStr | None = None
+
+    @field_validator("ruta_bbdd", "ruta_repo")
+    @classmethod
+    def _resolver_relativa(cls, v: Path) -> Path:
+        """Una ruta relativa se resuelve contra la carpeta del proyecto.
+
+        Así el mismo .env sirve en cualquier máquina: 'data/archivo.csv' apunta
+        siempre al lugar correcto sin importar dónde esté clonado el repo. Una
+        ruta absoluta se respeta tal cual, para no romper los .env que ya existen.
+        """
+        return v if v.is_absolute() else (RAIZ_PROYECTO / v).resolve()
 
     @field_validator("email_receiver", "email_receiver_csv", mode="before")
     @classmethod

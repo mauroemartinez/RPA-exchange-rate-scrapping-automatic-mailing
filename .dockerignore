@@ -22,7 +22,10 @@ __pycache__/
 # === COSAS QUE NO CORREN EN PRODUCCIÓN ===
 Assets/
 Previews/
+sql/
 sql_scripts/
+scripts/
+data/
 *.csv
 APUNTES.md
 README.md
