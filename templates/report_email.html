@@ -22,10 +22,21 @@
 
         /* TABLAS - scroll horizontal en mobile */
         .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        table { border-collapse: collapse; width: 100%; min-width: 400px; margin: 12px 0; border: 1px solid #dcdde1; }
+        table { border-collapse: collapse; width: 100%; min-width: 400px; margin: 12px 0; border: 1px solid #dcdde1;
+                box-shadow: 0 2px 6px rgba(44,62,80,0.16); }
         table td, table th { font-size: 8px !important; padding: 4px 2px; text-align: center; border: 1px solid #dcdde1; }
         th { background-color: #2c3e50; color: #ffffff; text-transform: uppercase; }
         tr:nth-child(even) { background-color: #f8f9fa; }
+
+        /* La tabla de inflación tiene 4 columnas, no 14: entra cómoda con letra
+           más grande. Las otras dos se quedan en 8px o no entran en mobile. */
+        .tabla-inflacion table { min-width: 0; }
+        .tabla-inflacion table td, .tabla-inflacion table th { font-size: 12px !important; padding: 7px 6px; }
+
+        /* Sombra en los gráficos. Gmail y Outlook descartan box-shadow, así que
+           el borde es lo que garantiza el recorte; la sombra es un extra que se
+           ve en Apple Mail y clientes web modernos. */
+        .grafico { box-shadow: 0 2px 6px rgba(44,62,80,0.16); }
 
         /* HEADER */
         .header-box { background: #2c3e50; color: white; padding: 20px 15px; text-align: center; }
@@ -121,10 +132,10 @@
 
             <!-- GRÁFICOS -->
             <div style="text-align:center; width:100%; margin:20px 0;">
-              <img src='cid:image1' style="max-width:100%; height:auto; display:block; margin:0 auto 15px auto; border:1px solid #dcdde1; border-radius:4px;">
-              <img src='cid:image2' style="max-width:100%; height:auto; display:block; margin:0 auto 15px auto; border:1px solid #dcdde1; border-radius:4px;">
-              <img src='cid:image3' style="max-width:100%; height:auto; display:block; margin:0 auto 15px auto; border:1px solid #dcdde1; border-radius:4px;">
-              <img src='cid:image4' style="max-width:100%; height:auto; display:block; margin:0 auto 15px auto; border:1px solid #dcdde1; border-radius:4px;">
+              <img src='cid:image1' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+              <img src='cid:image2' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+              <img src='cid:image3' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+              <img src='cid:image4' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
             </div>
 
             <!-- TABLA COTIZACIONES -->
@@ -141,7 +152,7 @@
             <!-- TABLA INFLACIÓN -->
             <p style="color:#2c3e50; margin-top:20px;">📈 <b><u>Termómetro de Inflación:</u></b><br>
             La siguiente tabla muestra las últimas 12 publicaciones del IPC. Tené en cuenta que la <b>inflación interanual es del {{ inflacion_interanual }}</b>:</p>
-            <div class="table-wrapper" style="width:100%; overflow-x:auto;">{{ tabla_inflacion | safe }}</div>
+            <div class="table-wrapper tabla-inflacion" style="width:100%; overflow-x:auto;">{{ tabla_inflacion | safe }}</div>
 
             <!-- FUENTES -->
             <div style="margin-top:30px; font-size:12px; color:#7f8c8d; border-top:1px solid #eee; padding-top:15px;">
@@ -158,7 +169,7 @@
 
             <!-- CIERRE -->
             <div style="margin-top:30px; border-top:1px solid #dcdde1; padding-top:20px;">
-              <p style="font-size:14px !important; color:#2c3e50;">🤓 <b>Muchas gracias por leer,</b><br>
+              <p style="font-size:14px !important; color:#2c3e50;">🤓 Muchas gracias por leer,<br>
               🤑 Ojalá esta información te sea de gran utilidad para tus decisiones.</p>
 
               <!-- Todo el cierre vive dentro de este recuadro.
@@ -173,14 +184,16 @@
                   <a href="https://linkedin.com/in/mauroemartinez/" style="text-decoration:none; color:#0077b5;"><b>LinkedIn</b></a>
                   | <a href="https://github.com/mauroemartinez/" style="text-decoration:none; color:#24292e;"><b>GitHub</b></a>
                 </p>
-                <p style="margin:0 0 14px 0; font-size:11px !important; color:#4d5a68;">
+                <p style="margin:0 0 8px 0; font-size:12px !important; color:#4d5a68;">
                   ☕ Si este reporte te ahorró tiempo y/o dinero, podés apoyar el proyecto al alias: <b style="color:#2c3e50;">mauroemartinezmp</b>
                 </p>
 
-                <div style="border-top:1px solid #dfe4ea; padding-top:14px; font-size:11px !important; color:#4d5a68; line-height:1.6;">
-                  🤖 <i>Este es un proceso de RPA desarrollado íntegramente en Python por <b style="color:#2c3e50;">Mauro E. Martinez</b>.</i><br>
-                  ⏱️ <b>Performance:</b> El script procesó los datos y generó este envío en {{ '{:.2f}'.format(performance_segundos) }} segundos.<br>
-                  📧 <i>Consultas, desuscripciones o propuestas: <a href="mailto:martinezmauroezequiel@gmail.com" style="color:#2c3e50; text-decoration:underline;">martinezmauroezequiel@gmail.com</a></i>
+                <!-- Mismo tamaño, mismo estilo y sin cursivas en las tres líneas.
+                     Solo el nombre y el mail van en negrita. -->
+                <div style="border-top:1px solid #dfe4ea; padding-top:10px; font-size:11px !important; color:#4d5a68; line-height:1.6;">
+                  🤖 Este es un proceso de RPA desarrollado íntegramente en Python por <b style="color:#2c3e50;">Mauro E. Martinez</b>.<br>
+                  ⏱️ Performance: el script procesó los datos y generó este envío en {{ '{:.2f}'.format(performance_segundos) }} segundos.<br>
+                  📧 Consultas, desuscripciones o propuestas: <a href="mailto:martinezmauroezequiel@gmail.com" style="color:#2c3e50; text-decoration:underline; font-weight:bold;">martinezmauroezequiel@gmail.com</a>
                 </div>
               </div>
             </div>
