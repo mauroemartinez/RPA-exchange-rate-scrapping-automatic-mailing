@@ -1,6 +1,6 @@
 from playwright.async_api import async_playwright
 
-from scrapers.utils import ScraperError, parse_money, retry_scrape, run_playwright
+from scrapers.utils import ScraperError, parse_money, retry_scrape
 
 WEB_BNA = "https://www.bna.com.ar/Personas"
 
@@ -47,9 +47,3 @@ async def run() -> dict:
         return await _scrape()
     except Exception as exc:
         raise ScraperError("BNA", "leer cotizaciones", exc) from exc
-
-
-def run_sync() -> dict:
-    """Versión sincrónica de run(), pensada para llamarse desde una celda de
-    notebook sin pelearse con el event loop que ya corre el kernel de Jupyter."""
-    return run_playwright(run())

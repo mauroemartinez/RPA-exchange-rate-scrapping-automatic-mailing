@@ -73,9 +73,11 @@ def retry_http(func):
     )(func)
 
 
-def run_playwright(coro):
-    # Corre una corutina de Playwright en un hilo con su propio event loop nuevo.
+def run_async(coro):
+    # Corre cualquier corutina en un hilo con su propio event loop nuevo.
     # El kernel de Jupyter ya corre su propio loop, así que un simple asyncio.run() falla ('loop ya corriendo').
+    # En Windows además ese loop es Selector, que no soporta subprocesos, y Playwright
+    # lanza su driver como subproceso: por eso se fuerza un ProactorEventLoop.
     result: dict = {}
 
     def _runner():
@@ -95,8 +97,3 @@ def run_playwright(coro):
     if "error" in result:
         raise result["error"]
     return result["value"]
-
-
-# run_playwright() no tiene nada de específico de Playwright: corre cualquier
-# corutina. Este alias es el nombre honesto, y el viejo queda por compatibilidad.
-run_async = run_playwright

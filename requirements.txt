@@ -70,7 +70,6 @@ pydantic==2.13.4
 pydantic-settings==2.15.0
 pydantic_core==2.46.4
 Pygments==2.20.0
-pyodbc==5.3.0
 pyparsing==3.3.2
 PySocks==1.7.1
 python-dateutil==2.9.0.post0
