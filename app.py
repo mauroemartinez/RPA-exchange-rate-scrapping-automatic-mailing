@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # Se deriva del archivo, no se hardcodea "/app": así el servicio corre igual
 # dentro del contenedor y en local para probar.
 BASE_DIR = Path(__file__).resolve().parent
-NOTEBOOK = BASE_DIR / "Argentinian_Macroeconomic_Automatic_Mailing.ipynb"
+NOTEBOOK = BASE_DIR / "notebooks" / "Argentinian_Macroeconomic_Automatic_Mailing.ipynb"
 
 TIMEOUT_NOTEBOOK = 3600
 TIMEOUT_PROCESO = TIMEOUT_NOTEBOOK + 100

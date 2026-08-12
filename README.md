@@ -59,6 +59,26 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 
 ---
 
+## 📁 Repository Layout
+
+```
+├── notebooks/          Orchestration notebook (relocates to project root on startup)
+├── scrapers/           Ingestion layer: Playwright scrapers + async REST clients
+├── templates/          Jinja2 email template
+├── scripts/            One-off maintenance (historical backfills)
+├── sql/                Schema, bulk load and exploratory queries
+├── data/               Local CSV history (gitignored)
+├── Previews/           Generated chart assets, auto-committed by the pipeline
+├── Assets/             Architecture diagram
+├── config.py           Typed environment configuration (Pydantic-Settings)
+├── models.py           Row-level validation schema (Pydantic)
+├── mailer.py           Failure alerting over SMTP
+├── ia_generator.py     Gemini narrative layer
+└── app.py              FastAPI entrypoint
+```
+
+---
+
 ## 🚀 Roadmap & Upcoming Features (In Development)
 
 The following modules are mapped in the architecture blueprint and are undergoing staging checks prior to production deployment:
