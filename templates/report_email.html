@@ -62,7 +62,7 @@
         /* MOBILE */
         @media only screen and (max-width: 600px) {
             .container { border-radius: 0 !important; }
-            .inner-pad { padding: 14px !important; text-align: left !important; }
+            .inner-pad { padding: 18px 16px 26px 16px !important; text-align: left !important; }
             .header-box h2 { font-size: 15px !important; }
             .ai-box p { font-size: 12px !important; }
             p, div, b, span { font-size: 12px !important; text-align: left !important; }
@@ -83,6 +83,13 @@
         </tr>
 
         <!-- BODY -->
+        <!-- Esta celda es la que da el margen interno del informe. Sin ella el
+             contenido queda suelto dentro de <table> y los clientes de mail lo
+             sacan afuera, que era el motivo de que no hubiera margen lateral.
+             El padding va inline porque Gmail descarta buena parte del <style>. -->
+        <tr>
+          <td class="inner-pad" style="padding:26px 30px 36px 30px;">
+
             <!-- RESUMEN EJECUTIVO -->
             <p style="margin:0 0 15px 0; font-size:14px !important; color:#2c3e50;">📅 <b>RESUMEN EJECUTIVO DE MERCADO</b></p>
 
