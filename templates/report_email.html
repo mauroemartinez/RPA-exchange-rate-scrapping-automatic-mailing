@@ -161,20 +161,27 @@
               <p style="font-size:14px !important; color:#2c3e50;">🤓 <b>Muchas gracias por leer,</b><br>
               🤑 Ojalá esta información te sea de gran utilidad para tus decisiones.</p>
 
-              <div style="background-color:#f8f9fa; padding:15px; border-radius:8px; margin:20px 0;">
-                <p style="margin:5px 0;">
+              <!-- Todo el cierre vive dentro de este recuadro.
+                   El gris pasa de #f8f9fa a #eef1f4: el anterior era 97% blanco y sobre
+                   el fondo del informe no se distinguía, así que la zona no se leía como
+                   zona. Con el borde sutil queda delimitada.
+                   Contraste medido sobre #eef1f4: #4d5a68 da 6.22:1 y #2c3e50 9.69:1,
+                   los dos por encima del 4.5:1 que pide WCAG AA para texto chico.
+                   El #bdc3c7 que estaba antes daba 1.69:1, ilegible. -->
+              <div style="background-color:#eef1f4; border:1px solid #dfe4ea; padding:18px 20px; border-radius:8px; margin:20px 0 0 0;">
+                <p style="margin:0 0 10px 0;">
                   <a href="https://linkedin.com/in/mauroemartinez/" style="text-decoration:none; color:#0077b5;"><b>LinkedIn</b></a>
                   | <a href="https://github.com/mauroemartinez/" style="text-decoration:none; color:#24292e;"><b>GitHub</b></a>
                 </p>
-                <p style="margin:5px 0; font-size:11px !important; color:#7f8c8d;">
+                <p style="margin:0 0 14px 0; font-size:11px !important; color:#4d5a68;">
                   ☕ Si este reporte te ahorró tiempo y/o dinero, podés apoyar el proyecto al alias: <b style="color:#2c3e50;">mauroemartinezmp</b>
                 </p>
-              </div>
 
-              <div style="font-size:11px; color:#bdc3c7; line-height:1.5;">
-                🤖 <i>Este es un proceso de RPA desarrollado íntegramente en Python por <b>Mauro E. Martinez</b>.</i><br>
-                ⏱️ <b>Performance:</b> El script procesó los datos y generó este envío en {{ '{:.2f}'.format(performance_segundos) }} segundos.<br>
-                📧 <i>Consultas, desuscripciones o propuestas: <a href="mailto:martinezmauroezequiel@gmail.com" style="color:#7f8c8d; text-decoration:underline;">martinezmauroezequiel@gmail.com</a></i>
+                <div style="border-top:1px solid #dfe4ea; padding-top:14px; font-size:11px !important; color:#4d5a68; line-height:1.6;">
+                  🤖 <i>Este es un proceso de RPA desarrollado íntegramente en Python por <b style="color:#2c3e50;">Mauro E. Martinez</b>.</i><br>
+                  ⏱️ <b>Performance:</b> El script procesó los datos y generó este envío en {{ '{:.2f}'.format(performance_segundos) }} segundos.<br>
+                  📧 <i>Consultas, desuscripciones o propuestas: <a href="mailto:martinezmauroezequiel@gmail.com" style="color:#2c3e50; text-decoration:underline;">martinezmauroezequiel@gmail.com</a></i>
+                </div>
               </div>
             </div>
 
