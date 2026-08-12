@@ -1,7 +1,7 @@
 """Riesgo país desde la API de ArgentinaDatos, vía httpx asíncrono.
 
 Reemplaza al scraping con Playwright de ambito.com/contenidos/riesgo-pais-historico.html.
-La fuente de fondo sigue siendo Ámbito — ArgentinaDatos la expone como JSON — pero
+La fuente de fondo sigue siendo Ámbito, ArgentinaDatos la expone como JSON, pero
 sin levantar un Chromium ni depender de que no cambien las clases CSS de la tabla.
 
 Además devuelve la FECHA a la que corresponde el valor. El scraper viejo no la
@@ -41,7 +41,7 @@ async def run(client: httpx.AsyncClient | None = None) -> dict:
 
     Claves: riesgo_pais (float) y riesgo_pais_fecha (date).
 
-    Si se le pasa un AsyncClient lo reutiliza — así varias llamadas comparten el
+    Si se le pasa un AsyncClient lo reutiliza, así varias llamadas comparten el
     pool de conexiones. Si no, abre y cierra uno propio.
     """
     try:

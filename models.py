@@ -24,6 +24,6 @@ class FilaMacro(BaseModel):
     fed_tea: float
     bcra_tea: float
 
-    # Estos campos no existen en fila_nueva todavía — se agregan en Supabase después
+    # Estos campos no existen en fila_nueva todavía, se agregan en Supabase después
     ai_paragraph: Optional[str] = None
     ai_model: Optional[str] = None

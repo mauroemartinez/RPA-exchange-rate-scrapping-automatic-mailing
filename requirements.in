@@ -1,6 +1,6 @@
 # Dependencias DIRECTAS: las que el proyecto importa de verdad.
 #
-# requirements.txt, en cambio, es la lista COMPLETA con versiones exactas —
+# requirements.txt, en cambio, es la lista COMPLETA con versiones exactas,
 # incluye también las dependencias de estas dependencias (h11, anyio, starlette,
 # protobuf y unas ochenta más). Ese archivo es el que se instala.
 #
