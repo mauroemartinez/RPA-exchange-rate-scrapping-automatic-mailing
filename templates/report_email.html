@@ -28,10 +28,13 @@
         th { background-color: #2c3e50; color: #ffffff; text-transform: uppercase; }
         tr:nth-child(even) { background-color: #f8f9fa; }
 
-        /* La tabla de inflación tiene 4 columnas, no 14: entra cómoda con letra
-           más grande. Las otras dos se quedan en 8px o no entran en mobile. */
-        .tabla-inflacion table { min-width: 0; }
-        .tabla-inflacion table td, .tabla-inflacion table th { font-size: 12px !important; padding: 7px 6px; }
+        /* Inflación (4 columnas) y Variaciones (7) entran cómodas a 12px.
+           Cotizaciones tiene 14 columnas: a 12px se pasa del ancho del mail, así
+           que va a 10px, el máximo que entra sin desbordar. */
+        .tabla-inflacion table, .tabla-variaciones table { min-width: 0; }
+        .tabla-inflacion table td, .tabla-inflacion table th,
+        .tabla-variaciones table td, .tabla-variaciones table th { font-size: 12px !important; padding: 7px 6px; }
+        .tabla-cotizaciones table td, .tabla-cotizaciones table th { font-size: 10px !important; padding: 5px 3px; }
 
         /* Sombra en los gráficos. Gmail y Outlook descartan box-shadow, así que
            el borde es lo que garantiza el recorte; la sombra es un extra que se
@@ -142,12 +145,12 @@
             <p style="color:#2c3e50;">📊 <b><u>Monitoreo de Mercado:</u></b><br>
             Las siguientes tablas muestran las últimas {{ cotizaciones_a_mostrar }} cotizaciones de dólares, euro, riesgo país y las tasas de referencia (BCRA 🇦🇷 y FED 🇺🇸).<br>
             Analizalas tranquilo mientras te cebás unos mates 🧉:</p>
-            <div class="table-wrapper" style="width:100%; overflow-x:auto;">{{ tabla_cotizaciones | safe }}</div>
+            <div class="table-wrapper tabla-cotizaciones" style="width:100%; overflow-x:auto;">{{ tabla_cotizaciones | safe }}</div>
 
             <!-- TABLA VARIACIONES -->
             <p style="color:#2c3e50; margin-top:20px;">🔄 <b><u>Brechas y Variaciones:</u></b><br>
             Acá podés ver cómo se están moviendo los arbitrajes entre los distintos tipos de cambio y qué tanto terreno ganó o perdió cada uno en las últimas jornadas.</p>
-            <div class="table-wrapper" style="width:100%; overflow-x:auto;">{{ tabla_variaciones | safe }}</div>
+            <div class="table-wrapper tabla-variaciones" style="width:100%; overflow-x:auto;">{{ tabla_variaciones | safe }}</div>
 
             <!-- TABLA INFLACIÓN -->
             <p style="color:#2c3e50; margin-top:20px;">📈 <b><u>Termómetro de Inflación:</u></b><br>
@@ -184,13 +187,15 @@
                   <a href="https://linkedin.com/in/mauroemartinez/" style="text-decoration:none; color:#0077b5;"><b>LinkedIn</b></a>
                   | <a href="https://github.com/mauroemartinez/" style="text-decoration:none; color:#24292e;"><b>GitHub</b></a>
                 </p>
-                <p style="margin:0 0 8px 0; font-size:12px !important; color:#4d5a68;">
+                <p style="margin:0 0 3px 0; font-size:12px !important; color:#4d5a68;">
                   ☕ Si este reporte te ahorró tiempo y/o dinero, podés apoyar el proyecto al alias: <b style="color:#2c3e50;">mauroemartinezmp</b>
                 </p>
 
-                <!-- Mismo tamaño, mismo estilo y sin cursivas en las tres líneas.
+                <!-- Sin separador ni padding entre esta línea y la anterior: la
+                     línea divisoria mas el margen abrian un renglon en blanco.
+                     Mismo tamaño, mismo estilo y sin cursivas en las tres líneas.
                      Solo el nombre y el mail van en negrita. -->
-                <div style="border-top:1px solid #dfe4ea; padding-top:10px; font-size:11px !important; color:#4d5a68; line-height:1.6;">
+                <div style="font-size:11px !important; color:#4d5a68; line-height:1.6;">
                   🤖 Este es un proceso de RPA desarrollado íntegramente en Python por <b style="color:#2c3e50;">Mauro E. Martinez</b>.<br>
                   ⏱️ Performance: el script procesó los datos y generó este envío en {{ '{:.2f}'.format(performance_segundos) }} segundos.<br>
                   📧 Consultas, desuscripciones o propuestas: <a href="mailto:martinezmauroezequiel@gmail.com" style="color:#2c3e50; text-decoration:underline; font-weight:bold;">martinezmauroezequiel@gmail.com</a>
