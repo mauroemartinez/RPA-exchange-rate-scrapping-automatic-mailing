@@ -2,7 +2,7 @@
 
 Ojo con el orden: la API devuelve el detalle de más NUEVO a más VIEJO. El código
 que estaba en el notebook tomaba .iloc[-1] sobre ese detalle sin invertirlo, o sea
-el registro más viejo de la ventana de 1000 puntos — guardaba la BADLAR de junio
+el registro más viejo de la ventana de 1000 puntos, guardaba la BADLAR de junio
 de 2022 como si fuera la de hoy. Acá las series se devuelven siempre ascendentes
 y el último valor es, efectivamente, el último.
 """

@@ -26,7 +26,7 @@ class ScraperError(Exception):
 
 def parse_money(text: str) -> float:
     """Convierte a float tanto formato es-AR ('$1.234,56', coma decimal) como
-    formato en-US ('1234.5600', punto decimal) — BNA usa uno u otro según la tabla."""
+    formato en-US ('1234.5600', punto decimal), BNA usa uno u otro según la tabla."""
     text = text.strip().lstrip("$")
     if "," in text:
         text = text.replace(".", "").replace(",", ".")
@@ -46,7 +46,7 @@ def retry_scrape(func):
 def _es_error_http_transitorio(exc: BaseException) -> bool:
     """True para fallos de red y 5xx (vale reintentar); False para 4xx.
 
-    Un 404 o un 401 no se arreglan reintentando — reintentar solo agrega latencia
+    Un 404 o un 401 no se arreglan reintentando, reintentar solo agrega latencia
     antes de un error inevitable. Un 503 o un timeout de red, en cambio, suelen
     resolverse solos en el segundo intento.
     """
