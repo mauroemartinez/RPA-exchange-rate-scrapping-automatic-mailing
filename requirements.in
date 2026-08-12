@@ -27,7 +27,6 @@ tenacity         # reintentos con backoff
 # ── Base de datos ──
 SQLAlchemy
 psycopg2-binary  # driver de PostgreSQL (Supabase)
-pyodbc           # legado: SQL Server, previo a la migración
 
 # ── Configuración y validación ──
 pydantic[email]  # el extra 'email' trae email-validator, que usa EmailStr

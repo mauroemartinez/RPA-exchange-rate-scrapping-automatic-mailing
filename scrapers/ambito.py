@@ -1,6 +1,6 @@
 from playwright.async_api import async_playwright
 
-from scrapers.utils import ScraperError, parse_money, retry_scrape, run_playwright
+from scrapers.utils import ScraperError, parse_money, retry_scrape
 
 # Riesgo país ya no se scrapea acá: viene de la API en scrapers/riesgo_pais.py.
 WEB_MEP = "https://www.ambito.com/contenidos/dolar-mep.html"
@@ -40,7 +40,3 @@ async def run() -> dict:
         return await _scrape()
     except Exception as exc:
         raise ScraperError("Ambito", "leer cotizaciones", exc) from exc
-
-
-def run_sync() -> dict:
-    return run_playwright(run())

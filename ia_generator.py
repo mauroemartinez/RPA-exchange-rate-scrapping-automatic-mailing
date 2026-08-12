@@ -1,16 +1,21 @@
-import os
 import pandas as pd
-from dotenv import load_dotenv
 from google import genai
 from sqlalchemy import text
 
+from config import settings
+
+
 def generar_con_failover(prompt):
     """
-    Carga las keys en el momento de la llamada (no al importar el módulo).
     Rota a la siguiente key si recibe error 429.
+
+    Las keys vienen de config.py, que las lee una sola vez al importarse. Antes
+    esta función hacía su propio load_dotenv(override=True) en cada llamada, lo
+    que permitía rotar keys sin reiniciar; a cambio había dos lugares leyendo el
+    .env. Como el pipeline corre una vez por día en un proceso nuevo, la lectura
+    única alcanza y deja una sola fuente de verdad.
     """
-    load_dotenv(override=True)
-    api_keys = [k for k in [os.getenv("GEMINI_API_KEY_1"), os.getenv("GEMINI_API_KEY_2")] if k]
+    api_keys = settings.gemini_keys
 
     if not api_keys:
         raise Exception("❌ No hay API keys de Gemini en el .env (GEMINI_API_KEY_1 / GEMINI_API_KEY_2).")

@@ -1,6 +1,6 @@
 from playwright.async_api import async_playwright
 
-from scrapers.utils import ScraperError, parse_money, retry_scrape, run_playwright
+from scrapers.utils import ScraperError, parse_money, retry_scrape
 
 WEB_DOLARHOY = "https://dolarhoy.com/cotizaciondolarblue"
 
@@ -28,7 +28,3 @@ async def run() -> dict:
         return await _scrape()
     except Exception as exc:
         raise ScraperError("DolarHoy", "leer cotización blue", exc) from exc
-
-
-def run_sync() -> dict:
-    return run_playwright(run())
