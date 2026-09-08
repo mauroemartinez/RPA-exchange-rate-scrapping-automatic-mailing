@@ -1,6 +1,23 @@
 # 🤖 Argentinian Macroeconomic Automatic Mailing System
 > **An Analytics Engineering, Data Pipeline, and AI Automation infrastructure designed to systematically untangle, model, and monitor Argentina's volatile macroeconomic chaos with an automated mailing report.**
 
+[![Python](https://img.shields.io/badge/Python-3.14-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org)
+[![Playwright](https://img.shields.io/badge/Playwright-async-2EAD33?style=flat&logo=playwright&logoColor=white)](https://playwright.dev)
+[![httpx](https://img.shields.io/badge/httpx-async_REST-0B7285?style=flat)](https://www.python-httpx.org)
+[![pandas](https://img.shields.io/badge/pandas-150458?style=flat&logo=pandas&logoColor=white)](https://pandas.pydata.org)
+[![Supabase](https://img.shields.io/badge/Supabase_PostgreSQL-3FCF8E?style=flat&logo=supabase&logoColor=white)](https://supabase.com)
+[![Gemini API](https://img.shields.io/badge/Gemini_API-1A73E8?style=flat&logo=google&logoColor=white)](https://ai.google.dev/)
+
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)](https://docs.docker.com/)
+[![Pydantic](https://img.shields.io/badge/Pydantic-validated-E92063?style=flat&logo=pydantic&logoColor=white)](https://docs.pydantic.dev)
+[![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-D71F00?style=flat&logo=sqlalchemy&logoColor=white)](https://www.sqlalchemy.org)
+[![Status](https://img.shields.io/badge/Status-Running_in_Production-28a745?style=flat)](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing)
+
+[![Last commit](https://img.shields.io/github/last-commit/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing?style=flat&color=6c757d)](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/commits/main)
+[![Top language](https://img.shields.io/github/languages/top/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing?style=flat&color=6c757d)](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing)
+[![Repo size](https://img.shields.io/github/repo-size/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing?style=flat&color=6c757d)](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing)
+
 ---
 
 ### 🏗️ System Architecture & Data Pipeline Blueprint
