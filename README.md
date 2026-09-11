@@ -82,7 +82,7 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 ├── notebooks/          Orchestration notebook (relocates to project root on startup)
 ├── scrapers/           Ingestion layer: Playwright scrapers + async REST clients
 ├── templates/          Jinja2 email template
-├── scripts/            One-off maintenance (historical backfills)
+├── scripts/            Operational tooling (historical backfills, manual resends)
 ├── sql/                Schema, bulk load and exploratory queries
 ├── data/               Local CSV history (gitignored)
 ├── Previews/           Generated chart assets, auto-committed by the pipeline
@@ -92,6 +92,31 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 ├── mailer.py           Failure alerting over SMTP
 ├── ia_generator.py     Gemini narrative layer
 └── app.py              FastAPI entrypoint
+```
+
+---
+
+## 🛟 Operational Tooling
+
+Scripts under `scripts/` run independently of the daily pipeline, for the situations the scheduler does not cover.
+
+**Manual resend.** Sends the most recent report to arbitrary recipients, for subscribers who join mid-month or who never received the mail:
+
+```bash
+python scripts/reenvio_manual.py someone@mail.com
+python scripts/reenvio_manual.py one@mail.com another@mail.com
+python scripts/reenvio_manual.py someone@mail.com --csv       # attaches the tracking CSV
+python scripts/reenvio_manual.py someone@mail.com --dry-run   # builds it, sends nothing
+```
+
+It replays the daily run rather than repeating it: no scraping, no row validation, no warehouse writes, no Gemini call, no git push. The report is rebuilt from the newest `Fact_Mercado_Macro` row, the AI paragraph already stored on it, and the chart assets in `Previews/`, which makes the output byte-identical to the daily mail. Recipients are placed in Bcc. The script aborts if the latest row carries no AI paragraph, since that indicates an unfinished pipeline run.
+
+**Historical backfill.** Repairs the `riesgo_pais` and `bcra_tea` series against their source APIs after a capture bug. Dry-run by default; writes only with `--apply`:
+
+```bash
+python scripts/backfill.py                    # dry-run, both series
+python scripts/backfill.py --serie bcra_tea   # dry-run, one series
+python scripts/backfill.py --apply            # applies the updates
 ```
 
 ---
