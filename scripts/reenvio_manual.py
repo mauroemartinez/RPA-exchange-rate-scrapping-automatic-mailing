@@ -273,11 +273,22 @@ def leer_imagenes() -> dict[str, bytes]:
 
 
 def armar_mail(html: str, imagenes: dict[str, bytes], destinatarios: list[str], csv: bool):
-    """El MIME completo. Los destinatarios van en Cco para que no se vean entre ellos."""
+    """El MIME completo.
+
+    Con varios destinatarios van todos en Cco, para que no se vean entre ellos.
+    Con uno solo va derecho en Para, que es lo habitual en un reenvío manual. No
+    es cosmético: un mail cuyo Para apunta al propio remitente y que llega por
+    Cco es una señal clásica de spam, y pesa todavía más cuando el destinatario
+    nunca recibió nada de esta casilla y no hay historial que lo respalde. Con un
+    único destinatario, Cco no protege la privacidad de nadie.
+    """
     em = MIMEMultipart("related")
     em["From"] = settings.email_sender
-    em["To"] = settings.email_sender
-    em["Bcc"] = ", ".join(destinatarios)
+    if len(destinatarios) == 1:
+        em["To"] = destinatarios[0]
+    else:
+        em["To"] = settings.email_sender
+        em["Bcc"] = ", ".join(destinatarios)
     em["Subject"] = f"📈 Reporte Macroeconómico - {dt.datetime.today():%d-%m-%Y}"
     em.attach(MIMEText(html, "html"))
 
