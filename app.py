@@ -1,11 +1,16 @@
 """Servicio HTTP que dispara la corrida del reporte.
 
 Expone /health para el healthcheck del contenedor y /run para ejecutar el
-notebook. /run está protegido por API key y no admite corridas simultáneas.
+pipeline. /run está protegido por API key y no admite corridas simultáneas.
 """
 
+import json
 import logging
+import os
+import secrets
 import subprocess
+import sys
+import tempfile
 import threading
 from pathlib import Path
 
@@ -19,16 +24,17 @@ logger = logging.getLogger(__name__)
 # Se deriva del archivo, no se hardcodea "/app": así el servicio corre igual
 # dentro del contenedor y en local para probar.
 BASE_DIR = Path(__file__).resolve().parent
-NOTEBOOK = BASE_DIR / "notebooks" / "Argentinian_Macroeconomic_Automatic_Mailing.ipynb"
+PIPELINE = BASE_DIR / "pipeline.py"
 
-TIMEOUT_NOTEBOOK = 3600
-TIMEOUT_PROCESO = TIMEOUT_NOTEBOOK + 100
+TIMEOUT_CORRIDA = 3600
 
-app = FastAPI(title="Seguimiento Macroeconómico", version="2.0")
+app = FastAPI(title="Seguimiento Macroeconómico", version="3.0")
 
-# Una corrida a la vez. Sin esto, dos POST simultáneos ejecutan el notebook dos
+# Una corrida a la vez. Sin esto, dos POST simultáneos ejecutan el pipeline dos
 # veces en paralelo: doble scraping, doble mail y dos INSERT compitiendo por la
 # misma fecha. El lock se toma sin bloquear y se rechaza con 409 si está ocupado.
+# El pipeline además toma un advisory lock en Supabase, que cubre disparadores
+# que no pasan por este proceso.
 _lock = threading.Lock()
 
 
@@ -38,7 +44,13 @@ def health():
 
 
 @app.post("/run")
-def run_notebook(x_api_key: str | None = Header(default=None)):
+def run_pipeline(x_api_key: str | None = Header(default=None), dry_run: bool = False):
+    """Corre pipeline.py y devuelve el estado de cada etapa.
+
+    Con ?dry_run=true scrapea y arma el reporte sin escribir en Supabase, sin
+    llamar a Gemini, sin mandar el mail y sin pushear: sirve para probar el
+    despliegue de punta a punta.
+    """
     # Falla cerrado: si no hay API key configurada, el endpoint no se habilita.
     # La versión anterior hacía `if API_KEY and ...`, o sea que un .env sin la
     # variable dejaba /run abierto a cualquiera.
@@ -46,47 +58,59 @@ def run_notebook(x_api_key: str | None = Header(default=None)):
         logger.error("API_KEY_EASY_PANEL no está configurada; /run deshabilitado")
         raise HTTPException(status_code=503, detail="Servicio no configurado")
 
-    if x_api_key != settings.api_key_easy_panel.get_secret_value():
+    # compare_digest tarda lo mismo acierte o no, así el tiempo de respuesta no
+    # deja adivinar la key de a un carácter.
+    esperada = settings.api_key_easy_panel.get_secret_value().encode()
+    if x_api_key is None or not secrets.compare_digest(x_api_key.encode(), esperada):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     if not _lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="Ya hay una corrida en curso")
 
     try:
-        logger.info("Iniciando ejecución del notebook")
-        result = subprocess.run(
-            [
-                "jupyter", "nbconvert",
-                "--to", "notebook",
-                "--execute",
-                # Se escribe a /tmp en vez de --inplace: el notebook del repo no
-                # se modifica, y así la imagen puede ser de solo lectura.
-                "--output", "/tmp/ejecutado.ipynb",
-                f"--ExecutePreprocessor.timeout={TIMEOUT_NOTEBOOK}",
-                str(NOTEBOOK),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=TIMEOUT_PROCESO,
-            cwd=BASE_DIR,
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            archivo_json = Path(tmp) / "resultado.json"
+            comando = [sys.executable, str(PIPELINE), "--origen", "api", "--json", str(archivo_json)]
+            if dry_run:
+                comando.append("--dry-run")
+
+            logger.info("Iniciando la corrida%s", " (dry-run)" if dry_run else "")
+            # Proceso aparte y no una llamada en este mismo proceso, por dos motivos:
+            # el timeout puede matar una corrida colgada (a un hilo no se lo puede
+            # matar) y cada corrida arranca limpia, sin estado de matplotlib ni
+            # memoria de la anterior, igual que cuando se ejecutaba el notebook.
+            # La salida no se captura: el log del pipeline va directo al del contenedor.
+            result = subprocess.run(
+                comando,
+                timeout=TIMEOUT_CORRIDA,
+                cwd=BASE_DIR,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            )
+            resultado = json.loads(archivo_json.read_text(encoding="utf-8")) if archivo_json.exists() else None
+
         exito = result.returncode == 0
-
         if exito:
-            logger.info("Notebook ejecutado correctamente")
+            logger.info("Corrida terminada: %s", resultado["estado"] if resultado else "sin resumen")
         else:
-            # El detalle va al log del servidor, no a la respuesta HTTP: un
-            # traceback puede arrastrar la connection string o una API key.
-            logger.error("Falló la ejecución (rc=%s): %s", result.returncode, result.stderr[-3000:])
+            # El detalle queda en el log del pipeline, no en la respuesta HTTP: un
+            # mensaje de error puede arrastrar la connection string o una API key.
+            logger.error("La corrida terminó con código %s", result.returncode)
 
-        return {"success": exito, "returncode": result.returncode}
+        respuesta = {"success": exito, "returncode": result.returncode}
+        if resultado:
+            respuesta["estado"] = resultado["estado"]
+            respuesta["etapas"] = [
+                {"nombre": e["nombre"], "estado": e["estado"], "segundos": e["segundos"]}
+                for e in resultado["etapas"]
+            ]
+        return respuesta
 
     except subprocess.TimeoutExpired:
-        logger.error("Timeout: el notebook superó %s segundos", TIMEOUT_PROCESO)
-        raise HTTPException(status_code=504, detail="Timeout: el notebook tardó más de una hora")
+        logger.error("Timeout: la corrida superó %s segundos", TIMEOUT_CORRIDA)
+        raise HTTPException(status_code=504, detail="Timeout: la corrida tardó más de una hora") from None
 
     except Exception as exc:
-        logger.exception("Error inesperado ejecutando el notebook")
+        logger.exception("Error inesperado ejecutando la corrida")
         raise HTTPException(status_code=500, detail=f"{type(exc).__name__}") from exc
 
     finally:
