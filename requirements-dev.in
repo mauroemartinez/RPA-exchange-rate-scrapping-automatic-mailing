@@ -1,0 +1,18 @@
+# Dependencias para desarrollar, sobre las de producción. No van a la imagen.
+#
+#     pip install -r requirements-dev.txt
+#
+# Para regenerar requirements-dev.txt:
+#     uv pip compile requirements-dev.in --universal --python-version 3.14 -o requirements-dev.txt
+
+-r requirements.in
+-c requirements.txt   # mismas versiones que producción para lo compartido
+
+# ── Notebook (referencia durante la transición) ──
+ipykernel
+nbformat
+nbstripout       # limpia outputs antes de commitear
+
+# ── Tests y lint ──
+pytest
+ruff
