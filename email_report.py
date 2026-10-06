@@ -148,6 +148,10 @@ def cids_disponibles(imagenes: dict[str, bytes]) -> list[str]:
     return [f"image{i + 1}" for i, nombre in enumerate(ORDEN_EN_MAIL) if nombre in imagenes]
 
 
+def template():
+    return Environment(loader=FileSystemLoader(RAIZ / "templates")).get_template("report_email.html")
+
+
 def renderizar(
     df: pd.DataFrame,
     inflacion_12: pd.DataFrame,
@@ -163,11 +167,23 @@ def renderizar(
     `graficos` son los cid presentes; si falta uno (por ejemplo, Yahoo no respondió
     y no hay gráfico de BTC) el template no deja la imagen rota.
     """
+    contexto = contexto_template(df, inflacion_12, fwd_oficial, fwd_blue, parrafo_ia, performance_segundos, graficos)
+    return template().render(**contexto)
+
+
+def contexto_template(
+    df: pd.DataFrame,
+    inflacion_12: pd.DataFrame,
+    fwd_oficial: float,
+    fwd_blue: float,
+    parrafo_ia: str,
+    performance_segundos: float,
+    graficos: list[str] | None = None,
+) -> dict:
+    """Las variables que recibe el template (celda 47)."""
     df_mail = preparar_df_mail(df)
     tabla_infl, interanual = tabla_inflacion(inflacion_12)
-
-    env = Environment(loader=FileSystemLoader(RAIZ / "templates"))
-    return env.get_template("report_email.html").render(
+    return dict(
         **resumen_ejecutivo(df_mail),
         fwd_oficial=fwd_oficial,
         fwd_blue=fwd_blue,

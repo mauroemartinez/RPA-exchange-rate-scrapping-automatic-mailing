@@ -1,0 +1,25 @@
+# Configuración de herramientas. El proyecto no se instala como paquete: este
+# archivo existe solo para pytest y ruff.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+extend-exclude = ["notebooks", "venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    "E501",   # hay SQL, f-strings y URLs largas a propósito
+    "E402",   # los scripts/ agregan la raíz al sys.path antes de importar el proyecto
+    "B905",   # zip() sin strict=: los zip del proyecto recorren columnas del mismo DataFrame
+    "UP030",  # '{0:,.2f}'.format(...) quedó igual que en el notebook
+]
+
+[tool.ruff.lint.isort]
+# conftest se importa desde los tests por sus constantes (HOY, jpeg_minimo)
+known-first-party = ["conftest"]
