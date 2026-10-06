@@ -1,11 +1,30 @@
+"""Párrafo de análisis de mercado con Gemini.
+
+Lee el historial de Supabase, calcula variaciones de 1 y 25 ruedas, arma el prompt,
+llama a Gemini rotando keys y modelos, y guarda el texto en la fila del día.
+"""
+
+import logging
+from datetime import date
+
 import pandas as pd
 from google import genai
 from sqlalchemy import text
 
 from config import settings
 
+log = logging.getLogger(__name__)
 
-def generar_con_failover(prompt):
+TABLA = "Fact_Mercado_Macro"
+MODELOS = ["gemini-3.5-flash", "gemini-2.5-flash"]
+MAX_INTENTOS = 3
+MENSAJE_FALLA = "No se pudo generar el análisis automatizado de mercado."
+
+# 25 ruedas hacia atrás más la de hoy
+FILAS_MINIMAS = 26
+
+
+def generar_con_failover(prompt, config=None):
     """
     Rota a la siguiente key si recibe error 429.
 
@@ -14,92 +33,87 @@ def generar_con_failover(prompt):
     que permitía rotar keys sin reiniciar; a cambio había dos lugares leyendo el
     .env. Como el pipeline corre una vez por día en un proceso nuevo, la lectura
     única alcanza y deja una sola fuente de verdad.
+
+    Devuelve (texto, modelo, intentos). Si no hubo respuesta, (None, None, intentos).
+    `config` se pasa tal cual a generate_content (por ejemplo, un esquema de salida).
     """
     api_keys = settings.gemini_keys
 
     if not api_keys:
-        raise Exception("❌ No hay API keys de Gemini en el .env (GEMINI_API_KEY_1 / GEMINI_API_KEY_2).")
-
-    models = ["gemini-3.5-flash", "gemini-2.5-flash"]
+        raise Exception("No hay API keys de Gemini en el .env (GEMINI_API_KEY_1 / GEMINI_API_KEY_2).")
 
     attempts = 0
     for i, key in enumerate(api_keys):
-        for model in models:
+        for model in MODELOS:
             attempts += 1
             try:
                 client = genai.Client(api_key=key)
-                response = client.models.generate_content(
-                    model=model,
-                    contents=prompt
-                )
+                response = client.models.generate_content(model=model, contents=prompt, config=config)
                 return response.text, model, attempts
 
             except Exception as e:
                 error_text = str(e).lower()
                 if "429" in error_text or "quota" in error_text or "resource exhausted" in error_text:
-                    print(f"⚠️ Key {i+1} agotada (Cuota excedida).")
-                    # stop trying models for this key and move to next key
+                    log.warning("Gemini: key %d agotada (cuota excedida)", i + 1)
+                    # No se prueban más modelos con esta key: se pasa a la siguiente
                     break
 
                 if "503" in error_text or "unavailable" in error_text:
-                    if model == models[0]:
-                        print("⚠️ Gemini 3.5 está saturado. Intentando gemini-2.5-flash...")
-                        # try next model with same key (counts as an additional sub-intento)
+                    if model == MODELOS[0]:
+                        log.warning("Gemini: %s saturado, se intenta %s", MODELOS[0], MODELOS[1])
                         continue
-                    print("❌ Gemini 2.5 también está indisponible. Intenta más tarde.")
-                    # return failure with attempts consumed so far
+                    log.error("Gemini: %s también está indisponible", model)
                     return None, None, attempts
 
-                print(f"❌ Error técnico en Gemini: {e}")
+                log.error("Gemini: error técnico con %s: %s", model, e)
                 return None, None, attempts
 
-        # If we broke the inner loop due to quota, try next API key.
         if i == len(api_keys) - 1:
-            print("❌ Se agotaron todas las API Keys (429).")
+            log.error("Gemini: se agotaron todas las API keys (429)")
             return None, None, attempts
-        print("🔄 Reintentando con la siguiente API Key...")
+        log.info("Gemini: se reintenta con la siguiente API key")
 
 
-def procesar_y_guardar_parrafo(engine):
-    """
-    Extrae historial de Supabase, calcula variaciones, genera párrafo con Gemini,
-    guarda en la DB y retorna el texto.
-    """
-    try:
-        print("🔌 [IA Subprocess] Conectando a Supabase para extraer historial...")
-        df = pd.read_sql("""
-            SELECT "Fecha", "TCV_MEP", "TCV_Blue", "TCV_Billete",
-                   "riesgo_pais", "bcra_tea", "fed_tea"
-            FROM "Fact_Mercado_Macro"
-            ORDER BY "Fecha" ASC
-        """, con=engine)
+def leer_historial(engine) -> pd.DataFrame:
+    """Las columnas que usa el prompt, de más viejo a más nuevo."""
+    df = pd.read_sql(
+        f"""
+        SELECT "Fecha", "TCV_MEP", "TCV_Blue", "TCV_Billete",
+               "riesgo_pais", "bcra_tea", "fed_tea"
+        FROM "{TABLA}"
+        ORDER BY "Fecha" ASC
+        """,
+        con=engine,
+    )
+    df.columns = df.columns.str.strip()
+    df["Fecha"] = pd.to_datetime(df["Fecha"])
+    if len(df) < FILAS_MINIMAS:
+        raise ValueError(f"Historial insuficiente: {len(df)} registros.")
+    return df
 
-        df.columns = df.columns.str.strip()
-        df['Fecha'] = pd.to_datetime(df['Fecha'])
 
-        if len(df) < 26:
-            raise Exception(f"Historial insuficiente: {len(df)} registros.")
+def armar_prompt(df: pd.DataFrame) -> str:
+    """El prompt del párrafo diario, con las variaciones de la última fila."""
+    hoy = df.iloc[-1]
+    ayer = df.iloc[-2]
+    mes = df.iloc[-FILAS_MINIMAS]
 
-        hoy  = df.iloc[-1]
-        ayer = df.iloc[-2]
-        mes  = df.iloc[-26]
+    blue = hoy["TCV_Blue"]
+    mep = hoy["TCV_MEP"]
+    billete = hoy["TCV_Billete"]
+    rp = hoy["riesgo_pais"]
+    tea = hoy["bcra_tea"]
+    fed = hoy["fed_tea"]
+    brecha = abs(((blue / mep) - 1) * 100)
+    barato = "Blue" if blue < mep else "MEP"
 
-        blue    = hoy['TCV_Blue']
-        mep     = hoy['TCV_MEP']
-        billete = hoy['TCV_Billete']
-        rp      = hoy['riesgo_pais']
-        tea     = hoy['bcra_tea']
-        fed     = hoy['fed_tea']
-        brecha  = abs(((blue / mep) - 1) * 100)
-        barato  = "Blue" if blue < mep else "MEP"
+    def var(a, b):
+        return ((a / b) - 1) * 100
 
-        def var(a, b):
-            return ((a / b) - 1) * 100
+    tea_cambio = abs(var(tea, ayer["bcra_tea"])) > 0.2
+    fed_cambio = abs(var(fed, ayer["fed_tea"])) > 0
 
-        tea_cambio = abs(var(tea, ayer['bcra_tea'])) > 0.2
-        fed_cambio = abs(var(fed, ayer['fed_tea'])) > 0
-
-        prompt = f"""
+    return f"""
 Actuá como analista financiero Senior. Redactá un párrafo de 3-4 líneas.
 DATOS REALES AL {hoy['Fecha'].strftime('%d/%m/%Y')}:
 - Blue: ${blue} (Día: {var(blue, ayer['TCV_Blue']):+.2f}% | Mes: {var(blue, mes['TCV_Blue']):+.2f}%)
@@ -118,44 +132,61 @@ Instrucciones:
 4. Tono seco, profesional. No somos asesores financieros.
 """
 
-        print(f"🤖 Analizando datos del {hoy['Fecha'].strftime('%d/%m/%Y')}...")
 
-        max_total_attempts = 3
-        total_attempts = 0
-        reporte = None
-        modelo = None
+def generar_parrafo(prompt: str, config=None) -> tuple[str | None, str | None]:
+    """(texto, modelo) con hasta MAX_INTENTOS llamadas en total. (None, None) si no hubo caso."""
+    total = 0
+    while total < MAX_INTENTOS:
+        respuesta, modelo, usados = generar_con_failover(prompt, config=config)
+        total += usados if usados is not None else 1
+        if respuesta is not None:
+            return respuesta, modelo
+        if total >= MAX_INTENTOS:
+            log.error("Gemini: se alcanzó el máximo de %d intentos; se sigue sin párrafo", MAX_INTENTOS)
+            break
+        log.warning("Gemini: intentos consumidos %d de %d, se reintenta", total, MAX_INTENTOS)
+    return None, None
 
-        while total_attempts < max_total_attempts:
-            resp, mod, used = generar_con_failover(prompt)
-            # generar_con_failover may raise only for missing API keys; otherwise returns attempts used
-            attempts_used = used if used is not None else 1
-            total_attempts += attempts_used
 
-            if resp is not None:
-                reporte = resp
-                modelo = mod
-                break
+def guardar_parrafo(engine, fecha: date, texto: str, modelo: str | None) -> int:
+    """UPDATE de ai_paragraph y ai_model en la fila de `fecha`. Devuelve las filas afectadas."""
+    with engine.begin() as conn:
+        result = conn.execute(
+            text(f'UPDATE "{TABLA}" SET "ai_paragraph" = :p, "ai_model" = :m WHERE "Fecha" = :f'),
+            {"p": texto, "m": modelo, "f": fecha},
+        )
+    log.info("Gemini: párrafo del %s guardado con %s (filas afectadas: %d)", fecha, modelo, result.rowcount)
+    return result.rowcount
 
-            if total_attempts >= max_total_attempts:
-                print(f"❌ Se alcanzó el máximo de reintentos ({max_total_attempts}). Avanzando sin información.")
-                break
 
-            print(f"⚠️ Intentos consumidos: {total_attempts}. Quedan {max_total_attempts - total_attempts}. Reintentando...")
+def procesar_y_guardar_parrafo(engine, fecha_esperada: date | None = None) -> str:
+    """
+    Extrae historial de Supabase, calcula variaciones, genera párrafo con Gemini,
+    guarda en la DB y retorna el texto.
 
-        if reporte is None:
-            reporte = ""
-            modelo = None
+    Con `fecha_esperada`, se niega a seguir si la última fila de la base no es de
+    esa fecha. Sin ese control, una fila del día que no llegó a insertarse hacía
+    que el párrafo de ayer se reescribiera con un análisis de los datos de ayer.
+    """
+    try:
+        log.info("Gemini: leyendo el historial de Supabase")
+        df = leer_historial(engine)
+        fecha = df["Fecha"].iloc[-1].date()
 
-        print(f"💾 Guardando en Supabase para la fecha {hoy['Fecha'].date()}, usando: {modelo}...")
-        with engine.begin() as conn:
-            result = conn.execute(
-                text('UPDATE "Fact_Mercado_Macro" SET "ai_paragraph" = :p, "ai_model" = :m WHERE "Fecha" = :f'),
-                {"p": reporte, "m": modelo, "f": hoy['Fecha'].date()}
+        if fecha_esperada is not None and fecha != fecha_esperada:
+            raise ValueError(
+                f"la última fila de {TABLA} es del {fecha} y se esperaba la del {fecha_esperada}; "
+                "no se genera el párrafo para no pisar el de otro día"
             )
-            print(f"✅ Guardado. Filas afectadas: {result.rowcount}")
 
+        log.info("Gemini: analizando los datos del %s", fecha.strftime("%d/%m/%Y"))
+        reporte, modelo = generar_parrafo(armar_prompt(df))
+        if reporte is None:
+            reporte, modelo = "", None
+
+        guardar_parrafo(engine, fecha, reporte, modelo)
         return reporte
 
     except Exception as e:
-        print(f"\n❌ Proceso de IA interrumpido: {e}")
-        return "No se pudo generar el análisis automatizado de mercado."
+        log.error("Gemini: proceso interrumpido: %s", e)
+        return MENSAJE_FALLA

@@ -1,0 +1,128 @@
+"""Lectura y escritura de Fact_Mercado_Macro en Supabase.
+
+Es lo que hacían las celdas 14, 18 y 36 del notebook: crear el engine, leer el
+histórico completo y guardar la fila del día sin duplicar la fecha.
+"""
+
+import logging
+from contextlib import contextmanager
+from datetime import date
+
+import pandas as pd
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
+
+from config import settings
+
+log = logging.getLogger(__name__)
+
+TABLA = "Fact_Mercado_Macro"
+
+# Orden real de las columnas en Supabase. El mail arma la tabla de cotizaciones
+# con df.iloc[:, :14], así que este orden no es cosmético.
+COLUMNAS_VALORES = [
+    "TCC_Blue", "TCV_Blue", "TCC_Billete", "TCV_Billete", "TCC_Divisas", "TCV_Divisas",
+    "Solidario", "TCV_MEP", "riesgo_pais", "TCC_Euro", "TCV_Euro", "fed_tea", "bcra_tea",
+]
+COLUMNAS_FILA = ["Fecha", *COLUMNAS_VALORES]
+COLUMNAS_TABLA = [*COLUMNAS_FILA, "ai_paragraph", "ai_model"]
+
+# Identificador del advisory lock de Postgres que impide dos corridas a la vez.
+# Es un número cualquiera; solo tiene que ser el mismo en todos los disparadores.
+CLAVE_CANDADO = 7_041_998
+
+
+def crear_engine() -> Engine:
+    """Engine con la misma configuración que tenía el notebook (celda 14)."""
+    return create_engine(
+        settings.supabase_db_url.get_secret_value(),
+        pool_size=3,
+        max_overflow=0,
+        pool_recycle=300,
+        pool_pre_ping=True,
+        connect_args={"connect_timeout": 30},
+    )
+
+
+def _normalizar_fecha(df: pd.DataFrame) -> pd.DataFrame:
+    df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce").dt.date.astype(str)
+    return df
+
+
+def leer_historico(engine: Engine, respaldo_csv: bool = True) -> tuple[pd.DataFrame, str]:
+    """Toda la tabla, más nuevo primero, con Fecha como texto 'YYYY-MM-DD'.
+
+    Devuelve también de dónde salió: "supabase" o, si la base no responde, "csv"
+    (el respaldo local de RUTA_BBDD, como el plan B de la celda 18). Ojo que ese
+    CSV no lo actualiza nadie: es una foto vieja y solo sirve para no frenar en seco.
+    Con respaldo_csv=False el error de la base se propaga.
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql_query(text(f'SELECT * FROM "{TABLA}" ORDER BY "Fecha" DESC;'), conn)
+        if "Fecha" not in df.columns:
+            raise KeyError(f"La tabla {TABLA} no tiene la columna 'Fecha'")
+        return _normalizar_fecha(df).dropna(subset=["Fecha"]), "supabase"
+
+    except Exception:
+        if not respaldo_csv:
+            raise
+        log.exception("No se pudo leer Supabase; se usa el CSV de contingencia %s", settings.ruta_bbdd)
+        df = pd.read_csv(settings.ruta_bbdd, encoding="latin1")
+        if "Fecha" in df.columns:
+            df = _normalizar_fecha(df)
+        return df, "csv"
+
+
+def guardar_fila(engine: Engine, fila: pd.DataFrame, sobrescribir: bool = False) -> bool:
+    """Guarda la fila del día. Devuelve True si escribió, False si la fecha ya estaba.
+
+    Un solo INSERT ... ON CONFLICT, atómico, en vez de traer todas las fechas y
+    filtrar en pandas como hacía la celda 36. Con sobrescribir=False la fila
+    existente no se toca (el comportamiento de siempre); con True se pisan sus
+    valores, que es lo que pide una corrida repetida a propósito (--forzar).
+    """
+    registro = fila.iloc[0]
+    valores = {"Fecha": registro["Fecha"]}
+    valores.update({col: float(registro[col]) for col in COLUMNAS_VALORES})
+
+    columnas = ", ".join(f'"{c}"' for c in COLUMNAS_FILA)
+    parametros = ", ".join(f":{c}" for c in COLUMNAS_FILA)
+    if sobrescribir:
+        asignaciones = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in COLUMNAS_VALORES)
+        conflicto = f"DO UPDATE SET {asignaciones}"
+    else:
+        conflicto = "DO NOTHING"
+
+    sql = text(f'INSERT INTO "{TABLA}" ({columnas}) VALUES ({parametros}) ON CONFLICT ("Fecha") {conflicto}')
+    with engine.begin() as conn:
+        escritas = conn.execute(sql, valores).rowcount
+
+    if escritas:
+        log.info("Supabase: fila del %s %s", valores["Fecha"], "actualizada" if sobrescribir else "insertada")
+    else:
+        log.info("Supabase: la fila del %s ya existía, no se modificó", valores["Fecha"])
+    return bool(escritas)
+
+
+def fecha_mas_reciente(engine: Engine) -> date | None:
+    """La última Fecha guardada. Sirve para confirmar qué fila va a tocar un UPDATE."""
+    with engine.connect() as conn:
+        return conn.execute(text(f'SELECT MAX("Fecha") FROM "{TABLA}"')).scalar()
+
+
+@contextmanager
+def candado_corrida(engine: Engine):
+    """Advisory lock de Postgres mientras dura la corrida. Cede True si lo obtuvo.
+
+    El lock de app.py solo cubre los POST que llegan al mismo proceso. Este cubre
+    cualquier combinación de disparadores (API, cron, GitHub Actions, alguien a mano)
+    porque vive en la base. Se libera solo si el proceso muere, ya que es de sesión.
+    """
+    with engine.connect() as conn:
+        obtenido = bool(conn.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": CLAVE_CANDADO}).scalar())
+        try:
+            yield obtenido
+        finally:
+            if obtenido:
+                conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": CLAVE_CANDADO})

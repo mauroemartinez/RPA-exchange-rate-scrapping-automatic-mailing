@@ -1,9 +1,10 @@
 """Envío de mails de alerta cuando algo del pipeline falla.
 
-Separado del notebook para que cualquier módulo pueda avisar sin depender de que
-la celda 33 esté definida. El reporte diario sigue armándose en el notebook.
+Separado del reporte para que cualquier módulo pueda avisar sin depender del resto.
+Las alertas van en texto plano a EMAIL_RECEIVER_CSV.
 """
 
+import logging
 import smtplib
 import ssl
 import traceback
@@ -12,6 +13,8 @@ from email.mime.text import MIMEText
 
 from config import settings
 
+log = logging.getLogger(__name__)
+
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 
@@ -19,7 +22,7 @@ SMTP_PORT = 587
 def enviar_alerta(asunto: str, cuerpo: str) -> bool:
     """Mail de texto plano a EMAIL_RECEIVER_CSV. Devuelve si pudo enviarlo.
 
-    Nunca propaga: si el SMTP también está caído, se avisa por consola y se sigue.
+    Nunca propaga: si el SMTP también está caído, se avisa en el log y se sigue.
     Una alerta que rompe el proceso que intentaba reportar no sirve de nada.
     """
     destinatarios = list(settings.email_receiver_csv)
@@ -31,15 +34,15 @@ def enviar_alerta(asunto: str, cuerpo: str) -> bool:
 
     try:
         context = ssl.create_default_context()
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=60) as smtp:
             smtp.ehlo()
             smtp.starttls(context=context)
             smtp.login(settings.email_sender, settings.email_password.get_secret_value())
             smtp.sendmail(settings.email_sender, destinatarios, em.as_string())
-        print(f"📧 Alerta enviada: {asunto}")
+        log.info("Alerta enviada: %s", asunto)
         return True
     except Exception as exc:
-        print(f"⚠️ No se pudo enviar la alerta por mail: {exc}")
+        log.error("No se pudo enviar la alerta por mail (%s): %s", asunto, exc)
         return False
 
 
@@ -58,3 +61,8 @@ def alertar_scraper_caido(exc: BaseException) -> bool:
         f"{''.join(traceback.format_exception(type(exc), exc, exc.__traceback__))}"
     )
     return enviar_alerta(f"⚠️ Scraper caído: {sitio}", cuerpo)
+
+
+def alertar_validacion(error: BaseException) -> bool:
+    """La fila del día no pasó models.FilaMacro: no se guardó ni se mandó nada."""
+    return enviar_alerta("Atención: Error en el mailing automático", str(error))
