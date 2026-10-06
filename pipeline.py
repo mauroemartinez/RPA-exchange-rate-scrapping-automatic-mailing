@@ -337,7 +337,7 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
         pendientes = [
             (charts.TIPOS_DE_CAMBIO, lambda: charts.grafico_tipos_de_cambio(data, carpeta)),
             (charts.VARIACIONES, lambda: charts.grafico_variaciones(
-                charts.preparar_variaciones(data, inflacion_12.iloc[::-1]), carpeta)),
+                charts.preparar_variaciones(data, inflacion), carpeta)),
             (charts.INFLACION, lambda: charts.grafico_inflacion(charts.preparar_inflacion(inflacion_12), carpeta)),
         ]
         fallas = []

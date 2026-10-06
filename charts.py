@@ -258,8 +258,12 @@ def preparar_variaciones(
 ) -> pd.DataFrame:
     """Solidario, blue e inflación acumulados desde fecha_inicio (celda 41).
 
-    `data` es la salida de preparar_datos() e `inflacion` los meses de inflación
-    que se cruzan por fecha con las cotizaciones.
+    `data` es la salida de preparar_datos() e `inflacion` la serie mensual que se
+    cruza por fecha con las cotizaciones. Tiene que ser la serie completa, o al
+    menos cubrir desde fecha_inicio: el notebook cruzaba solo los últimos 12 meses
+    y, pasado un año desde fecha_inicio, la inflación acumulada empezaba meses
+    después que el dólar (en octubre de 2026 arrancaba en septiembre de 2025
+    contra julio de 2025), así que el gráfico comparaba períodos distintos.
     """
     data = data.copy()
     # preparar_datos() dejó las fechas como 'dd/mm/yy'; con el formato explícito
@@ -269,7 +273,9 @@ def preparar_variaciones(
     va = data.merge(inflacion[["Fecha", "Inflación Mensual"]], on=["Fecha"], how="outer")
     # Después del merge, las fechas con inflación pero sin cotización quedan al final
     va.sort_values("Fecha", inplace=True)
-    va = va[va["Fecha"] >= pd.to_datetime(fecha_inicio)]
+    # Índice desde cero: las etiquetas "cada 25 filas" del gráfico arrancan en el
+    # inicio del período y no dependen de cuánta historia vino antes
+    va = va[va["Fecha"] >= pd.to_datetime(fecha_inicio)].reset_index(drop=True)
 
     for column in ["Variación Solidario", "Variación TCV Blue", "Inflación Mensual"]:
         if column == "Inflación Mensual":

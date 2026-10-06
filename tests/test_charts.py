@@ -40,7 +40,7 @@ def test_los_cuatro_graficos_se_generan(df, inflacion_12, btc_crudo, tmp_path):
     data = charts.preparar_datos(df)
     rutas = [
         charts.grafico_tipos_de_cambio(data, tmp_path),
-        charts.grafico_variaciones(charts.preparar_variaciones(data, inflacion_12.iloc[::-1], "2026-08-01"), tmp_path),
+        charts.grafico_variaciones(charts.preparar_variaciones(data, inflacion_12, "2026-08-01"), tmp_path),
         charts.grafico_inflacion(charts.preparar_inflacion(inflacion_12), tmp_path),
         charts.grafico_btc(charts.preparar_btc(btc_crudo, AHORA), tmp_path),
     ]
@@ -80,3 +80,15 @@ def test_rango_de_descarga_de_btc_incluye_el_margen():
     desde, hasta = charts.rango_btc(AHORA)
     assert hasta == AHORA
     assert (hasta - desde).days == charts.DIAS_BTC + charts.MARGEN_BTC
+
+
+def test_la_inflacion_acumulada_arranca_con_el_periodo(df, resultados):
+    # Regresión: con solo los últimos 12 meses, la inflación acumulada arrancaba
+    # meses después que las cotizaciones
+    inflacion = t.serie_inflacion(resultados.bcra["inflacion_mensual"], 23.66)
+    va = charts.preparar_variaciones(charts.preparar_datos(df), inflacion, "2026-08-01")
+
+    primera_inflacion = va.dropna(subset=["Inflación Mensual"])["Fecha"].min()
+    assert primera_inflacion == pd.Timestamp("2026-08-31")
+    assert va["Inflación Mensual Acumulada"].dropna().iloc[0] == va["Inflación Mensual"].dropna().iloc[0]
+    assert list(va.index[:3]) == [0, 1, 2]
