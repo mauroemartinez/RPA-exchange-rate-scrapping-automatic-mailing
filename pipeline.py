@@ -140,7 +140,6 @@ class Dependencias:
     descargar_btc: Callable = btc.descargar
     generar_parrafo: Callable = ia_generator.procesar_y_guardar_parrafo
     enviar_mail: Callable = email_report.enviar
-    leer_csv: Callable = email_report.leer_csv_adjunto
     actualizar_previews: Callable = preview_git.actualizar_previews
     alertar: Callable = mailer.enviar_alerta
     alertar_scraper: Callable = mailer.alertar_scraper_caido
@@ -286,9 +285,9 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
             resultado.alertado = deps.alertar_validacion(exc)
             raise
 
-    df = transformations.sumar_al_historico(fila, historico)
-    fwd_oficial, fwd_blue = transformations.forwards_fisher(df)
-    df = transformations.agregar_brechas_y_variaciones(df)
+    df_base = transformations.sumar_al_historico(fila, historico)
+    fwd_oficial, fwd_blue = transformations.forwards_fisher(df_base)
+    df = transformations.agregar_brechas_y_variaciones(df_base)
 
     # ── Persistencia ─────────────────────────────────────────────────────────
     persistida = False
@@ -307,8 +306,11 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
                 e.detalle = "la fila apareció mientras corría; se conservan los valores guardados"
 
     # ── Párrafo de IA ────────────────────────────────────────────────────────
+    # parrafo es lo que muestra el mail; texto_ia, lo que queda guardado en la fila
     parrafo = ia_generator.MENSAJE_FALLA
+    texto_ia = None
     if opciones.dry_run:
+        texto_ia = parrafo_existente
         parrafo = parrafo_existente or "[dry-run] Acá va el párrafo de Gemini, que en una prueba no se pide."
         registro.omitir("ia", "dry-run: no se llama a Gemini")
     elif not persistida:
@@ -317,7 +319,7 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
         with registro.etapa("ia", critica=False) as e:
             texto = deps.generar_parrafo(engine, fecha_esperada=fecha)
             if texto and texto != ia_generator.MENSAJE_FALLA:
-                parrafo = texto
+                parrafo = texto_ia = texto
             else:
                 e.estado = ADVERTENCIA
                 e.detalle = "Gemini no devolvió párrafo; el mail lleva el mensaje de reemplazo"
@@ -375,9 +377,13 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
         if resultado.salida:
             _guardar_vista_previa(resultado.salida, html, imagenes, fecha)
 
+        con_parrafo = df_base.copy()
+        con_parrafo.loc[0, "ai_paragraph"] = texto_ia
+        csv = email_report.csv_historico(con_parrafo)
+
         if opciones.enviar_a:
             errores = email_report.enviar_reporte_diario(
-                html, imagenes, fecha, deps.leer_csv(), receptores=[], receptores_csv=opciones.enviar_a,
+                html, imagenes, fecha, csv, receptores=[], receptores_csv=opciones.enviar_a,
                 enviar_fn=deps.enviar_mail,
             )
         elif opciones.dry_run or not opciones.enviar_mail:
@@ -385,7 +391,7 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
             e.estado = OMITIDA
             e.detalle = "dry-run" if opciones.dry_run else "--sin-mail"
         else:
-            errores = email_report.enviar_reporte_diario(html, imagenes, fecha, deps.leer_csv(), enviar_fn=deps.enviar_mail)
+            errores = email_report.enviar_reporte_diario(html, imagenes, fecha, csv, enviar_fn=deps.enviar_mail)
 
         if errores is not None:
             fallidos = {variante: error for variante, error in errores.items() if error}

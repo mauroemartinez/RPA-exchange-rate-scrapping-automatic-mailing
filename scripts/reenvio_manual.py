@@ -110,6 +110,7 @@ def main() -> None:
 
     # Los forwards van antes de agregar las brechas, igual que en el pipeline
     fwd_oficial, fwd_blue = transformations.forwards_fisher(df)
+    csv = email_report.csv_historico(df) if args.csv else None
     df = transformations.agregar_brechas_y_variaciones(df)
     inflacion_12 = armar_inflacion()
     imagenes = leer_imagenes()
@@ -130,7 +131,6 @@ def main() -> None:
     else:
         para, cco = settings.email_sender, args.destinatarios
 
-    csv = email_report.leer_csv_adjunto() if args.csv else None
     em = email_report.armar_mensaje(
         html, imagenes, email_report.asunto(dt.date.fromisoformat(ultima)), para=para, cco=cco, csv=csv
     )

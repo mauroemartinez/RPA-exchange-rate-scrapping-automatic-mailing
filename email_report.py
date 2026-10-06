@@ -25,6 +25,7 @@ from tabulate import tabulate
 
 from charts import COTIZACIONES_A_MOSTRAR, ORDEN_EN_MAIL
 from config import settings
+from data_access import COLUMNAS_FILA
 from scrapers import ambito, bcra, bna, dolarhoy, fed, riesgo_pais
 from transformations import etiqueta_mes
 
@@ -272,13 +273,20 @@ def enviar(mensaje: MIMEMultipart, destinatarios: list[str]) -> None:
         raise smtplib.SMTPRecipientsRefused(rechazados)
 
 
-def leer_csv_adjunto() -> str | None:
-    """El CSV de RUTA_BBDD, como lo adjuntaba la celda 47. None si no se puede leer."""
-    try:
-        return Path(settings.ruta_bbdd).read_text(encoding="latin-1")
-    except OSError as exc:
-        log.warning("No se pudo leer el CSV para adjuntar (%s): %s", settings.ruta_bbdd, exc)
-        return None
+def csv_historico(df: pd.DataFrame) -> str:
+    """El histórico completo como CSV, para la variante del mail con adjunto.
+
+    Se arma en el momento desde los datos de Supabase, más nuevo primero y con las
+    mismas columnas que tenía el archivo de RUTA_BBDD. La celda 47 adjuntaba ese
+    archivo tal cual, pero nadie lo actualizaba desde junio de 2026: los
+    destinatarios recibían una foto vieja, con los párrafos de IA mal decodificados
+    (se leía en latin-1 un archivo con texto UTF-8), y en el contenedor ni siquiera
+    existía. `df` es el histórico sin las columnas calculadas, con la fila del día.
+    """
+    columnas = [*COLUMNAS_FILA, "ai_paragraph"]
+    salida = df.reindex(columns=columnas).copy()
+    salida["Fecha"] = pd.to_datetime(salida["Fecha"]).dt.strftime("%Y-%m-%d")
+    return salida.to_csv(index=False, lineterminator="\n")
 
 
 def enviar_reporte_diario(
