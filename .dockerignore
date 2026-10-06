@@ -29,6 +29,15 @@ data/
 *.csv
 APUNTES.md
 README.md
+AGENTS.md
+docs/
+logs/
+# El notebook ya no se ejecuta en el contenedor: /run corre pipeline.py
+notebooks/
+tests/
+.github/
+requirements-dev.*
+pyproject.toml
 
 # === IDEs ===
 .vscode/

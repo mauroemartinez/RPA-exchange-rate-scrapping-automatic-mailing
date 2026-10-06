@@ -1,16 +1,22 @@
-# Dependencias DIRECTAS: las que el proyecto importa de verdad.
+# Dependencias DIRECTAS de producción: las que importa el pipeline o la API.
 #
 # requirements.txt, en cambio, es la lista COMPLETA con versiones exactas,
 # incluye también las dependencias de estas dependencias (h11, anyio, starlette,
-# protobuf y unas ochenta más). Ese archivo es el que se instala.
+# protobuf y unas cuantas más). Ese archivo es el que se instala en la imagen.
+#
+# Lo que solo hace falta para desarrollar (notebook, tests, lint) está en
+# requirements-dev.in, así no termina dentro del contenedor.
 #
 # Para regenerar requirements.txt desde este archivo:
+#     uv pip compile requirements.in --universal --python-version 3.14 -o requirements.txt
+# o, con pip-tools:
 #     pip install pip-tools
 #     pip-compile requirements.in -o requirements.txt
 #
 # Por qué separarlos: en un requirements.txt hecho con `pip freeze` no se puede
 # distinguir lo que usás de lo que arrastraste. Si mañana sacás yfinance, no hay
 # forma de saber cuáles de las 100 líneas se van con él. Acá sí.
+# Ojo: `pip freeze > requirements.txt` desde PowerShell 5 lo guarda en UTF-16.
 
 # ── Datos y análisis ──
 pandas
@@ -32,6 +38,7 @@ psycopg2-binary  # driver de PostgreSQL (Supabase)
 pydantic[email]  # el extra 'email' trae email-validator, que usa EmailStr
 pydantic-settings
 python-dotenv
+tzdata           # base de zonas horarias para zoneinfo (fechas.py) donde el sistema no la trae
 
 # ── IA ──
 google-genai
@@ -44,9 +51,3 @@ seaborn
 # ── Servicio HTTP (app.py) ──
 fastapi
 uvicorn
-nbconvert        # ejecuta el notebook desde el endpoint /run
-
-# ── Notebook ──
-ipykernel
-nbformat
-nbstripout       # limpia outputs antes de commitear

@@ -4,14 +4,18 @@
 # Dockerfile, y la minor es la que realmente importa para compatibilidad.
 FROM python:3.14-slim
 
-# PYTHONUNBUFFERED: que los print salgan al log al instante y no en bloques.
+# PYTHONUNBUFFERED: que el log salga al instante y no en bloques.
 # PYTHONDONTWRITEBYTECODE: no generar .pyc, son basura en una imagen efímera.
 # PLAYWRIGHT_BROWSERS_PATH: ruta fija y compartida, para que el navegador quede
 #   accesible cuando el proceso deje de correr como root.
+# TZ: la hora de los logs, en Argentina. La fecha de cada fila NO depende de
+#   esto: fechas.py la calcula siempre en America/Argentina/Buenos_Aires, así una
+#   corrida después de las 21:00 no queda estampada con el día siguiente.
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    TZ=America/Argentina/Buenos_Aires
 
 WORKDIR /app
 
@@ -40,6 +44,10 @@ COPY --chown=appuser:appuser . .
 USER appuser
 
 EXPOSE 8000
+
+# El servicio expone POST /run, que corre pipeline.py en un proceso aparte.
+# Para una corrida suelta sin la API:
+#   docker run --env-file .env macro-mailing python pipeline.py --dry-run
 
 # Docker reinicia el contenedor si /health deja de responder.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
