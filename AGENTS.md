@@ -4,13 +4,22 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## What this project does
 
-Daily automated pipeline that scrapes Argentine FX rates and macroeconomic indicators, stores them in Supabase, generates charts and an AI-written narrative via Gemini, and emails a styled HTML report to a subscriber list. A FastAPI wrapper (`app.py`) exposes a `/run` endpoint so the notebook can be triggered by n8n or any HTTP scheduler.
+Daily automated pipeline that scrapes Argentine FX rates and macroeconomic indicators, stores them in Supabase, generates charts and an AI-written narrative via Gemini, and emails a styled HTML report to a subscriber list. The daily run lives in `pipeline.py`, a plain Python entry point with no Jupyter dependency. A FastAPI wrapper (`app.py`) exposes a `/run` endpoint that executes the same pipeline, so it can be triggered by n8n or any HTTP scheduler.
 
 ## Running the project
 
-**Locally (notebook):** Open `notebooks/Argentinian_Macroeconomic_Automatic_Mailing.ipynb` in VS Code and run all cells top to bottom. The first cell walks up to the project root (it looks for `config.py`) and `chdir`s there, so every relative path in the rest of the notebook resolves against the repo root regardless of where Jupyter started. The kernel must use the venv Python, configured in `venv/share/jupyter/kernels/python3/kernel.json` with the full path to `venv/Scripts/python.exe`.
+**Locally (CLI):**
+```bash
+python pipeline.py --dry-run                          # scrapes and builds everything, writes and sends nothing
+python pipeline.py --dry-run --enviar-a yo@mail.com   # same, but the mail goes only to that address
+python pipeline.py                                    # the real daily run
+```
 
-Running the notebook has real side effects: it writes to Supabase, emails the whole subscriber list, and commits to git. Never run it end to end just to verify a code change.
+A real run has side effects: it writes to Supabase, emails the whole subscriber list, and commits and pushes `Previews/` to git. To verify a code change use `--dry-run`, optionally with `--enviar-a`, never a plain run. Other flags: `--sin-mail` (everything except the email), `--sin-push` (no git), `--forzar` (redo today even if its row already exists: it overwrites the row and emails again), `--salida DIR`, `--log-archivo FILE` and `--json FILE` (machine-readable result). The exit code is 1 when any stage ends in error, so a scheduler can tell a failed run from a good one.
+
+`--dry-run` scrapes the live sources and reads Supabase, but does not write to Supabase, does not call Gemini, does not send the mail and does not touch git. It leaves the four charts, `mail_preview.html` (opens in a browser) and `mail.eml` (opens in a mail client) in a temp folder, or in `--salida`. It never writes to `Previews/`, because that folder gets auto-committed.
+
+**Notebook (reference during the transition):** `notebooks/Argentinian_Macroeconomic_Automatic_Mailing.ipynb` still works the old way, with the same side effects as a real run. It stays as a reference until the CLI and the API have replaced it in daily use; never run it end to end to verify a change. Its first cell walks up to the project root (it looks for `config.py`) and `chdir`s there. The kernel must use the venv Python, configured in `venv/share/jupyter/kernels/python3/kernel.json` with the full path to `venv/Scripts/python.exe`.
 
 **Via Docker (production):**
 ```bash
@@ -18,18 +27,23 @@ docker build -t macro-mailing .
 docker run --env-file .env -p 8000:8000 macro-mailing
 # trigger execution:
 curl -X POST http://localhost:8000/run -H "x-api-key: <API_KEY_EASY_PANEL>"
+# end-to-end check of a deployment, with no side effects:
+curl -X POST "http://localhost:8000/run?dry_run=true" -H "x-api-key: <API_KEY_EASY_PANEL>"
 ```
+
+`/run` executes `pipeline.py` in a child process, so a hung run can be killed by the timeout and every run starts from a clean interpreter. The response carries the state and duration of each stage but no error details, which stay in the container log.
 
 Scraping runs on Playwright (Chromium) in both environments, with no Edge/Chrome branching. The Dockerfile installs the browser via `playwright install --with-deps chromium` at build time; locally you need to run that once yourself (see below).
 
 **Install dependencies:**
 ```bash
 python -m venv venv
-.\venv\Scripts\activate       # PowerShell
-pip install -r requirements.txt
-playwright install chromium   # required once, for the scrapers
-pip install fastapi uvicorn nbconvert   # only needed for Docker/API mode
+.\venv\Scripts\activate                # PowerShell
+pip install -r requirements-dev.txt    # production dependencies plus notebook, pytest and ruff
+playwright install chromium            # required once, for the scrapers
 ```
+
+`requirements.txt` holds only what production imports, and it is what the Docker image installs. Both lock files are generated from their `.in` with `uv pip compile` (the command is in the header of each `.in`). Do not regenerate them with `pip freeze > requirements.txt` from PowerShell 5: it writes UTF-16 and pins whatever happens to be installed.
 
 **Resend today's report to one person:**
 ```bash
@@ -40,33 +54,42 @@ See "Manual resend" below.
 
 ## Architecture
 
-The entire pipeline lives in one notebook with this execution order:
+`pipeline.py` runs these stages in order. Each one is recorded with its state (`ok`, `advertencia`, `error` or `omitida`) and its duration, and the whole run returns a `ResultadoCorrida`:
 
-1. **Imports:** all libraries, including `import scrapers` (the `scrapers/` package)
-2. **Config:** `config.py` loads and validates `.env` through Pydantic-Settings, then the notebook creates the SQLAlchemy engine pointing at Supabase and sets the seaborn visual style
-3. **Historical load:** reads the full `Fact_Mercado_Macro` table from Supabase, newest row first; falls back to the local CSV at `RUTA_BBDD` if Supabase fails
-4. **Ingestion:** `scrapers.run_all_sync()` runs all six sources concurrently via `asyncio.gather()` and returns their results in a fixed order: BNA (billetes + divisas tabs), DolarHoy (blue), Ambito (MEP + euro blue), riesgo país, BCRA (BADLAR id=140 and monthly inflation id=27), and the St. Louis FED (EFFR). The three HTTP sources share one `httpx.AsyncClient`. BTC/USD comes separately from Yahoo Finance via `yfinance`.
-5. **DataFrame assembly:** concatenates today's row with the historical df; calculates spreads, pct changes, and Irving Fisher forward rates
-6. **Pre-persistence validation:** validates the freshly built row with Pydantic before it is persisted. If a scraper returns invalid, non-positive, or malformed values, the run stops and notifies the developer instead of saving corrupted data.
-7. **Supabase upsert:** deduplicates by `Fecha` PK, inserts new rows one by one defensively
-8. **AI paragraph:** calls `ia_generator.procesar_y_guardar_parrafo(engine)`, which queries Supabase, computes 1-day and 25-session variations, prompts Gemini, and saves the result back via `UPDATE`
-9. **Charts:** four matplotlib/seaborn figures saved to `Previews/`
-10. **Email:** renders `templates/report_email.html` via Jinja2 with the computed values, then sends two variants (with and without the CSV attached) in parallel via `threading`
-11. **Git push:** auto-commits changed files in `Previews/` to the repo
+1. **Control:** takes a Postgres advisory lock (`data_access.candado_corrida`) so two triggers cannot run at once, and skips the day when its row already exists, unless `--forzar`
+2. **historico:** `data_access.leer_historico()` reads the full `Fact_Mercado_Macro` table, newest row first; falls back to the local CSV at `RUTA_BBDD` if Supabase fails
+3. **scraping:** `scrapers.run_all_sync()` runs all six sources concurrently via `asyncio.gather()` and returns their results in a fixed order: BNA (billetes + divisas tabs), DolarHoy (blue), Ambito (MEP + euro blue), riesgo país, BCRA (BADLAR id=140 and monthly inflation id=27), and the St. Louis FED (EFFR). The three HTTP sources share one `httpx.AsyncClient`. A `ScraperError` emails an alert and stops the run
+4. **validacion:** `transformations.armar_fila_nueva()` builds today's row and `models.FilaMacro` validates it. If a scraper returned invalid, non-positive, or malformed values, the run emails the developer and stops before anything is persisted
+5. **persistencia:** `data_access.guardar_fila()`, one atomic `INSERT ... ON CONFLICT ("Fecha") DO NOTHING` (`DO UPDATE` under `--forzar`)
+6. **ia:** `ia_generator.procesar_y_guardar_parrafo(engine, fecha_esperada=hoy)` queries Supabase, computes 1-day and 25-session variations, prompts Gemini and saves the result back via `UPDATE`. It refuses to write when the newest row is not today's, so a row that failed to insert can never get yesterday's paragraph overwritten
+7. **graficos:** `charts.py` draws the four JPGs. BTC/USD comes from Yahoo Finance through `scrapers/btc.py`; if Yahoo fails, the mail goes out without that chart instead of the whole run dying
+8. **mail:** `email_report.py` renders `templates/report_email.html` with Jinja2 and sends the two variants (with and without the CSV) in parallel. A failed send marks the run as failed
+9. **previews:** `preview_git.py` commits and pushes `Previews/`, only from the `main` branch, and checks the exit code of every git command
+
+Any stage in `error` sets exit code 1 and triggers one summary alert email, unless the failure already sent its own (scraper down, validation). The calculations (spreads, daily changes, Irving Fisher forwards, inflation accumulations) live in `transformations.py` as pure functions with no I/O.
+
+The pipeline is a faithful port of the notebook: fed the same inputs, the four JPGs, the HTML and both MIME messages come out byte-identical.
 
 ## Key files
 
 | File | Purpose |
 |---|---|
-| `notebooks/Argentinian_Macroeconomic_Automatic_Mailing.ipynb` | Main pipeline (single source of truth) |
+| `pipeline.py` | Daily run and its CLI: stage orchestration, result per stage, alerts |
+| `data_access.py` | Supabase engine, historical read (with the CSV fallback), idempotent insert of today's row, run lock |
+| `transformations.py` | Today's row, validation, spreads and daily changes, Fisher forwards, inflation series |
+| `charts.py` | Data preparation and drawing of the four charts |
+| `email_report.py` | Tables, HTML rendering, MIME assembly and SMTP sending; shared with the manual resend |
+| `preview_git.py` | Commit and push of `Previews/` |
+| `fechas.py` | Today's date in Argentina time and Spanish month names, independent of the machine's timezone and locale |
 | `config.py` | Typed, validated settings loaded once from `.env`; import `settings` from here instead of reading `os.environ` |
 | `models.py` | Pydantic schema for the macro row; the validation contract before persistence |
 | `ia_generator.py` | Gemini integration: queries Supabase, builds the prompt, calls the API with key failover, saves the paragraph |
-| `mailer.py` | Plain-text failure alerts over SMTP, so any module can report a broken run without depending on the notebook |
-| `app.py` | FastAPI wrapper that executes the notebook via `jupyter nbconvert --execute` |
+| `mailer.py` | Plain-text failure alerts over SMTP, so any module can report a broken run |
+| `app.py` | FastAPI wrapper whose `/run` executes `pipeline.py` |
 | `Dockerfile` | Linux/Chromium image for containerized execution |
-| `scrapers/` | Playwright scrapers (`bna.py`, `dolarhoy.py`, `ambito.py`), async REST clients (`bcra.py`, `fed.py`, `riesgo_pais.py`), `utils.py` (retry, `ScraperError`, event-loop helper) and `__init__.py` (`run_all_sync()`, which runs all six concurrently) |
-| `templates/report_email.html` | Jinja2 template for the HTML email report: CSS plus markup, rendered with computed values from the mailing cell |
+| `scrapers/` | Playwright scrapers (`bna.py`, `dolarhoy.py`, `ambito.py`), async REST clients (`bcra.py`, `fed.py`, `riesgo_pais.py`), `btc.py` (Yahoo Finance), `utils.py` (retry, `ScraperError`, event-loop helper) and `__init__.py` (`run_all_sync()`, which runs the first six concurrently) |
+| `templates/report_email.html` | Jinja2 template for the HTML email report: CSS plus markup, rendered by `email_report.py` |
+| `notebooks/Argentinian_Macroeconomic_Automatic_Mailing.ipynb` | The original pipeline, kept as a reference during the transition |
 | `scripts/backfill.py` | Repairs historical `riesgo_pais` and `bcra_tea` series against their source APIs. Dry-run by default, writes only with `--apply`. |
 | `scripts/reenvio_manual.py` | Resends the latest report to arbitrary recipients without rerunning the pipeline |
 | `sql/` | One-off SQL scripts for DB setup and historical data cleaning (not part of the automated pipeline) |
@@ -87,7 +110,7 @@ API_KEY_EASY_PANEL       # Auth token for the /run FastAPI endpoint (optional)
 SERVICE_ROUTE            # Deployment URL (optional, currently unread)
 ```
 
-`EMAIL_RECEIVER` and `EMAIL_RECEIVER_CSV` are comma-separated lists, each address validated individually.
+`EMAIL_RECEIVER` and `EMAIL_RECEIVER_CSV` are comma-separated lists, each address validated individually. The git step only runs when `RUTA_REPO` is the folder that holds the code, so a checkout elsewhere never commits into another repo.
 
 ## Supabase table: `Fact_Mercado_Macro`
 
@@ -104,17 +127,21 @@ python scripts/reenvio_manual.py alguien@mail.com --csv       # attaches the tra
 python scripts/reenvio_manual.py alguien@mail.com --dry-run   # builds it, writes a preview, sends nothing
 ```
 
-It does not rerun the pipeline: no scraping, no row validation, no upsert, no Gemini call, no git push. It replays what the daily run already produced, namely the newest `Fact_Mercado_Macro` row, the `ai_paragraph` stored on it, and the four JPGs in `Previews/`. The one input it must refetch is the BCRA monthly inflation series, which the table does not persist. Recipients go in Bcc so they cannot see each other, and the rendered HTML is byte-identical to the daily mail apart from the performance timing line.
+It does not rerun the pipeline: no scraping, no row validation, no upsert, no Gemini call, no git push. It replays what the daily run already produced, namely the newest `Fact_Mercado_Macro` row, the `ai_paragraph` stored on it, and the four JPGs in `Previews/`. The one input it must refetch is the BCRA monthly inflation series, which the table does not persist. It renders through `email_report.py`, the same code as the daily run, so its HTML is identical to the daily mail apart from the performance timing line. With several recipients they go in Bcc so they cannot see each other.
 
-Two guardrails worth knowing: it aborts if the newest row has no `ai_paragraph` (that means the pipeline did not finish), and it warns when that row is not from today or when the charts in `Previews/` are over 24 hours old. `--dry-run` writes its preview to the system temp directory, deliberately not to `Previews/`, because the notebook auto-commits anything that lands in that folder.
+Two guardrails worth knowing: it aborts if the newest row has no `ai_paragraph` (that means the pipeline did not finish), and it warns when that row is not from today or when the charts in `Previews/` are over 24 hours old. `--dry-run` writes its preview to the system temp directory, deliberately not to `Previews/`, because the pipeline auto-commits anything that lands in that folder.
 
 ## Important constraints
 
-- **Scrapers depend on each site's HTML structure.** BNA, DolarHoy, and Ambito (`scrapers/`) use short CSS and id-based Playwright selectors, but still break if a site changes its markup. Unlike the old Selenium version, a broken selector now raises a `ScraperError` carrying site and step context instead of silently leaving NaN columns in `fila_nueva`.
-- **Validation gate before persistence.** If the newly built row does not satisfy the Pydantic schema, the process fails fast and notifies the developer instead of saving a bad record.
-- **`fecha_inicio`** in the variaciones acumuladas chart (cell ~42) is hardcoded to `"2025-07-01"`. Update it when the reference period changes.
+- **Scrapers depend on each site's HTML structure.** BNA, DolarHoy, and Ambito (`scrapers/`) use short CSS and id-based Playwright selectors, but still break if a site changes its markup. A broken selector raises a `ScraperError` carrying site and step context instead of silently leaving NaN columns in the new row.
+- **Validation gate before persistence.** If the newly built row does not satisfy the Pydantic schema, the run fails fast and notifies the developer instead of saving a bad record.
+- **Today's date comes from `fechas.hoy()`,** computed in America/Argentina/Buenos_Aires. Never use `datetime.today()` or `date.today()` for the row date: the container runs in UTC, and a run after 21:00 would stamp the next day.
+- **No `locale.setlocale()`.** Spanish month names come from `fechas.MESES_ABREV`. The slim Docker image has no Spanish locale (the call raises there), and the locale is process-wide state.
+- **Charts never use pyplot's global state.** Each one is drawn on its own `matplotlib.figure.Figure` inside an `rc_context` that starts from the same base style, so a chart cannot leak its style into the next one or into the next run.
+- **`charts.FECHA_INICIO_VARIACIONES`,** the start of the variaciones acumuladas chart, is hardcoded to `"2025-07-01"`. Update it when the reference period changes.
 - **`ia_generator` requires at least 26 rows** in Supabase to compute 25-session rolling variations; it raises an exception otherwise.
-- **Jupyter's event loop cannot run scraper coroutines directly.** `ipykernel` already runs its own asyncio loop, and on Windows that loop cannot spawn subprocesses, which Playwright needs for its browser driver. Notebook cells call the sync wrapper `scrapers.run_all_sync()`, which runs the coroutines in a separate thread with its own event loop (`run_async` in `scrapers/utils.py`). Do not call `asyncio.run()` or a bare `await` directly in a notebook cell for scraping.
-- **Send failures are caught and printed, not raised.** A bad Gmail App Password surfaces as a `535` line in the output and nothing else, so the run still looks green. Test SMTP changes with an isolated script rather than a full notebook run.
+- **Jupyter's event loop cannot run scraper coroutines directly.** `ipykernel` already runs its own asyncio loop, and on Windows that loop cannot spawn subprocesses, which Playwright needs for its browser driver. Callers use the sync wrapper `scrapers.run_all_sync()`, which runs the coroutines in a separate thread with its own event loop (`run_async` in `scrapers/utils.py`). Do not call `asyncio.run()` or a bare `await` directly in a notebook cell for scraping.
+- **Send failures.** In the pipeline a failed send marks the run as failed (exit code 1) and is logged with the SMTP error. The notebook still catches and prints them, so there a bad Gmail App Password surfaces as a `535` line and nothing else. Since alerts use the same credentials, they fail with it; the exit code is the signal that survives. Test SMTP changes with `python pipeline.py --dry-run --enviar-a <your address>`.
+- **Keep the `httpx` logger at WARNING or above.** It logs full request URLs at INFO, and the FRED request carries the API key in its query string.
 - **Column order matters in the email.** The cotizaciones table is built with `df.iloc[:, :14]`, so it depends on the column order coming back from Supabase. Adding a column to the table in the wrong position silently reshuffles the mail.
 - **Writing style for this repo: no em dashes,** in documentation, comments, or commit messages.
