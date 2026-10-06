@@ -134,11 +134,14 @@
             </div>
 
             <!-- GRÁFICOS -->
+            {#- Solo van los cid que vinieron adjuntos: si un gráfico no se pudo
+                generar, no queda una imagen rota. Sin la variable (el notebook no
+                la pasa) van los cuatro, como siempre. Es un comentario de Jinja y
+                no de HTML para que no viaje en el mail. #}
             <div style="text-align:center; width:100%; margin:20px 0;">
-              <img src='cid:image1' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
-              <img src='cid:image2' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
-              <img src='cid:image3' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
-              <img src='cid:image4' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+              {%- for cid in graficos | default(['image1', 'image2', 'image3', 'image4']) %}
+              <img src='cid:{{ cid }}' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+              {%- endfor %}
             </div>
 
             <!-- TABLA COTIZACIONES -->
