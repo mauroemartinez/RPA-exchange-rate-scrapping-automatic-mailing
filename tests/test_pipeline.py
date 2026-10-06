@@ -42,7 +42,6 @@ def entorno(historico, resultados, btc_crudo, tmp_path):
         descargar_btc=lambda desde, hasta: btc_crudo.copy(),
         generar_parrafo=generar_parrafo,
         enviar_mail=lambda mensaje, destinatarios: hechos["mails"].append((mensaje, destinatarios)),
-        leer_csv=lambda: "Fecha,TCV_Blue\n",
         actualizar_previews=lambda repo: hechos["previews"].append(repo) or (True, "ok"),
         alertar=lambda asunto, cuerpo: hechos["alertas"].append(asunto) or True,
         alertar_scraper=lambda exc: hechos["alertas"].append("scraper") or True,
@@ -240,3 +239,16 @@ def test_cli_devuelve_1_si_la_corrida_falla(monkeypatch):
     monkeypatch.setattr(pipeline, "correr", lambda opciones: fallida)
     monkeypatch.setattr(pipeline, "configurar_logging", lambda archivo: None)
     assert pipeline.main(["--dry-run"]) == 1
+
+
+def test_el_csv_adjunto_sale_de_supabase_con_el_parrafo_de_hoy(entorno, historico):
+    deps, hechos, salida = entorno
+    pipeline.correr(pipeline.Opciones(salida=salida), deps)
+
+    con_csv = next(m for m, d in hechos["mails"] if "csv@example.com" in d)
+    adjunto = next(p for p in con_csv.walk() if p.get_content_type() == "text/csv")
+    lineas = adjunto.get_payload(decode=True).decode("utf-8").splitlines()
+    assert lineas[0].startswith("Fecha,TCC_Blue,TCV_Blue") and lineas[0].endswith(",bcra_tea,ai_paragraph")
+    assert lineas[1].startswith("2026-10-06,1535.0,1555.0") and lineas[1].endswith("Párrafo de Gemini")
+    assert lineas[2].startswith(historico["Fecha"].iloc[0])
+    assert len(lineas) == len(historico) + 2

@@ -148,3 +148,12 @@ def test_enviar_levanta_si_hay_destinatarios_rechazados(monkeypatch, imagenes):
 
 def test_asunto():
     assert er.asunto(HOY) == "📈 Reporte Macroeconómico - 06-10-2026"
+
+
+def test_csv_historico(historico):
+    texto = er.csv_historico(historico)
+    lineas = texto.split("\n")
+    assert lineas[0] == ",".join([*er.COLUMNAS_FILA, "ai_paragraph"])
+    assert lineas[1].startswith(historico["Fecha"].iloc[0] + ",")
+    assert "\r" not in texto
+    assert "Párrafo del" in texto  # UTF-8 sin mojibake
