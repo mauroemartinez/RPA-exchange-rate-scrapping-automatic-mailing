@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field
 from datetime import date
-from typing import Optional
+
+from pydantic import BaseModel, Field
 
 
 class FilaMacro(BaseModel):
@@ -25,5 +25,5 @@ class FilaMacro(BaseModel):
     bcra_tea: float
 
     # Estos campos no existen en fila_nueva todavía, se agregan en Supabase después
-    ai_paragraph: Optional[str] = None
-    ai_model: Optional[str] = None
+    ai_paragraph: str | None = None
+    ai_model: str | None = None
