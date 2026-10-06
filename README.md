@@ -116,6 +116,8 @@ python pipeline.py                                    # the real run
 
 A dry run leaves the charts, a browser preview and an `.eml` of the report in a temp folder. The exit code is 1 when any stage fails, so schedulers can alert on it.
 
+**Tests.** `pytest` runs an offline suite that never touches the network, the warehouse or SMTP: fake credentials override any real `.env`, and a test that tries to open a real SMTP connection fails. `ruff check .` lints the codebase.
+
 Scripts under `scripts/` run independently of the daily pipeline, for the situations the scheduler does not cover.
 
 **Manual resend.** Sends the most recent report to arbitrary recipients, for subscribers who join mid-month or who never received the mail:
