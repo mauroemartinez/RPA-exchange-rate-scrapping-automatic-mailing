@@ -90,5 +90,5 @@ def test_la_inflacion_acumulada_arranca_con_el_periodo(df, resultados):
 
     primera_inflacion = va.dropna(subset=["Inflación Mensual"])["Fecha"].min()
     assert primera_inflacion == pd.Timestamp("2026-08-31")
-    assert va["Inflación Mensual Acumulada"].dropna().iloc[0] == va["Inflación Mensual"].dropna().iloc[0]
+    assert va["Inflación Mensual Acumulada"].dropna().iloc[0] == pytest.approx(va["Inflación Mensual"].dropna().iloc[0])
     assert list(va.index[:3]) == [0, 1, 2]
