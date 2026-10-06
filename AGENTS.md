@@ -45,6 +45,14 @@ playwright install chromium            # required once, for the scrapers
 
 `requirements.txt` holds only what production imports, and it is what the Docker image installs. Both lock files are generated from their `.in` with `uv pip compile` (the command is in the header of each `.in`). Do not regenerate them with `pip freeze > requirements.txt` from PowerShell 5: it writes UTF-16 and pins whatever happens to be installed.
 
+**Tests and lint:**
+```bash
+pytest         # offline: no network, no Supabase, no SMTP
+ruff check .
+```
+
+The test suite loads fake credentials over any real `.env` and fails any test that tries to open a real SMTP connection, so it is always safe to run. It covers the transformations, charts, email assembly, the pipeline orchestration through fake dependencies, the idempotent insert, `preview_git` against temporary git repos, the Gemini failover, the API and the manual resend.
+
 **Resend today's report to one person:**
 ```bash
 python scripts/reenvio_manual.py alguien@mail.com
@@ -63,7 +71,7 @@ See "Manual resend" below.
 5. **persistencia:** `data_access.guardar_fila()`, one atomic `INSERT ... ON CONFLICT ("Fecha") DO NOTHING` (`DO UPDATE` under `--forzar`)
 6. **ia:** `ia_generator.procesar_y_guardar_parrafo(engine, fecha_esperada=hoy)` queries Supabase, computes 1-day and 25-session variations, prompts Gemini and saves the result back via `UPDATE`. It refuses to write when the newest row is not today's, so a row that failed to insert can never get yesterday's paragraph overwritten
 7. **graficos:** `charts.py` draws the four JPGs. BTC/USD comes from Yahoo Finance through `scrapers/btc.py`; if Yahoo fails, the mail goes out without that chart instead of the whole run dying
-8. **mail:** `email_report.py` renders `templates/report_email.html` with Jinja2 and sends the two variants (with and without the CSV) in parallel. A failed send marks the run as failed
+8. **mail:** `email_report.py` renders `templates/report_email.html` with Jinja2 and sends the two variants in parallel: one to `EMAIL_RECEIVER`, and one to `EMAIL_RECEIVER_CSV` with the full history attached as CSV, generated at send time from the same data as the report. A failed send marks the run as failed
 9. **previews:** `preview_git.py` commits and pushes `Previews/`, only from the `main` branch, and checks the exit code of every git command
 
 Any stage in `error` sets exit code 1 and triggers one summary alert email, unless the failure already sent its own (scraper down, validation). The calculations (spreads, daily changes, Irving Fisher forwards, inflation accumulations) live in `transformations.py` as pure functions with no I/O.
@@ -101,7 +109,7 @@ All of these are declared and validated in `config.py`. A missing or malformed v
 ```
 EMAIL_SENDER, EMAIL_PASSWORD, EMAIL_RECEIVER, EMAIL_RECEIVER_CSV
 SUPABASE_DB_URL          # PostgreSQL connection string
-RUTA_BBDD                # Path to fallback CSV (relative paths resolve against the repo root)
+RUTA_BBDD                # Path to the CSV read when Supabase is down (relative paths resolve against the repo root)
 RUTA_REPO                # Path to repo root (for the git push step)
 FED_API_KEY              # St. Louis FRED API key
 GEMINI_API_KEY_1         # Primary Gemini key
@@ -138,7 +146,7 @@ Two guardrails worth knowing: it aborts if the newest row has no `ai_paragraph` 
 - **Today's date comes from `fechas.hoy()`,** computed in America/Argentina/Buenos_Aires. Never use `datetime.today()` or `date.today()` for the row date: the container runs in UTC, and a run after 21:00 would stamp the next day.
 - **No `locale.setlocale()`.** Spanish month names come from `fechas.MESES_ABREV`. The slim Docker image has no Spanish locale (the call raises there), and the locale is process-wide state.
 - **Charts never use pyplot's global state.** Each one is drawn on its own `matplotlib.figure.Figure` inside an `rc_context` that starts from the same base style, so a chart cannot leak its style into the next one or into the next run.
-- **`charts.FECHA_INICIO_VARIACIONES`,** the start of the variaciones acumuladas chart, is hardcoded to `"2025-07-01"`. Update it when the reference period changes.
+- **`charts.FECHA_INICIO_VARIACIONES`,** the start of the variaciones acumuladas chart, is hardcoded to `"2025-07-01"`. Update it when the reference period changes. The chart must receive the full inflation series, not the 12 months of the table: with only 12 months, the inflation line starts later than the dollar lines once the period is longer than a year.
 - **`ia_generator` requires at least 26 rows** in Supabase to compute 25-session rolling variations; it raises an exception otherwise.
 - **Jupyter's event loop cannot run scraper coroutines directly.** `ipykernel` already runs its own asyncio loop, and on Windows that loop cannot spawn subprocesses, which Playwright needs for its browser driver. Callers use the sync wrapper `scrapers.run_all_sync()`, which runs the coroutines in a separate thread with its own event loop (`run_async` in `scrapers/utils.py`). Do not call `asyncio.run()` or a bare `await` directly in a notebook cell for scraping.
 - **Send failures.** In the pipeline a failed send marks the run as failed (exit code 1) and is logged with the SMTP error. The notebook still catches and prints them, so there a bad Gmail App Password surfaces as a `535` line and nothing else. Since alerts use the same credentials, they fail with it; the exit code is the signal that survives. Test SMTP changes with `python pipeline.py --dry-run --enviar-a <your address>`.
