@@ -381,17 +381,17 @@ def opcion_1() -> str:
 ETAPAS = [
     # (número, título, detalle, color de la familia de la opción 1)
     (1, "Control", "run lock · weekends &amp; holidays skipped", "#A855F7"),
-    (2, "History", "reads the warehouse, CSV fallback", "#2FD27C"),
+    (2, "History", "reads the warehouse; flags an unfinished day", "#2FD27C"),
     (3, "Scraping", "6 sources in parallel", "#1ECBEA"),
     (4, "Validation", "Pydantic gate before any write", "#12B5CC"),
     (5, "Persistence", "idempotent upsert of today's row", "#2FD27C"),
     (6, "AI narrative", "Gemini JSON: summary + chart comments", "#B38BF5"),
-    (7, "Indicators &amp; charts", "money &amp; debt data, 6 charts, debt in USD", "#F2CC0C"),
-    (8, "Mail", "2 variants, one with CSV", "#FF4766"),
-    (9, "Deck", "executive PowerPoint", "#F2CC0C"),
-    (10, "Publish", "charts to GitHub, deck to its branch", "#FF4766"),
-    (11, "Series", "money &amp; debt series to Supabase", "#2FD27C"),
-    (12, "Result", "state and time per stage; any error turns it red", "#2088FF"),
+    (7, "Indicators", "money &amp; debt series: BCRA, Finanzas", "#1ECBEA"),
+    (8, "Charts", "6 charts, debt in USD", "#F2CC0C"),
+    (9, "Mail", "2 variants, one with CSV", "#FF4766"),
+    (10, "Deck", "executive PowerPoint", "#F2CC0C"),
+    (11, "Publish", "charts to GitHub, deck to its branch", "#FF4766"),
+    (12, "Series", "money &amp; debt series to Supabase", "#2FD27C"),
 ]
 
 FUENTES_2 = [
