@@ -11,11 +11,16 @@ import pytest
 
 import charts
 import ia_generator
+import indicadores
 import pipeline
 import presentacion
-from conftest import HOY
+from conftest import HOY, jpeg_minimo, series_sinteticas
 from scrapers import agregados
 from scrapers.utils import ScraperError
+
+# Los gráficos de agregados y deuda de verdad, para los tests que los dibujan: el
+# fixture los reemplaza por un .jpg mínimo para que el resto de los tests no tarde
+GRAFICO_AGREGADOS, GRAFICO_DEUDA = charts.grafico_agregados, charts.grafico_deuda
 
 
 class EngineFalso:
@@ -33,6 +38,17 @@ def entorno(historico, resultados, btc_crudo, tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "PREVIEWS", tmp_path / "Previews")
     hechos = {"filas": [], "parrafos": [], "mails": [], "alertas": [], "previews": [], "limpiezas": [],
               "presentaciones": []}
+
+    # Los datos de agregados y deuda se preparan de verdad; solo se saltea el dibujo
+    def jpg(carpeta, nombre):
+        ruta = Path(carpeta) / nombre
+        ruta.write_bytes(jpeg_minimo())
+        return ruta
+
+    monkeypatch.setattr(pipeline.charts, "grafico_agregados", lambda niveles, interanual, carpeta: jpg(carpeta, charts.AGREGADOS))
+    monkeypatch.setattr(pipeline.charts, "grafico_deuda", lambda datos, carpeta: jpg(carpeta, charts.DEUDA))
+    series, provisorios = series_sinteticas()
+    del_bcra = {clave: puntos for clave, puntos in series.items() if clave != agregados.DEUDA_BRUTA.clave}
 
     def guardar_fila(engine, fila, sobrescribir=False):
         hechos["filas"].append((fila, sobrescribir))
@@ -59,6 +75,8 @@ def entorno(historico, resultados, btc_crudo, tmp_path, monkeypatch):
         alertar_scraper=lambda exc: hechos["alertas"].append("scraper") or True,
         alertar_validacion=lambda exc: hechos["alertas"].append("validacion") or True,
         tabla_series=lambda engine: False,
+        descargar_series=lambda desde: dict(del_bcra),
+        descargar_deuda=lambda: (series[agregados.DEUDA_BRUTA.clave], provisorios),
         columna_secciones=lambda engine: False,
         limpiar_secciones=lambda engine, fecha: hechos["limpiezas"].append(fecha) or 1,
         feriado=lambda fecha: None,
@@ -79,7 +97,8 @@ def test_corrida_completa(entorno):
     assert r.estado == "ok" and r.exitosa
     assert _estados(r) == {
         "historico": "ok", "scraping": "ok", "validacion": "ok", "persistencia": "ok",
-        "ia": "ok", "graficos": "ok", "mail": "ok", "presentacion": "ok", "previews": "omitida", "series": "omitida",
+        "ia": "ok", "indicadores": "ok", "graficos": "ok", "mail": "ok", "presentacion": "ok",
+        "previews": "omitida", "series": "omitida",
     }
     fila, sobrescribir = hechos["filas"][0]
     assert fila["Fecha"].iloc[0] == HOY and sobrescribir is False
@@ -177,7 +196,7 @@ def test_sin_btc_el_mail_sale_igual_sin_ese_grafico(entorno):
     assert _estados(r)["graficos"] == "advertencia"
     mensaje = hechos["mails"][0][0]
     cids = [p.get("Content-ID") for p in mensaje.walk() if p.get_content_type() == "image/jpeg"]
-    assert cids == ["<image1>", "<image2>", "<image3>"]
+    assert cids == ["<image1>", "<image2>", "<image3>", "<image5>", "<image6>"]
     assert "cid:image4" not in mensaje.get_payload()[0].get_payload(decode=True).decode()
 
 
@@ -290,7 +309,7 @@ def test_series_se_guardan_cuando_existe_la_tabla(entorno):
     )
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
     assert _estados(r)["series"] == "ok"
-    assert sorted(guardadas) == sorted(s.clave for s in agregados.SERIES)
+    assert sorted(guardadas) == sorted(agregados.CATALOGO)
     assert r.estado == "ok"
 
 
@@ -300,11 +319,17 @@ def test_una_falla_en_las_series_no_pone_la_corrida_en_rojo(entorno):
     def descargar(desde):
         raise ScraperError("BCRA", "leer agregados monetarios", TimeoutError("timeout"))
 
-    deps = replace(deps, tabla_series=lambda engine: True, descargar_series=descargar)
+    deps = replace(deps, tabla_series=lambda engine: True, descargar_series=descargar,
+                   guardar_series=lambda engine, serie, puntos: len(puntos))
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
-    assert _estados(r)["series"] == "advertencia"
+    assert _estados(r)["indicadores"] == "advertencia" and _estados(r)["graficos"] == "advertencia"
     assert r.estado == "advertencia" and r.exitosa
     assert len(hechos["mails"]) == 2
+    # Sin el BCRA no hay gráfico de agregados; el de deuda sale con la deuda bruta sola
+    cids = [p.get("Content-ID") for p in hechos["mails"][0][0].walk() if p.get_content_type() == "image/jpeg"]
+    assert "<image5>" not in cids and "<image6>" in cids
+    # Y la etapa de series guarda lo que sí llegó
+    assert _estados(r)["series"] == "ok"
 
 
 def _secciones():
@@ -497,8 +522,9 @@ def test_una_serie_rota_no_frena_a_las_demas(entorno):
 
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
 
-    assert _estados(r)["series"] == "advertencia"
-    assert "m2" not in guardadas and len(guardadas) == len(agregados.SERIES) - 1
+    # La serie rota se descarta al bajarla; las demás se grafican y se guardan
+    assert _estados(r)["indicadores"] == "advertencia"
+    assert "m2" not in guardadas and len(guardadas) == len(agregados.CATALOGO) - 1
 
 
 @pytest.mark.parametrize("argumentos", [
@@ -571,7 +597,7 @@ def test_un_grafico_que_falla_no_viaja_aunque_quede_el_de_ayer(entorno, monkeypa
     assert _estados(r)["graficos"] == "error" and r.estado == "error"
     mensaje = hechos["mails"][0][0]
     cids = [p.get("Content-ID") for p in mensaje.walk() if p.get_content_type() == "image/jpeg"]
-    assert cids == ["<image1>", "<image3>", "<image4>"]
+    assert cids == ["<image1>", "<image3>", "<image4>", "<image5>", "<image6>"]
     assert len(hechos["alertas"]) == 1
 
 
@@ -699,7 +725,7 @@ def test_dry_run_arma_la_presentacion_en_la_salida_y_no_en_previews(entorno):
     r = pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida), deps)
 
     assert _estados(r)["presentacion"] == "ok"
-    assert len(_diapositivas(salida / presentacion.ARCHIVO)) == 6
+    assert len(_diapositivas(salida / presentacion.ARCHIVO)) == 8
     assert not (pipeline.PREVIEWS / presentacion.ARCHIVO).exists()
 
 
@@ -807,3 +833,98 @@ def test_dry_run_con_salida_dentro_de_previews_usa_un_temporal(monkeypatch, tmp_
     monkeypatch.setattr(pipeline, "PREVIEWS", tmp_path / "Previews")
     carpeta = pipeline._carpeta_de_salida(pipeline.Opciones(dry_run=True, salida=tmp_path / "Previews" / "prueba"))
     assert not carpeta.resolve().is_relative_to(tmp_path / "Previews")
+
+
+# ── Indicadores: agregados monetarios y deuda ────────────────────────────────
+
+def _cids(mensaje) -> list[str]:
+    return [p.get("Content-ID") for p in mensaje.walk() if p.get_content_type() == "image/jpeg"]
+
+
+def _html(mensaje) -> str:
+    return mensaje.get_payload()[0].get_payload(decode=True).decode()
+
+
+def test_los_graficos_nuevos_viajan_con_su_explicacion(entorno, monkeypatch):
+    deps, hechos, salida = entorno
+    monkeypatch.setattr(pipeline.charts, "grafico_agregados", GRAFICO_AGREGADOS)
+    monkeypatch.setattr(pipeline.charts, "grafico_deuda", GRAFICO_DEUDA)
+
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+
+    assert r.estado == "ok"
+    assert (salida / charts.AGREGADOS).stat().st_size > 10_000 and (salida / charts.DEUDA).stat().st_size > 10_000
+    mensaje = hechos["mails"][0][0]
+    assert _cids(mensaje) == [f"<image{i}>" for i in range(1, 7)]
+    html = _html(mensaje)
+    assert indicadores.TEXTO_AGREGADOS in html and indicadores.TEXTO_DEUDA in html
+    assert "descontada la inflación, las dos cayeron." in html
+    assert "la deuda bruta del Tesoro era de USD 484,9 mil millones" in html
+
+
+def test_sin_las_fuentes_el_mail_sale_sin_esos_graficos(entorno):
+    deps, hechos, salida = entorno
+
+    def caida(*args, **kwargs):
+        raise ScraperError("BCRA", "leer agregados monetarios", TimeoutError("timeout"))
+
+    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, descargar_series=caida, descargar_deuda=caida))
+
+    assert _estados(r)["indicadores"] == "advertencia" and _estados(r)["graficos"] == "advertencia"
+    assert r.estado == "advertencia" and hechos["alertas"] == []
+    mensaje = hechos["mails"][0][0]
+    assert _cids(mensaje) == ["<image1>", "<image2>", "<image3>", "<image4>"]
+    assert 'class="explicacion"' not in _html(mensaje)
+
+
+def test_sin_la_secretaria_el_grafico_de_deuda_sale_con_el_bcra(entorno):
+    deps, hechos, salida = entorno
+
+    def caida():
+        raise ScraperError("Secretaría de Finanzas", "leer la deuda bruta mensual", TimeoutError("timeout"))
+
+    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, descargar_deuda=caida))
+
+    assert _estados(r)["indicadores"] == "advertencia" and _estados(r)["graficos"] == "ok"
+    html = _html(hechos["mails"][0][0])
+    assert "<image6>" in _cids(hechos["mails"][0][0])
+    assert "deuda bruta del Tesoro era de" not in html and "familias y empresas les debían a los bancos" in html
+
+
+def test_un_grafico_nuevo_que_falla_es_una_advertencia(entorno, monkeypatch):
+    deps, hechos, salida = entorno
+
+    def falla(*args, **kwargs):
+        raise ValueError("datos raros")
+
+    monkeypatch.setattr(pipeline.charts, "grafico_deuda", falla)
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+    assert _estados(r)["graficos"] == "advertencia" and r.estado == "advertencia"
+    assert "<image6>" not in _cids(hechos["mails"][0][0])
+
+
+def test_el_dry_run_baja_los_indicadores_pero_no_los_guarda(entorno):
+    deps, hechos, salida = entorno
+    bajadas, guardadas = [], []
+    original = deps.descargar_series
+    deps = replace(
+        deps, tabla_series=lambda engine: True,
+        descargar_series=lambda desde: bajadas.append(desde) or original(desde),
+        guardar_series=lambda engine, serie, puntos: guardadas.append(serie.clave) or len(puntos),
+    )
+    r = pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida), deps)
+    assert _estados(r)["indicadores"] == "ok" and _estados(r)["series"] == "omitida"
+    assert bajadas == [indicadores.desde(HOY)] and guardadas == []
+
+
+def test_series_diarias_desde_el_corte_y_mensuales_enteras(entorno):
+    deps, hechos, salida = entorno
+    guardadas = {}
+    deps = replace(deps, tabla_series=lambda engine: True,
+                   guardar_series=lambda engine, serie, puntos: guardadas.setdefault(serie.clave, puntos) and len(puntos))
+
+    pipeline.correr(pipeline.Opciones(salida=salida), deps)
+
+    corte = HOY - timedelta(days=pipeline.DIAS_SERIES)
+    assert min(f for f, _ in guardadas["base_monetaria"]) >= corte
+    assert len(guardadas["deuda_bruta_tesoro"]) == 30 and len(guardadas["m3"]) == 30

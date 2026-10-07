@@ -12,9 +12,11 @@ diaria ya dejó hecho:
   - el ai_paragraph ya guardado en esa fila
   - los .jpg que quedaron en Previews/
 
-La única fuente externa que sí se vuelve a pedir es la serie de inflación mensual
-del BCRA (GET, solo lectura): no está en Fact_Mercado_Macro, así que no hay de
-dónde replayearla.
+Las únicas fuentes externas que sí se vuelven a pedir (GET, solo lectura) son las
+que no están en Fact_Mercado_Macro: la inflación mensual del BCRA, para la tabla, y
+las series de las frases de los gráficos de agregados y deuda (BCRA y Secretaría
+de Finanzas). Esas frases salen con el último dato publicado al momento del
+reenvío; si alguna fuente no responde, el gráfico va con su texto fijo solo.
 
 El HTML sale de email_report, el mismo módulo que usa el pipeline diario, así que
 es idéntico al del mail del día salvo la línea de performance. Con varios
@@ -47,9 +49,13 @@ import data_access
 import email_report
 import fechas
 import ia_generator
+import indicadores
 import transformations
 from config import settings
-from scrapers import agregados
+from scrapers import agregados, finanzas
+
+# Las series que necesitan las frases de los gráficos de agregados y deuda
+CLAVES_FRASES = ["base_monetaria", "m2", "inflacion_interanual", "prestamos_sector_privado", "tipo_cambio_mayorista"]
 
 
 def armar_inflacion() -> pd.DataFrame:
@@ -57,6 +63,22 @@ def armar_inflacion() -> pd.DataFrame:
     mensual = agregados.descargar(claves=["inflacion_mensual"])["inflacion_mensual"]
     inflacion = transformations.serie_inflacion(mensual)
     return transformations.ultimos_meses(inflacion)
+
+
+def armar_explicaciones(fecha_reporte: dt.date, cids: list[str]) -> dict:
+    """Las explicaciones de agregados y deuda, si esos gráficos viajan; sin datos, con su texto fijo solo."""
+    if indicadores.CID_AGREGADOS not in cids and indicadores.CID_DEUDA not in cids:
+        return {}
+    series, provisorios = {}, set()
+    try:
+        series.update(agregados.descargar(desde=indicadores.desde(fecha_reporte), claves=CLAVES_FRASES))
+    except Exception as exc:
+        print(f"  ⚠️ Sin series del BCRA para las explicaciones: {exc}")
+    try:
+        series[agregados.DEUDA_BRUTA.clave], provisorios = finanzas.descargar()
+    except Exception as exc:
+        print(f"  ⚠️ Sin la deuda bruta de la Secretaría de Finanzas: {exc}")
+    return indicadores.explicaciones(series, provisorios, cids=cids)
 
 
 def leer_imagenes(fecha_reporte: dt.date) -> dict[str, bytes]:
@@ -118,11 +140,15 @@ def main() -> None:
     # Los comentarios por gráfico de la fase 4, si la fila los tiene
     comentarios = ia_generator.comentarios_por_grafico(df.iloc[0].get("ai_secciones"))
 
+    graficos = email_report.cids_disponibles(imagenes)
+    explicaciones = armar_explicaciones(dt.date.fromisoformat(ultima), graficos)
+
     html = email_report.renderizar(
         df, inflacion_12, fwd_oficial, fwd_blue, parrafo,
         performance_segundos=time.perf_counter() - comienzo,
-        graficos=email_report.cids_disponibles(imagenes),
+        graficos=graficos,
         comentarios=comentarios,
+        explicaciones=explicaciones,
     )
 
     # Con un solo destinatario va derecho en Para, que es lo habitual en un

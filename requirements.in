@@ -29,6 +29,7 @@ playwright       # scraping de BNA, DolarHoy, Ambito
 curl_cffi        # requerido por yfinance
 yfinance         # cotización de BTC
 tenacity         # reintentos con backoff
+openpyxl         # lee el Excel mensual de deuda de la Secretaría de Finanzas
 
 # ── Base de datos ──
 SQLAlchemy

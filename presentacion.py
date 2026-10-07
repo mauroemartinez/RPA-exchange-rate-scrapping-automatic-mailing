@@ -1,9 +1,11 @@
-"""Presentación ejecutiva en PowerPoint: seis diapositivas con lo que deja la corrida del día.
+"""Presentación ejecutiva en PowerPoint: ocho diapositivas con lo que deja la corrida del día.
 
 Portada; un tablero con blue, MEP, billete, riesgo país, BADLAR y el forward de
-Fisher, cada uno con su variación; el análisis de IA; y tres diapositivas de
+Fisher, cada uno con su variación; el análisis de IA; tres diapositivas de
 gráficos (tipos de cambio y riesgo país, inflación con variaciones acumuladas,
-BTC), con sus comentarios por gráfico cuando los hay. Usa los colores del mail.
+BTC), con sus comentarios por gráfico cuando los hay; y las de agregados
+monetarios y deuda, con la misma explicación para no especialistas que el mail.
+Usa los colores del mail.
 
 La arma todos los días la etapa `presentacion` de pipeline.py, con los datos y
 los textos de esa misma corrida, y queda en Previews/ con un nombre fijo
@@ -23,6 +25,7 @@ from pptx.util import Inches, Pt
 import charts
 import email_report
 import ia_generator
+import indicadores
 import transformations
 
 ARCHIVO = "Reporte Ejecutivo.pptx"
@@ -110,6 +113,7 @@ def _metadatos(prs, fecha: date) -> None:
 
 def armar(
     df, imagenes: dict[str, Path], salida: Path, parrafo: str | None = None, comentarios: dict | None = None,
+    explicaciones: dict | None = None,
 ) -> Path:
     """Arma la presentación en `salida`/ARCHIVO y devuelve su ruta.
 
@@ -122,6 +126,8 @@ def armar(
     pasa en memoria porque todavía no están en `df`. Sin ellos se leen de la fila 0
     (ai_paragraph y ai_secciones), que es lo que hace el script manual. `comentarios`
     tiene la forma de ia_generator.comentarios_por_grafico; {} significa "sin comentarios".
+    `explicaciones` son las de indicadores.explicaciones; sin ellas, las diapositivas
+    de agregados y deuda llevan solo el texto fijo, sin la frase con los últimos datos.
     """
     hoy, ayer = df.iloc[0], df.iloc[1]
     fecha = _fecha(hoy["Fecha"])
@@ -132,6 +138,8 @@ def armar(
     if parrafo is None:
         guardado = hoy.get("ai_paragraph")
         parrafo = guardado if isinstance(guardado, str) and guardado else SIN_ANALISIS
+    if explicaciones is None:
+        explicaciones = indicadores.explicaciones({})
 
     prs = Presentation()
     prs.slide_width, prs.slide_height = ANCHO, ALTO
@@ -178,11 +186,14 @@ def armar(
     _texto(analisis, Inches(0.6), Inches(6.8), Inches(12.1), Inches(0.4),
            "Generado con Gemini a partir de los datos del día. No es asesoramiento financiero.", 11, GRIS)
 
-    # 4 a 6. Gráficos, con sus comentarios si los hay
+    # 4 a 8. Gráficos, con sus comentarios y explicaciones si los hay
     def diapositiva_grafico(titulo: str, nombres: list[str], cid: str | None):
         slide = _encabezado(prs, titulo, fecha)
         presentes = [imagenes[n] for n in nombres if n in imagenes]
-        textos = comentarios.get(cid, []) if cid else []
+        textos = list(comentarios.get(cid, [])) if cid else []
+        explicacion = explicaciones.get(cid) if cid else None
+        if explicacion:
+            textos.append((explicacion["titulo"], "\n\n".join(filter(None, [explicacion["texto"], explicacion["dato"]]))))
         cuerpo = "\n\n".join(f"{t.upper()}\n{x}" for t, x in textos)
 
         if len(presentes) > 1:
@@ -211,6 +222,8 @@ def armar(
     diapositiva_grafico("Tipos de cambio y riesgo país", [charts.TIPOS_DE_CAMBIO], "image1")
     diapositiva_grafico("Inflación y variaciones acumuladas", [charts.INFLACION, charts.VARIACIONES], None)
     diapositiva_grafico("Bitcoin", [charts.BTC], "image4")
+    diapositiva_grafico("Agregados monetarios", [charts.AGREGADOS], indicadores.CID_AGREGADOS)
+    diapositiva_grafico("Endeudamiento, en dólares", [charts.DEUDA], indicadores.CID_DEUDA)
 
     salida = Path(salida)
     salida.mkdir(parents=True, exist_ok=True)

@@ -1,9 +1,19 @@
-"""Agregados monetarios e inflación del BCRA, con su fecha, frecuencia y unidad originales.
+"""Series macro del BCRA (agregados, inflación, deuda), con su fecha, frecuencia y unidad originales.
 
 Fase 3 del roadmap. Usa la misma API que scrapers/bcra.py (estadísticas v4.0) y
 devuelve cada serie tal cual la publica el BCRA: no convierte unidades ni completa
 días. La base monetaria viene en millones de ARS y el M3 en miles de ARS porque así
 salen de la fuente; cualquier conversión es cosa del gráfico, no del dato guardado.
+Lo mismo con la deuda: el BCRA la publica en millones de ARS y el pasaje a dólares
+(con el tipo de cambio mayorista de cada día, que también se guarda) es del gráfico.
+
+Endeudamiento, según la definición elegida (docs/fase-3-agregados-y-deuda.md):
+C, la deuda del BCRA y su financiamiento al Tesoro, y D, los préstamos al sector
+privado. De C quedó afuera la posición neta de pases (variable 1261): está en
+cero desde que el BCRA dejó de tomar pases pasivos en 2024. La deuda bruta del
+Tesoro (opción A) no sale de esta API sino de un Excel de la Secretaría de
+Finanzas: scrapers/finanzas.py. Su descripción vive acá (DEUDA_BRUTA) para que
+CATALOGO tenga todas las series que se guardan en Fact_Series_Macro.
 
 Por qué estas series y no otras (detalle en docs/fase-3-agregados-y-deuda.md):
 las M1, M2 y M3 diarias del Informe Monetario Diario (ids 1232 a 1234) están sin
@@ -28,12 +38,18 @@ PAGINA = 3000
 @dataclass(frozen=True)
 class Serie:
     clave: str
-    id_bcra: int
+    id_bcra: int | None  # None para las series que no salen de la API del BCRA
     nombre: str
-    frecuencia: str  # "D" diaria o "M" mensual, como la informa la API
-    unidad: str  # tal cual la publica el BCRA
+    frecuencia: str  # "D" diaria o "M" mensual, como la informa la fuente
+    unidad: str  # tal cual la publica la fuente
     positiva: bool = True  # un stock no puede ser <= 0; una variación de precios sí
     fuente: str = "BCRA"
+    referencia: str | None = None  # dónde está el dato en una fuente sin ids (hoja y fila de un Excel)
+
+    @property
+    def id_fuente(self) -> str:
+        """Lo que se guarda en la columna id_fuente: el id del BCRA o la referencia."""
+        return self.referencia or str(self.id_bcra)
 
 
 SERIES = (
@@ -48,8 +64,25 @@ SERIES = (
     # Fact_Series_Macro (docs/evaluacion-cache.md)
     Serie("inflacion_mensual", 27, "Inflación mensual", "M", "porcentaje", positiva=False),
     Serie("inflacion_interanual", 28, "Inflación interanual", "M", "porcentaje", positiva=False),
+    # Endeudamiento, opción C: deuda del BCRA y financiamiento al Tesoro
+    Serie("letras_bcra_pesos", 1258, "Letras del BCRA en pesos", "D", "millones de ARS"),
+    Serie("letras_bcra_moneda_extranjera", 1259, "Letras del BCRA en moneda extranjera", "D", "millones de ARS"),
+    Serie("adelantos_transitorios", 1268, "Adelantos transitorios del BCRA al Tesoro", "D", "millones de ARS"),
+    # Endeudamiento, opción D: lo que familias y empresas les deben a los bancos
+    Serie("prestamos_sector_privado", 26, "Préstamos al sector privado", "D", "millones de ARS"),
+    # Para pasar a dólares las series en pesos, fecha por fecha
+    Serie("tipo_cambio_mayorista", 5, "Tipo de cambio mayorista de referencia (Com. A 3500)", "D", "ARS por USD"),
 )
 POR_CLAVE = {s.clave: s for s in SERIES}
+
+# Endeudamiento, opción A: la deuda bruta del Tesoro, que publica la Secretaría de
+# Finanzas en un Excel mensual (scrapers/finanzas.py), en millones de USD
+DEUDA_BRUTA = Serie(
+    "deuda_bruta_tesoro", None, "Deuda bruta de la Administración Central", "M", "millones de USD",
+    fuente="Secretaría de Finanzas", referencia="A.1, A- DEUDA BRUTA",
+)
+# Todas las series que se guardan en Fact_Series_Macro, por clave
+CATALOGO = {**POR_CLAVE, DEUDA_BRUTA.clave: DEUDA_BRUTA}
 
 
 @retry_http

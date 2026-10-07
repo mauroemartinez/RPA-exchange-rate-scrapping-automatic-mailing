@@ -70,9 +70,10 @@ def test_el_template_sin_la_variable_graficos_muestra_los_cuatro(df, inflacion_1
 
 
 def test_cids_disponibles(imagenes):
-    assert er.cids_disponibles(imagenes) == ["image1", "image2", "image3", "image4"]
+    assert er.cids_disponibles(imagenes) == [f"image{i}" for i in range(1, 7)]
     del imagenes[charts.BTC]
-    assert er.cids_disponibles(imagenes) == ["image1", "image2", "image3"]
+    # Los cid son fijos por gráfico: sin BTC, los de agregados y deuda siguen siendo 5 y 6
+    assert er.cids_disponibles(imagenes) == ["image1", "image2", "image3", "image5", "image6"]
 
 
 def test_armar_mensaje(imagenes):
@@ -82,7 +83,8 @@ def test_armar_mensaje(imagenes):
     msg = message_from_string(em.as_string())
     partes = [(p.get_content_type(), p.get("Content-ID")) for p in msg.walk() if not p.is_multipart()]
     assert partes == [("text/html", None), ("image/jpeg", "<image1>"), ("image/jpeg", "<image3>"),
-                      ("image/jpeg", "<image4>"), ("text/csv", None)]
+                      ("image/jpeg", "<image4>"), ("image/jpeg", "<image5>"), ("image/jpeg", "<image6>"),
+                      ("text/csv", None)]
     assert msg["Bcc"] == "a@example.com, b@example.com"
     assert msg["To"] == "remitente@example.com"
 
@@ -157,3 +159,22 @@ def test_csv_historico(historico):
     assert lineas[1].startswith(historico["Fecha"].iloc[0] + ",")
     assert "\r" not in texto
     assert "Párrafo del" in texto  # UTF-8 sin mojibake
+
+
+def test_la_explicacion_va_debajo_de_su_grafico(df, inflacion_12):
+    explicaciones = {"image5": {"titulo": "Agregados, en simple", "texto": "Texto con <b> & más", "dato": "Dato del día."}}
+    html = er.renderizar(df, inflacion_12, 2000.0, 2100.0, "x", 1.0, graficos=["image1", "image5"],
+                         explicaciones=explicaciones)
+    assert html.index("cid:image1") < html.index("cid:image5") < html.index('class="explicacion"')
+    assert "Texto con &lt;b&gt; &amp; más" in html and "<b style=\"color:#1a252f;\">Dato del día.</b>" in html
+
+    sin_dato = {"image5": {**explicaciones["image5"], "dato": None}}
+    html = er.renderizar(df, inflacion_12, 2000.0, 2100.0, "x", 1.0, graficos=["image5"], explicaciones=sin_dato)
+    assert 'class="explicacion"' in html and "Dato del día." not in html
+
+
+def test_sin_explicaciones_el_html_no_cambia(df, inflacion_12):
+    base = er.renderizar(df, inflacion_12, 2000.0, 2100.0, "x", 1.0, graficos=["image1", "image2"])
+    otra = er.renderizar(df, inflacion_12, 2000.0, 2100.0, "x", 1.0, graficos=["image1", "image2"],
+                         explicaciones={"image5": {"titulo": "t", "texto": "x", "dato": None}})
+    assert 'class="explicacion"' not in base and base == otra

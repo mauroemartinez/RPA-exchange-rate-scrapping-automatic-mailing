@@ -190,13 +190,13 @@ def sentencia_series():
 
 
 def guardar_series(engine: Engine, serie, puntos: list[tuple[date, float]]) -> int:
-    """Upsert de los puntos de una scrapers.agregados.Serie. Devuelve cuántos escribió."""
+    """Upsert de los puntos de una scrapers.agregados.Serie (del BCRA o no). Devuelve cuántos escribió."""
     if not puntos:
         return 0
     filas = [
         {
             "serie": serie.clave, "Fecha": fecha, "valor": valor, "frecuencia": serie.frecuencia,
-            "unidad": serie.unidad, "fuente": serie.fuente, "id_fuente": str(serie.id_bcra),
+            "unidad": serie.unidad, "fuente": serie.fuente, "id_fuente": serie.id_fuente,
         }
         for fecha, valor in puntos
     ]

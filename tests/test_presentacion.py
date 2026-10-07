@@ -9,6 +9,7 @@ pytest.importorskip("pptx")
 from pptx import Presentation
 
 import charts
+import indicadores
 import presentacion
 import presentacion_ejecutiva
 from conftest import jpeg_minimo
@@ -27,11 +28,11 @@ def imagenes(tmp_path):
     return rutas
 
 
-def test_arma_las_seis_diapositivas(historico, imagenes, tmp_path):
+def test_arma_las_ocho_diapositivas(historico, imagenes, tmp_path):
     ruta = presentacion.armar(historico, imagenes, tmp_path / "salida")
     prs = Presentation(ruta)
 
-    assert len(prs.slides) == 6
+    assert len(prs.slides) == 8
     assert ruta == tmp_path / "salida" / presentacion.ARCHIVO
     tablero = _textos(prs.slides[1])
     assert "DÓLAR BLUE" in tablero and "RIESGO PAÍS" in tablero and "FORWARD OFICIAL 3 MESES" in tablero
@@ -122,4 +123,18 @@ def test_el_script_manual_usa_el_mismo_armado(historico, imagenes, tmp_path, mon
 
     assert ruta == tmp_path / "manual" / presentacion.ARCHIVO
     prs = Presentation(ruta)
-    assert len(prs.slides) == 6 and historico["ai_paragraph"].iloc[0] in _textos(prs.slides[2])
+    assert len(prs.slides) == 8 and historico["ai_paragraph"].iloc[0] in _textos(prs.slides[2])
+
+
+def test_agregados_y_deuda_llevan_su_explicacion(historico, imagenes, tmp_path, series_indicadores):
+    # Sin explicaciones (el script manual): el texto fijo, sin la frase con datos
+    prs = Presentation(presentacion.armar(historico, imagenes, tmp_path))
+    assert indicadores.TITULO_AGREGADOS.upper() in _textos(prs.slides[6])
+    assert indicadores.TEXTO_DEUDA in _textos(prs.slides[7])
+
+    # Con las de la corrida, también la frase con los últimos datos
+    series, provisorios = series_indicadores
+    explicaciones = indicadores.explicaciones(series, provisorios)
+    prs = Presentation(presentacion.armar(historico, imagenes, tmp_path, explicaciones=explicaciones))
+    assert explicaciones[indicadores.CID_DEUDA]["dato"] in _textos(prs.slides[7])
+    assert explicaciones[indicadores.CID_AGREGADOS]["dato"] in _textos(prs.slides[6])

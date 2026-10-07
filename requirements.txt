@@ -43,6 +43,8 @@ dnspython==2.8.0
     # via email-validator
 email-validator==2.3.0
     # via pydantic
+et-xmlfile==2.0.0
+    # via openpyxl
 fastapi==0.141.1
     # via -r requirements.in
 fonttools==4.62.1
@@ -97,6 +99,8 @@ numpy==2.4.4
     #   pandas
     #   seaborn
     #   yfinance
+openpyxl==3.1.5
+    # via -r requirements.in
 packaging==26.2
     # via matplotlib
 pandas==3.0.2

@@ -182,6 +182,22 @@ def serie_a_frame(puntos: list[tuple[date, float]], nombre: str = "valor") -> pd
     return df.sort_values("Fecha").reset_index(drop=True)
 
 
+def a_dolares(puntos: list[tuple[date, float]], tipo_cambio: list[tuple[date, float]]) -> pd.DataFrame:
+    """Una serie en pesos pasada a dólares fecha por fecha, con el tipo de cambio vigente ese día.
+
+    Para cada fecha toma el último tipo de cambio publicado hasta esa fecha
+    (merge_asof hacia atrás), así un día sin cotización usa la anterior. Devuelve
+    Fecha, valor (en pesos), tipo_cambio y usd, en la misma escala que el valor:
+    millones de ARS dan millones de USD. Las fechas anteriores al primer tipo de
+    cambio quedan afuera.
+    """
+    serie = serie_a_frame(puntos)
+    cambio = serie_a_frame(tipo_cambio, "tipo_cambio")
+    cruce = pd.merge_asof(serie, cambio, on="Fecha", direction="backward").dropna(subset=["tipo_cambio"])
+    cruce["usd"] = cruce["valor"] / cruce["tipo_cambio"]
+    return cruce.reset_index(drop=True)
+
+
 def interanual_por_fecha(puntos: list[tuple[date, float]]) -> pd.DataFrame:
     """Para cada fecha, la variación % contra el último dato de un año antes o más.
 
