@@ -43,3 +43,6 @@ Previews/*.pptx
 # Archivos de bloqueo de Office (~$Reporte...): se crean al abrir un documento y
 # llevan el nombre de usuario de Office
 ~$*
+
+# HTML intermedio del diagrama: se regenera con Assets/arquitectura/construir.py
+Assets/arquitectura/*.html
