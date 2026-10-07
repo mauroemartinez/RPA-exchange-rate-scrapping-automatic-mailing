@@ -100,7 +100,10 @@ def test_sin_respuesta_de_gemini_guarda_vacio(monkeypatch, con_historial):
 
 
 class _ClienteFalso:
-    """genai.Client falso: cada (key, modelo) responde según el guion."""
+    """genai.Client falso: cada (key, modelo) responde según el guion.
+
+    Una lista en el guion son respuestas sucesivas, una por llamada.
+    """
 
     guion: dict = {}
     llamadas: list = []
@@ -115,6 +118,8 @@ class _ClienteFalso:
     def generate_content(self, model, contents, config=None):
         _ClienteFalso.llamadas.append((self.api_key, model))
         respuesta = _ClienteFalso.guion.get((self.api_key, model), "ok")
+        if isinstance(respuesta, list):
+            respuesta = respuesta.pop(0) if respuesta else "ok"
         if isinstance(respuesta, Exception):
             raise respuesta
         return type("R", (), {"text": f"texto de {model}"})()
@@ -187,15 +192,13 @@ def test_con_todas_las_keys_agotadas_no_hay_parrafo(cliente_falso):
 
 
 def test_el_peor_caso_son_cinco_llamadas(cliente_falso):
+    agotada, saturado = Exception("429 RESOURCE_EXHAUSTED"), Exception("503 UNAVAILABLE")
     cliente_falso.guion = {
-        ("gemini-falsa-1", "gemini-3.5-flash"): Exception("429 RESOURCE_EXHAUSTED"),
-        ("gemini-falsa-2", "gemini-3.5-flash"): Exception("503 UNAVAILABLE"),
-        ("gemini-falsa-2", "gemini-2.5-flash"): Exception("429 RESOURCE_EXHAUSTED"),
+        # 1.a vuelta: las dos keys agotadas (2 intentos). 2.a vuelta: key 1 agotada,
+        # key 2 con el primer modelo saturado y el segundo agotado (3 intentos).
+        ("gemini-falsa-1", "gemini-3.5-flash"): [agotada, agotada],
+        ("gemini-falsa-2", "gemini-3.5-flash"): [agotada, saturado],
+        ("gemini-falsa-2", "gemini-2.5-flash"): [agotada],
     }
-    assert ia_generator.generar_con_failover("prompt") == (None, None, 3)
-
-    cliente_falso.llamadas.clear()
-    cliente_falso.guion[("gemini-falsa-1", "gemini-3.5-flash")] = Exception("400 INVALID_ARGUMENT")
     assert ia_generator.generar_parrafo("prompt") == (None, None)
-    # 1 (error técnico) + 1 + 1, y la tercera vuelta ya no entra: 3 llamadas
-    assert len(cliente_falso.llamadas) == 3
+    assert len(cliente_falso.llamadas) == 5
