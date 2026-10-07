@@ -138,11 +138,28 @@ def etiqueta_mes(fecha) -> str:
 MAX_REZAGO_DIAS = {"D": 10, "M": 75}
 
 
+def sin_ceros_iniciales(serie, puntos: list[tuple[date, float]]) -> tuple[list[tuple[date, float]], int]:
+    """(puntos sin los valores <= 0 del principio, cuántos se sacaron), para un stock.
+
+    La historia completa del BCRA trae algunas series con ceros en sus primeros años
+    (el M3 tiene uno en 1940): son la serie antes de existir, no datos. Solo se sacan
+    los del principio; un valor no positivo después del primer dato real sigue siendo
+    un error de validar_serie. Para lo que no es un stock (la inflación), no toca nada.
+    """
+    if not serie.positiva:
+        return puntos, 0
+    for i, (_, valor) in enumerate(puntos):
+        if valor > 0:
+            return puntos[i:], i
+    return [], len(puntos)
+
+
 def validar_serie(serie, puntos: list[tuple[date, float]], hoy: date) -> list[str]:
     """Levanta ValueError si la serie viene rota; devuelve avisos si viene atrasada.
 
     `serie` es un scrapers.agregados.Serie. Rota es: vacía, con fechas repetidas o
-    desordenadas, con valores no finitos, o un stock con valores <= 0.
+    desordenadas, con valores no finitos, o un stock con valores <= 0 (o < 0, si la
+    serie admite cero, como las letras del BCRA en los años sin letras en circulación).
     """
     if not puntos:
         raise ValueError(f"{serie.clave}: la API no devolvió puntos")
@@ -154,7 +171,7 @@ def validar_serie(serie, puntos: list[tuple[date, float]], hoy: date) -> list[st
     for fecha, valor in puntos:
         if not math.isfinite(valor):
             raise ValueError(f"{serie.clave}: valor no finito el {fecha}")
-        if serie.positiva and valor <= 0:
+        if serie.positiva and (valor < 0 if getattr(serie, "admite_cero", False) else valor <= 0):
             raise ValueError(f"{serie.clave}: valor no positivo ({valor}) el {fecha}")
 
     rezago = (hoy - fechas[-1]).days

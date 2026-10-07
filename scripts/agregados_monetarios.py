@@ -49,7 +49,11 @@ def main() -> None:
     print(f"\n{'serie':30s} {'frec':4s} {'unidad':16s} {'último dato':>11s} {'valor':>20s} {'i.a.':>8s}")
     avisos = []
     for serie in agregados.CATALOGO.values():
-        puntos = series[serie.clave]
+        # La historia completa trae ceros de antes de que la serie existiera (el M3 en 1940)
+        puntos, descartados = transformations.sin_ceros_iniciales(serie, series[serie.clave])
+        series[serie.clave] = puntos
+        if descartados:
+            avisos.append(f"{serie.clave}: se descartaron {descartados} valores en cero del principio de la serie")
         avisos += transformations.validar_serie(serie, puntos, hoy)
         fecha, valor = puntos[-1]
         interanual = transformations.variacion_interanual(puntos)

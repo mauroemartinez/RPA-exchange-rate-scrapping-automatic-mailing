@@ -262,3 +262,26 @@ def test_el_m3_tiene_su_propio_margen_de_atraso():
     assert t.validar_serie(m3, hace_90, HOY) == []  # 90 días: normal para el M3
     hace_110 = [(HOY - timedelta(days=110 + 31 * i), 1.0) for i in range(3)][::-1]
     assert t.validar_serie(m3, hace_110, HOY)  # 110: avisa
+
+
+def test_los_ceros_del_principio_de_un_stock_se_descartan():
+    m3 = agregados.POR_CLAVE["m3"]
+    puntos = [(date(1940, 6, 30), 0.0), (date(1940, 7, 31), 0.0), (date(1940, 8, 31), 5.0), (date(1940, 9, 30), 6.0)]
+    limpios, descartados = t.sin_ceros_iniciales(m3, puntos)
+    assert descartados == 2 and limpios == puntos[2:]
+    # Un cero después de datos reales no se toca: validar_serie lo va a rechazar
+    con_hueco = [(date(1940, 8, 31), 5.0), (date(1940, 9, 30), 0.0)]
+    assert t.sin_ceros_iniciales(m3, con_hueco) == (con_hueco, 0)
+    # La inflación puede ser cero o negativa: no es un stock
+    assert t.sin_ceros_iniciales(INFLACION, [(date(2020, 1, 31), 0.0)]) == ([(date(2020, 1, 31), 0.0)], 0)
+
+
+def test_las_letras_pueden_valer_cero_pero_no_menos():
+    letras = agregados.POR_CLAVE["letras_bcra_pesos"]
+    base = agregados.POR_CLAVE["base_monetaria"]
+    con_cero = [(HOY - timedelta(days=3), 0.0), (HOY - timedelta(days=2), 5.0)]
+    assert t.validar_serie(letras, con_cero, HOY) == []  # años sin letras en circulación
+    with pytest.raises(ValueError, match="no positivo"):
+        t.validar_serie(letras, [(HOY - timedelta(days=2), -1.0)], HOY)
+    with pytest.raises(ValueError, match="no positivo"):
+        t.validar_serie(base, con_cero, HOY)  # la base nunca vale cero
