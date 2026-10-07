@@ -160,3 +160,9 @@ def test_columna_existe_mira_solo_el_schema_public():
     assert data_access.columna_existe(engine, "ai_secciones") is True
     sql, params = engine.conexion.ejecutado[0]
     assert "table_schema = 'public'" in sql and params == {"t": "Fact_Mercado_Macro", "c": "ai_secciones"}
+
+
+def test_sin_csv_de_respaldo_llega_el_error_de_la_base(monkeypatch, tmp_path):
+    monkeypatch.setattr(data_access.settings, "ruta_bbdd", tmp_path / "no-existe.csv")
+    with pytest.raises(ConnectionError, match="caída"):
+        data_access.leer_historico(EngineFalso(falla=ConnectionError("caída")))

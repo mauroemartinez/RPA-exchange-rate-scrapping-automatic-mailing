@@ -103,7 +103,7 @@ class Settings(BaseSettings):
         """
         return v if v.is_absolute() else (RAIZ_PROYECTO / v).resolve()
 
-    @field_validator("api_key_easy_panel", mode="before")
+    @field_validator("api_key_easy_panel", "gemini_api_key_2", mode="before")
     @classmethod
     def _key_vacia_es_sin_key(cls, v):
         """API_KEY_EASY_PANEL= (vacía) cuenta como no configurada.
@@ -161,9 +161,11 @@ def reemplazos_sensibles() -> list[tuple[str, str]]:
         settings.fed_api_key, settings.supabase_db_url, settings.api_key_easy_panel,
     ]
     pares = [(s.get_secret_value(), "***") for s in secretos if s is not None]
-    clave_base = urlparse(settings.supabase_db_url.get_secret_value()).password
-    if clave_base:
-        pares.append((clave_base, "***"))
+    url = urlparse(settings.supabase_db_url.get_secret_value())
+    # La clave, y también el usuario del pooler (postgres.<id del proyecto>) y el host
+    for parte in (url.password, url.username if url.username != "postgres" else None, url.hostname):
+        if parte:
+            pares.append((parte, "***"))
     destinatarios = {str(m) for m in [*settings.email_receiver, *settings.email_receiver_csv, *settings.email_alertas]}
     pares += [(m, "[destinatario]") for m in destinatarios]
     return sorted((p for p in pares if p[0]), key=lambda p: len(p[0]), reverse=True)

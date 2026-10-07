@@ -73,7 +73,10 @@ def main(argv: list[str] | None = None) -> int:
 
     problema = (
         f"No hay fila del {hoy} en {data_access.TABLA}: la corrida de hoy no se hizo o falló antes de guardar.\n"
-        "Para hacerla ahora: python pipeline.py"
+        "Si la corrida no arrancó (no llegó ninguna alerta de ella): python pipeline.py, o en GitHub, "
+        "Actions > Corrida diaria > Run workflow, modo real.\n"
+        "Si arrancó y su alerta muestra la etapa persistencia en error, el mail YA SALIÓ: para cargar solo la "
+        "fila, python pipeline.py --sin-mail, o en GitHub el modo sin-mail. La corrida completa mandaría el mail otra vez."
     )
     print(problema)
     if args.sin_alerta:

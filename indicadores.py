@@ -12,6 +12,7 @@ import pandas as pd
 
 import charts
 import transformations
+from scrapers import agregados
 
 # Cuánta historia bajar para los dos gráficos: el panel de variación interanual
 # muestra un año, y cada punto se compara con el mismo día del año anterior
@@ -134,15 +135,27 @@ def frase_deuda(series: dict, provisorios=frozenset()) -> str | None:
     return frase[0].upper() + frase[1:] + "."
 
 
+def textos_fijos(cids: list[str] | None = None) -> dict[str, dict]:
+    """Las explicaciones sin la frase de los últimos datos. Es el plan B si calcularla falla."""
+    todas = {
+        CID_AGREGADOS: {"titulo": TITULO_AGREGADOS, "texto": TEXTO_AGREGADOS, "dato": None},
+        CID_DEUDA: {"titulo": TITULO_DEUDA, "texto": TEXTO_DEUDA, "dato": None, "con_deuda_bruta": False},
+    }
+    return {cid: explicacion for cid, explicacion in todas.items() if cids is None or cid in cids}
+
+
 def explicaciones(series: dict | None, provisorios=frozenset(), cids: list[str] | None = None) -> dict[str, dict]:
     """{cid: {"titulo", "texto", "dato"}} de los gráficos de agregados y deuda.
 
     `dato` es la frase con los últimos números; None si faltan series para armarla,
-    y entonces queda solo el texto fijo. `cids` limita a los gráficos que viajan.
+    y entonces queda solo el texto fijo. `cids` limita a los gráficos que viajan. La
+    de deuda dice además si llegó la deuda bruta, para citar o no a la Secretaría.
     """
     series = series or {}
-    todas = {
-        CID_AGREGADOS: {"titulo": TITULO_AGREGADOS, "texto": TEXTO_AGREGADOS, "dato": frase_agregados(series)},
-        CID_DEUDA: {"titulo": TITULO_DEUDA, "texto": TEXTO_DEUDA, "dato": frase_deuda(series, provisorios)},
-    }
-    return {cid: explicacion for cid, explicacion in todas.items() if cids is None or cid in cids}
+    todas = textos_fijos(cids)
+    if CID_AGREGADOS in todas:
+        todas[CID_AGREGADOS]["dato"] = frase_agregados(series)
+    if CID_DEUDA in todas:
+        todas[CID_DEUDA]["dato"] = frase_deuda(series, provisorios)
+        todas[CID_DEUDA]["con_deuda_bruta"] = bool(series.get(agregados.DEUDA_BRUTA.clave))
+    return todas

@@ -122,15 +122,27 @@ async def fetch_todas(
 ) -> dict[str, list[tuple[date, float]]]:
     """Todas las series (o las de `claves`) en paralelo, por clave."""
     series = [POR_CLAVE[c] for c in claves] if claves else list(SERIES)
-    try:
-        if client is not None:
-            resultados = await asyncio.gather(*(fetch(s, client, desde) for s in series))
-        else:
-            async with httpx.AsyncClient(timeout=TIMEOUT) as propio:
-                resultados = await asyncio.gather(*(fetch(s, propio, desde) for s in series))
-    except Exception as exc:
-        raise ScraperError("BCRA", "leer agregados monetarios", exc) from exc
-    return {s.clave: puntos for s, puntos in zip(series, resultados)}
+    # Hasta 4 variables a la vez: la API del BCRA limita a quien le pega muy seguido
+    limite = asyncio.Semaphore(4)
+
+    async def una(serie: Serie, cliente: httpx.AsyncClient):
+        async with limite:
+            return await fetch(serie, cliente, desde)
+
+    if client is not None:
+        resultados = await asyncio.gather(*(una(s, client) for s in series), return_exceptions=True)
+    else:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as propio:
+            resultados = await asyncio.gather(*(una(s, propio) for s in series), return_exceptions=True)
+
+    # Una variable que falla (un 404, una caída puntual) no se lleva puestas a las demás:
+    # se devuelven las que llegaron y quien llama ve cuáles faltan. Solo si no llegó
+    # ninguna es un error.
+    llegaron = {s.clave: r for s, r in zip(series, resultados) if not isinstance(r, BaseException)}
+    if not llegaron:
+        primero = next(r for r in resultados if isinstance(r, BaseException))
+        raise ScraperError("BCRA", "leer agregados monetarios", primero) from primero
+    return llegaron
 
 
 def descargar(desde: date | None = None, claves: list[str] | None = None) -> dict[str, list[tuple[date, float]]]:

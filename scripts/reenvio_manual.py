@@ -78,7 +78,11 @@ def armar_explicaciones(fecha_reporte: dt.date, cids: list[str]) -> dict:
         series[agregados.DEUDA_BRUTA.clave], provisorios = finanzas.descargar()
     except Exception as exc:
         print(f"  ⚠️ Sin la deuda bruta de la Secretaría de Finanzas: {exc}")
-    return indicadores.explicaciones(series, provisorios, cids=cids)
+    try:
+        return indicadores.explicaciones(series, provisorios, cids=cids)
+    except Exception as exc:
+        print(f"  ⚠️ No se pudieron armar las frases con los últimos datos ({exc}): van solo los textos fijos")
+        return indicadores.textos_fijos(cids)
 
 
 def leer_imagenes(fecha_reporte: dt.date) -> dict[str, bytes]:

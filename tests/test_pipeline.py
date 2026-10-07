@@ -928,3 +928,64 @@ def test_series_diarias_desde_el_corte_y_mensuales_enteras(entorno):
     corte = HOY - timedelta(days=pipeline.DIAS_SERIES)
     assert min(f for f, _ in guardadas["base_monetaria"]) >= corte
     assert len(guardadas["deuda_bruta_tesoro"]) == 30 and len(guardadas["m3"]) == 30
+
+
+def test_si_falla_el_push_de_los_graficos_igual_se_publica_la_presentacion(entorno):
+    import preview_git
+
+    deps, hechos, _ = entorno
+
+    def actualizar(repo, archivos=None):
+        raise preview_git.GitError("git push terminó con código 1: rejected")
+
+    r = pipeline.correr(pipeline.Opciones(), replace(deps, actualizar_previews=actualizar))
+
+    etapa = next(e for e in r.etapas if e.nombre == "previews")
+    assert etapa.estado == "error" and "gráficos sin publicar" in etapa.detalle
+    assert len(hechos["presentaciones"]) == 1  # el deck va a otra rama y se publicó igual
+
+
+def test_si_las_frases_fallan_el_mail_sale_con_los_textos_fijos(entorno, monkeypatch):
+    deps, hechos, salida = entorno
+
+    def falla(*args, **kwargs):
+        raise ZeroDivisionError("dato raro")
+
+    monkeypatch.setattr(pipeline.indicadores, "frase_deuda", falla)
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+
+    assert len(hechos["mails"]) == 2 and r.estado != "error"
+    assert indicadores.TEXTO_DEUDA in _html(hechos["mails"][0][0])
+
+
+def test_falta_una_serie_del_bcra_y_se_avisa(entorno):
+    deps, hechos, salida = entorno
+    original = deps.descargar_series
+
+    def sin_m3(desde):
+        series = dict(original(desde))
+        series.pop("m3", None)
+        return series
+
+    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, descargar_series=sin_m3))
+    etapa = next(e for e in r.etapas if e.nombre == "indicadores")
+    assert etapa.estado == "advertencia" and "sin m3" in etapa.detalle
+    assert len(hechos["mails"]) == 2
+
+
+def test_en_github_las_advertencias_se_anotan_y_queda_el_resumen(monkeypatch, tmp_path, capsys):
+    resultado = pipeline.ResultadoCorrida(fecha=HOY, estado="advertencia")
+    resultado.etapas.append(pipeline.Etapa("indicadores", "advertencia", "BCRA: sin m3\nsegunda línea 100%"))
+    resultado.etapas.append(pipeline.Etapa("mail", "ok", "enviado"))
+    monkeypatch.setattr(pipeline, "correr", lambda opciones: resultado)
+    monkeypatch.setattr(pipeline, "configurar_logging", lambda archivo: None)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    resumen = tmp_path / "resumen.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(resumen))
+
+    pipeline.main(["--dry-run"])
+
+    salida = capsys.readouterr().out
+    assert "::warning title=indicadores::BCRA: sin m3%0Asegunda línea 100%25" in salida
+    assert "title=mail" not in salida
+    assert "indicadores" in resumen.read_text(encoding="utf-8")
