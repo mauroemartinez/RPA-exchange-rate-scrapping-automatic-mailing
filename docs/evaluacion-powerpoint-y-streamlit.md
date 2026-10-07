@@ -2,7 +2,7 @@
 
 Roadmap, fase 5: *evaluar la generación automática de un PowerPoint ejecutivo* y *evaluar un dashboard en Streamlit conectado al histórico completo*, sin que ninguno se convierta en otra implementación del pipeline diario.
 
-Para evaluar con algo concreto hice un prototipo de cada uno. **El PowerPoint ya es parte de la corrida diaria** (la decisión está abajo); el dashboard sigue siendo un prototipo que se corre a mano y solo lee.
+Para evaluar con algo concreto hice un prototipo de cada uno. **El PowerPoint ya es parte de la corrida diaria** (la decisión está abajo). **El dashboard sigue siendo un prototipo** que se corre a mano y solo lee; quedó para revisarlo más adelante.
 
 ## PowerPoint: `presentacion.py`
 
@@ -11,7 +11,7 @@ python scripts/presentacion_ejecutiva.py                # .pptx en una carpeta t
 python scripts/presentacion_ejecutiva.py --salida DIR
 ```
 
-`python-pptx` ya viene pineado en `requirements-dev.txt`; la imagen de producción no lo instala.
+`python-pptx` es una dependencia de producción (`requirements.txt`): la corrida diaria lo necesita.
 
 Arma seis diapositivas en 16:9 con lo que la corrida ya dejó: portada; un tablero con blue, MEP, billete, riesgo país, BADLAR y el forward de Fisher, cada uno con su variación; el párrafo de IA; y tres de gráficos (tipos de cambio y riesgo país, inflación con variaciones acumuladas, BTC). Si la fila tiene los comentarios por gráfico de la fase 4, van al lado de cada gráfico (debajo, en el de BTC). Usa los colores del mail.
 
@@ -22,9 +22,9 @@ Lo que salió de la prueba, con los datos del 6 de octubre:
 - **Costo:** una dependencia (`python-pptx`, que trae `lxml`) y unas 200 líneas. El armado es posicional: si cambia el tamaño de un gráfico, hay que retocar la ubicación.
 - **No exporta a PDF.** `python-pptx` solo escribe .pptx; para PDF hace falta PowerPoint o LibreOffice en la máquina que corre.
 
-Mi recomendación era semanal y fuera de git, por el peso. **La decisión (7 de octubre de 2026) fue diaria y en git**, para que GitHub tenga siempre la última: la corrida la arma en la etapa `presentacion` y la commitea con los gráficos como `Previews/Reporte Ejecutivo.pptx`, con el mismo nombre todos los días. En la corrida usa los datos y los textos de IA que ya tiene en memoria, así que no suma consultas; `scripts/presentacion_ejecutiva.py` sigue sirviendo para armarla a mano desde Supabase.
+**La decisión (7 de octubre de 2026): diaria, en GitHub, y que se reemplace sin acumular.** La corrida la arma en la etapa `presentacion`, con los datos y los textos de IA que ya tiene en memoria (no suma consultas), y la etapa `previews` la publica en la rama `reporte-ejecutivo` como `Reporte Ejecutivo.pptx`. Esa rama tiene siempre un único commit, sin historia: cada día se arma uno nuevo con solo el archivo y se sube con `--force`. Así GitHub muestra siempre la última y las versiones viejas no se acumulan: el repo no crece por la presentación. En `main` no entra nunca (`Previews/*.pptx` está en `.gitignore`). Si un día la presentación falla, queda la del día anterior y la corrida lo avisa como advertencia.
 
-El costo, para tenerlo a la vista: el repo pesa hoy unos 49 MB, casi todo de los gráficos diarios (unos 550 KB por día hábil). La presentación agrega unos 460 KB por día, así que el repo pasa a crecer unos 250 MB por año en vez de 140. GitHub recomienda que un repo no pase de 1 GB, así que hay margen para varios años. Si algún día molesta, la presentación se puede mover a una rama aparte que guarde solo la última.
+`scripts/presentacion_ejecutiva.py` sigue sirviendo para armarla a mano desde Supabase.
 
 ## Streamlit: `dashboard/app.py`
 
