@@ -13,7 +13,15 @@ python scripts/presentacion_ejecutiva.py --salida DIR
 
 `python-pptx` es una dependencia de producción (`requirements.txt`): la corrida diaria lo necesita.
 
-Arma seis diapositivas en 16:9 con lo que la corrida ya dejó: portada; un tablero con blue, MEP, billete, riesgo país, BADLAR y el forward de Fisher, cada uno con su variación; el párrafo de IA; y tres de gráficos (tipos de cambio y riesgo país, inflación con variaciones acumuladas, BTC). Si la fila tiene los comentarios por gráfico de la fase 4, van al lado de cada gráfico (debajo, en el de BTC). Usa los colores del mail.
+Arma ocho diapositivas en 16:9 con lo que la corrida ya dejó:
+
+- portada;
+- un tablero con blue, MEP, billete, riesgo país, BADLAR y el forward de Fisher, cada uno con su variación;
+- el párrafo de IA;
+- tres de gráficos: tipos de cambio y riesgo país, inflación con variaciones acumuladas, y BTC;
+- desde el 7 de octubre, agregados monetarios y endeudamiento en dólares, con la misma explicación para no especialistas que el mail.
+
+Si la fila tiene los comentarios por gráfico de la fase 4, van al lado de cada gráfico (debajo, en el de BTC). Usa los colores del mail. Con las ocho diapositivas pesa unos 640 KB: como vive en una rama que se reemplaza entera, ese peso no se acumula.
 
 Lo que salió de la prueba, con los datos del 6 de octubre:
 
