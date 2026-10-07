@@ -408,7 +408,9 @@ def grafico_inflacion(inflacion: pd.DataFrame, carpeta: Path) -> Path:
         ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{x:.1f} %"))
 
         ax2.set_ylabel("Inflación Anual", fontweight="bold", fontsize=12, rotation=270, labelpad=15)
-        ax2.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{x:.0f} %"))
+        # Un decimal, como el eje izquierdo: con la interanual en un rango angosto
+        # (31,5% a 34%), sin decimales los rótulos se repetían ("32 %" tres veces)
+        ax2.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{x:.1f} %"))
 
         # Con twinx la leyenda hay que armarla a mano con los dos ejes
         handles1, labels1 = ax.get_legend_handles_labels()
