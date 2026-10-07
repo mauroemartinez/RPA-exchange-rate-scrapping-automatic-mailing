@@ -119,3 +119,14 @@ def test_la_serie_se_describe_en_el_catalogo():
     assert (serie.frecuencia, serie.unidad, serie.fuente) == ("M", "millones de USD", "Secretaría de Finanzas")
     assert serie.id_fuente == "A.1, A- DEUDA BRUTA"
     assert agregados.POR_CLAVE["base_monetaria"].id_fuente == "15"
+
+
+def test_sin_openpyxl_el_modulo_se_importa_igual(monkeypatch):
+    """pipeline.py importa este módulo al arrancar: sin openpyxl, el mail tiene que salir igual."""
+    import importlib
+    import sys
+
+    monkeypatch.setitem(sys.modules, "openpyxl", None)
+    modulo = importlib.reload(finanzas)
+    with pytest.raises(ImportError):
+        modulo.leer_planilla(b"cualquier cosa")
