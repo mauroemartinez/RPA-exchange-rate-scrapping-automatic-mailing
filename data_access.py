@@ -143,7 +143,7 @@ def candado_corrida(engine: Engine):
 TABLA_SERIES = "Fact_Series_Macro"
 
 # Formato largo: una fila por serie y fecha, con la unidad y la frecuencia de la
-# fuente. La crea scripts/sql/06_series_macro.sql; mientras no exista, el pipeline omite
+# fuente. La crea sql/06_series_macro.sql; mientras no exista, el pipeline omite
 # la etapa en vez de fallar.
 _metadata = MetaData()
 series_macro = Table(
