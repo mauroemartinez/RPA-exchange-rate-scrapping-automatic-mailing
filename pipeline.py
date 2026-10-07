@@ -153,6 +153,7 @@ class Dependencias:
     columna_secciones: Callable = lambda engine: data_access.columna_existe(engine, "ai_secciones")
     generar_secciones: Callable = ia_generator.generar_secciones
     guardar_secciones: Callable = ia_generator.guardar_secciones
+    limpiar_secciones: Callable = ia_generator.limpiar_secciones
     enviar_mail: Callable = email_report.enviar
     actualizar_previews: Callable = preview_git.actualizar_previews
     tabla_series: Callable = data_access.tabla_existe
@@ -257,27 +258,8 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
     resultado = registro.resultado
     fecha = resultado.fecha
 
-    # ── Calendario ───────────────────────────────────────────────────────────
-    # Un programador automático de lunes a viernes dispararía la corrida también
-    # los feriados, con las fuentes repitiendo el último dato. Si el calendario no
-    # responde, se sigue: es preferible un mail de más que un día sin reporte.
-    if fecha.weekday() >= 5:
-        motivo = "fin de semana"
-    else:
-        try:
-            nombre = deps.feriado(fecha)
-        except Exception as exc:
-            log.warning("No se pudo consultar el calendario de feriados (%s); se sigue como día hábil", exc)
-            nombre = None
-        motivo = f"feriado ({nombre})" if nombre else None
-
-    if motivo and not opciones.forzar:
-        if opciones.dry_run:
-            log.warning("El %s es %s: una corrida real no se haría (dry-run sigue igual)", fecha, motivo)
-        else:
-            registro.omitir("control", f"el {fecha} es {motivo}; para correr igual: --forzar")
-            resultado.estado = OMITIDA
-            return
+    if _no_es_dia_habil(opciones, deps, registro, fecha):
+        return
 
     # ── Histórico ────────────────────────────────────────────────────────────
     with registro.etapa("historico") as e:
@@ -286,16 +268,22 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
         if origen != "supabase":
             e.estado = ADVERTENCIA
 
-    hoy_iso = str(fecha)
-    existente = historico[historico["Fecha"] == hoy_iso]
+    existente = historico[historico["Fecha"] == str(fecha)]
     ya_existe = not existente.empty
-    parrafo_existente = secciones_existentes = None
+    parrafo_existente = _primer_valor(existente, "ai_paragraph", str)
+    secciones_existentes = _primer_valor(existente, "ai_secciones", dict)
     if ya_existe:
-        if "ai_paragraph" in existente.columns and isinstance(existente["ai_paragraph"].iloc[0], str):
-            parrafo_existente = existente["ai_paragraph"].iloc[0]
-        if "ai_secciones" in existente.columns and isinstance(existente["ai_secciones"].iloc[0], dict):
-            secciones_existentes = existente["ai_secciones"].iloc[0]
         if not (opciones.forzar or opciones.dry_run):
+            if parrafo_existente is None:
+                # La fila está pero sin párrafo: la corrida que la insertó murió antes de
+                # la IA y del mail (timeout, reinicio, la PC suspendida). Omitir el día
+                # dejaría a la lista sin reporte y todo en verde.
+                resultado.etapas.append(Etapa(
+                    "control", ERROR,
+                    f"la fila del {fecha} existe sin párrafo de IA: la corrida anterior no terminó. "
+                    "Para rehacer el día: --forzar",
+                ))
+                return
             registro.omitir(
                 "control",
                 f"la fila del {fecha} ya existe, así que la corrida de hoy ya se hizo. "
@@ -304,7 +292,7 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
             resultado.estado = OMITIDA
             return
         log.warning("La fila del %s ya existe; se rehace el día sin duplicarla", fecha)
-        historico = historico[historico["Fecha"] != hoy_iso].reset_index(drop=True)
+        historico = historico[historico["Fecha"] != str(fecha)].reset_index(drop=True)
 
     # ── Scraping ─────────────────────────────────────────────────────────────
     with registro.etapa("scraping") as e:
@@ -332,20 +320,23 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
     df = transformations.agregar_brechas_y_variaciones(df_base)
 
     # ── Persistencia ─────────────────────────────────────────────────────────
-    persistida = False
+    persistida = conflicto = False
     if opciones.dry_run:
         registro.omitir("persistencia", "dry-run")
     else:
         with registro.etapa("persistencia", critica=False) as e:
-            escrita = deps.guardar_fila(engine, fila, sobrescribir=ya_existe)
-            persistida = True
-            if escrita:
+            persistida = deps.guardar_fila(engine, fila, sobrescribir=ya_existe)
+            if persistida:
                 e.detalle = "fila actualizada" if ya_existe else "fila insertada"
             else:
-                # Solo pasa si otra corrida sin candado (el notebook, por ejemplo) la
-                # insertó entre la lectura del histórico y este INSERT.
-                e.estado = ADVERTENCIA
-                e.detalle = "la fila apareció mientras corría; se conservan los valores guardados"
+                # Otra corrida (el notebook, o una que leyó el histórico del CSV de
+                # respaldo y no vio la fila) ya hizo el día: seguir mandaría otro mail
+                conflicto = True
+                e.estado = OMITIDA
+                e.detalle = "la fila ya estaba en la base: otra corrida hizo el día"
+    if conflicto:
+        resultado.estado = OMITIDA
+        return
 
     # ── BTC ──────────────────────────────────────────────────────────────────
     # Se descarga antes de la IA porque el comentario de BTC lo necesita. Si
@@ -358,84 +349,164 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
         log.warning("Sin datos de BTC: %s", exc)
         falla_btc = f"{type(exc).__name__}: {exc}"
 
-    # ── Párrafo de IA ────────────────────────────────────────────────────────
-    # parrafo es lo que muestra el mail; texto_ia, lo que queda guardado en la
-    # fila; comentarios, los textos por gráfico de la fase 4 ({cid: [(título, texto)]})
-    parrafo = ia_generator.MENSAJE_FALLA
-    texto_ia = None
-    comentarios: dict = {}
-    if opciones.dry_run:
-        texto_ia = parrafo_existente
-        parrafo = parrafo_existente or "[dry-run] Acá va el párrafo de Gemini, que en una prueba no se pide."
-        comentarios = ia_generator.comentarios_por_grafico(secciones_existentes)
-        if opciones.probar_ia:
-            with registro.etapa("ia", critica=False) as e:
-                prompt = ia_generator.armar_prompt_secciones(df_base, btc_df, fwd_oficial)
-                secciones, modelo = deps.generar_secciones(prompt)
-                if secciones is None:
-                    e.estado = ADVERTENCIA
-                    e.detalle = "Gemini no devolvió secciones válidas"
-                else:
-                    parrafo = secciones.resumen
-                    comentarios = ia_generator.comentarios_por_grafico(secciones)
-                    e.detalle = f"secciones de prueba con {modelo}, sin guardar"
-        else:
-            registro.omitir("ia", "dry-run: no se llama a Gemini (--con-ia para probar los comentarios)")
-    elif not persistida:
-        registro.omitir("ia", "la fila del día no quedó guardada")
-    else:
-        with registro.etapa("ia", critica=False) as e:
-            try:
-                con_secciones = bool(deps.columna_secciones(engine))
-            except Exception as exc:
-                log.warning("No se pudo consultar la columna ai_secciones (%s); se usa el párrafo único", exc)
-                con_secciones = False
+    parrafo, texto_ia, comentarios = _etapa_ia(
+        opciones, deps, registro, engine, fecha, df_base, btc_df, fwd_oficial, persistida,
+        parrafo_existente, secciones_existentes,
+    )
 
-            secciones = None
-            if con_secciones:
-                prompt = ia_generator.armar_prompt_secciones(df_base, btc_df, fwd_oficial)
-                secciones, modelo = deps.generar_secciones(prompt)
-                if secciones is not None and deps.guardar_secciones(engine, fecha, secciones, modelo):
-                    parrafo = texto_ia = secciones.resumen
-                    comentarios = ia_generator.comentarios_por_grafico(secciones)
-                    e.detalle = f"resumen y comentarios por gráfico con {modelo}"
-                else:
-                    log.warning("Sin comentarios por gráfico; se vuelve al párrafo único")
-                    secciones = None
-
-            if secciones is None:
-                texto = deps.generar_parrafo(engine, fecha_esperada=fecha)
-                if texto and texto != ia_generator.MENSAJE_FALLA:
-                    parrafo = texto_ia = texto
-                    if con_secciones:
-                        e.estado = ADVERTENCIA
-                        e.detalle = "falló la respuesta estructurada; salió el párrafo único"
-                else:
-                    e.estado = ADVERTENCIA
-                    e.detalle = "Gemini no devolvió párrafo; el mail lleva el mensaje de reemplazo"
-
-    # ── Gráficos ─────────────────────────────────────────────────────────────
     inflacion = transformations.serie_inflacion(res.bcra["inflacion_mensual"], res.bcra["bcra_tea"])
     inflacion_12 = transformations.ultimos_meses(inflacion)
+    carpeta = _carpeta_de_salida(opciones)
+    if opciones.dry_run or carpeta != PREVIEWS:
+        resultado.salida = carpeta
+    generados = _etapa_graficos(registro, carpeta, df, inflacion, inflacion_12, btc_df, falla_btc)
 
+    _etapa_mail(
+        opciones, deps, registro, fecha, comienzo, df, df_base, inflacion_12, fwd_oficial, fwd_blue,
+        parrafo, texto_ia, comentarios, generados,
+    )
+    _etapa_previews(opciones, deps, registro, carpeta)
+    _etapa_series(opciones, deps, registro, engine, fecha)
+
+
+def _no_es_dia_habil(opciones: Opciones, deps: Dependencias, registro: _Registro, fecha: date) -> bool:
+    """Fines de semana y feriados: True si la corrida no corresponde.
+
+    Un programador automático de lunes a viernes dispararía la corrida también
+    los feriados, con las fuentes repitiendo el último dato. Si el calendario no
+    responde, se sigue: es preferible un mail de más que un día sin reporte.
+    """
+    if fecha.weekday() >= 5:
+        motivo = "fin de semana"
+    else:
+        try:
+            nombre = deps.feriado(fecha)
+        except Exception as exc:
+            log.warning("No se pudo consultar el calendario de feriados (%s); se sigue como día hábil", exc)
+            nombre = None
+        motivo = f"feriado ({nombre})" if nombre else None
+
+    if not motivo or opciones.forzar:
+        return False
+    if opciones.dry_run:
+        log.warning("El %s es %s: una corrida real no se haría (dry-run sigue igual)", fecha, motivo)
+        return False
+    registro.omitir("control", f"el {fecha} es {motivo}; para correr igual: --forzar")
+    registro.resultado.estado = OMITIDA
+    return True
+
+
+def _primer_valor(filas, columna: str, tipo: type):
+    """El valor de `columna` en la primera fila si existe y es del tipo esperado; si no, None."""
+    if filas.empty or columna not in filas.columns:
+        return None
+    valor = filas[columna].iloc[0]
+    return valor if isinstance(valor, tipo) else None
+
+
+def _etapa_ia(
+    opciones: Opciones, deps: Dependencias, registro: _Registro, engine, fecha: date, df_base, btc_df,
+    fwd_oficial: float, persistida: bool, parrafo_existente: str | None, secciones_existentes: dict | None,
+) -> tuple[str, str | None, dict]:
+    """(párrafo que muestra el mail, texto que queda guardado en la fila, comentarios por gráfico).
+
+    Con la columna ai_secciones, una llamada estructurada (fase 4). Ante cualquier
+    falla de esa llamada, o si no se pudo guardar, se vuelve al párrafo único.
+    """
+    if opciones.dry_run:
+        parrafo = parrafo_existente or "[dry-run] Acá va el párrafo de Gemini, que en una prueba no se pide."
+        comentarios = ia_generator.comentarios_por_grafico(secciones_existentes)
+        if not opciones.probar_ia:
+            registro.omitir("ia", "dry-run: no se llama a Gemini (--con-ia para probar los comentarios)")
+            return parrafo, parrafo_existente, comentarios
+        with registro.etapa("ia", critica=False) as e:
+            secciones, modelo = _pedir_secciones(deps, df_base, btc_df, fwd_oficial)
+            if secciones is None:
+                e.estado = ADVERTENCIA
+                e.detalle = "Gemini no devolvió secciones válidas"
+            else:
+                parrafo = secciones.resumen
+                comentarios = ia_generator.comentarios_por_grafico(secciones)
+                e.detalle = f"secciones de prueba con {modelo}, sin guardar"
+        return parrafo, parrafo_existente, comentarios
+
+    if not persistida:
+        registro.omitir("ia", "la fila del día no quedó guardada")
+        return ia_generator.MENSAJE_FALLA, None, {}
+
+    parrafo, texto_ia, comentarios = ia_generator.MENSAJE_FALLA, None, {}
+    with registro.etapa("ia", critica=False) as e:
+        try:
+            con_secciones = bool(deps.columna_secciones(engine))
+        except Exception as exc:
+            log.warning("No se pudo consultar la columna ai_secciones (%s); se usa el párrafo único", exc)
+            con_secciones = False
+
+        if con_secciones:
+            secciones, modelo = _pedir_secciones(deps, df_base, btc_df, fwd_oficial)
+            if secciones is not None and _guardar_secciones(deps, engine, fecha, secciones, modelo):
+                e.detalle = f"resumen y comentarios por gráfico con {modelo}"
+                return secciones.resumen, secciones.resumen, ia_generator.comentarios_por_grafico(secciones)
+            log.warning("Sin comentarios por gráfico; se vuelve al párrafo único")
+            # Una corrida anterior del día (--forzar) pudo dejar comentarios de otros valores
+            try:
+                deps.limpiar_secciones(engine, fecha)
+            except Exception as exc:
+                log.warning("No se pudieron borrar los comentarios anteriores del día: %s", exc)
+
+        texto = deps.generar_parrafo(engine, fecha_esperada=fecha)
+        if texto and texto != ia_generator.MENSAJE_FALLA:
+            parrafo = texto_ia = texto
+            if con_secciones:
+                e.estado = ADVERTENCIA
+                e.detalle = "falló la respuesta estructurada; salió el párrafo único"
+        else:
+            e.estado = ADVERTENCIA
+            e.detalle = "Gemini no devolvió párrafo; el mail lleva el mensaje de reemplazo"
+    return parrafo, texto_ia, comentarios
+
+
+def _pedir_secciones(deps: Dependencias, df_base, btc_df, fwd_oficial: float):
+    """(secciones, modelo) de la llamada estructurada, o (None, None) ante cualquier falla."""
+    try:
+        return deps.generar_secciones(ia_generator.armar_prompt_secciones(df_base, btc_df, fwd_oficial))
+    except Exception:
+        log.exception("Falló la llamada estructurada a Gemini")
+        return None, None
+
+
+def _guardar_secciones(deps: Dependencias, engine, fecha: date, secciones, modelo) -> bool:
+    try:
+        return bool(deps.guardar_secciones(engine, fecha, secciones, modelo))
+    except Exception:
+        log.exception("No se pudieron guardar las secciones de IA")
+        return False
+
+
+def _carpeta_de_salida(opciones: Opciones) -> Path:
+    """Previews/ en una corrida real; una carpeta temporal (o --salida) en un dry-run."""
     carpeta = opciones.salida or (Path(tempfile.mkdtemp(prefix="macro_dryrun_")) if opciones.dry_run else PREVIEWS)
     if opciones.dry_run and carpeta.resolve() == PREVIEWS:
         # La vista previa (mail.eml, con el remitente) terminaría commiteada en el repo público
         log.warning("Un dry-run no escribe en Previews/: se usa una carpeta temporal")
         carpeta = Path(tempfile.mkdtemp(prefix="macro_dryrun_"))
     carpeta.mkdir(parents=True, exist_ok=True)
-    if opciones.dry_run or carpeta != PREVIEWS:
-        resultado.salida = carpeta
+    return carpeta
 
+
+def _etapa_graficos(registro: _Registro, carpeta: Path, df, inflacion, inflacion_12, btc_df, falla_btc) -> dict[str, Path]:
+    """Los cuatro .jpg. Devuelve solo los que se generaron en esta corrida."""
     generados: dict[str, Path] = {}
     with registro.etapa("graficos", critica=False) as e:
         data = charts.preparar_datos(df)
         pendientes = [
             (charts.TIPOS_DE_CAMBIO, lambda: charts.grafico_tipos_de_cambio(data, carpeta)),
-            (charts.VARIACIONES, lambda: charts.grafico_variaciones(
-                charts.preparar_variaciones(data, inflacion), carpeta)),
+            (charts.VARIACIONES, lambda: charts.grafico_variaciones(charts.preparar_variaciones(data, inflacion), carpeta)),
             (charts.INFLACION, lambda: charts.grafico_inflacion(charts.preparar_inflacion(inflacion_12), carpeta)),
         ]
+        if btc_df is not None:
+            pendientes.append((charts.BTC, lambda: charts.grafico_btc(btc_df, carpeta)))
+
         fallas = []
         for nombre, generar in pendientes:
             try:
@@ -447,19 +518,19 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
         if btc_df is None:
             e.estado = ADVERTENCIA
             e.detalle = f"sin gráfico de BTC ({falla_btc})"
-        else:
-            try:
-                generados[charts.BTC] = charts.grafico_btc(btc_df, carpeta)
-            except Exception as exc:
-                log.exception("No se pudo generar %s", charts.BTC)
-                fallas.append(f"{charts.BTC}: {type(exc).__name__}: {exc}")
-
         if fallas:
             # A diferencia de BTC, estos no dependen de un tercero: si fallan, es un bug
             e.estado = ERROR
             e.detalle = "; ".join(fallas + ([e.detalle] if e.detalle else []))
+    return generados
 
-    # ── Mail ─────────────────────────────────────────────────────────────────
+
+def _etapa_mail(
+    opciones: Opciones, deps: Dependencias, registro: _Registro, fecha: date, comienzo: float, df, df_base,
+    inflacion_12, fwd_oficial: float, fwd_blue: float, parrafo: str, texto_ia: str | None, comentarios: dict,
+    generados: dict[str, Path],
+) -> None:
+    resultado = registro.resultado
     with registro.etapa("mail", critica=False) as e:
         # Solo los gráficos generados en esta corrida: si uno falló, en Previews/
         # sigue el de ayer y no tiene que viajar en el mail de hoy.
@@ -497,7 +568,8 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
             else:
                 e.detalle = "enviado" + (f" solo a {', '.join(opciones.enviar_a)}" if opciones.enviar_a else "")
 
-    # ── Previews en GitHub ───────────────────────────────────────────────────
+
+def _etapa_previews(opciones: Opciones, deps: Dependencias, registro: _Registro, carpeta: Path) -> None:
     if opciones.dry_run or not opciones.push_previews:
         registro.omitir("previews", "dry-run" if opciones.dry_run else "--sin-push")
     elif carpeta != PREVIEWS:
@@ -510,31 +582,41 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
             if not hecho:
                 e.estado = OMITIDA
 
-    # ── Series monetarias (fase 3) ───────────────────────────────────────────
-    # Se guardan para ir armando la historia, pero todavía no van en el mail: por
-    # eso un problema acá queda como advertencia y no pone la corrida en rojo.
+
+def _etapa_series(opciones: Opciones, deps: Dependencias, registro: _Registro, engine, fecha: date) -> None:
+    """Series monetarias (fase 3): se guardan para ir armando la historia, todavía no van en el mail.
+
+    Por eso un problema acá queda como advertencia y no pone la corrida en rojo.
+    Cada serie se valida y se guarda por separado: una discontinuada no frena a las demás.
+    """
     if opciones.dry_run:
         registro.omitir("series", "dry-run")
-    else:
-        with registro.etapa("series", critica=False) as e:
+        return
+    with registro.etapa("series", critica=False) as e:
+        try:
+            if not deps.tabla_series(engine):
+                e.estado = OMITIDA
+                e.detalle = f"falta la tabla {data_access.TABLA_SERIES} (sql/06_series_macro.sql)"
+                return
+            series = deps.descargar_series(fecha - timedelta(days=DIAS_SERIES))
+        except Exception as exc:
+            log.exception("No se pudieron descargar las series monetarias")
+            e.estado = ADVERTENCIA
+            e.detalle = f"{type(exc).__name__}: {exc}"
+            return
+
+        avisos, escritos = [], 0
+        for clave, puntos in series.items():
+            serie = agregados.POR_CLAVE[clave]
             try:
-                if not deps.tabla_series(engine):
-                    e.estado = OMITIDA
-                    e.detalle = f"falta la tabla {data_access.TABLA_SERIES} (sql/06_series_macro.sql)"
-                else:
-                    series = deps.descargar_series(fecha - timedelta(days=DIAS_SERIES))
-                    avisos, escritos = [], 0
-                    for clave, puntos in series.items():
-                        serie = agregados.POR_CLAVE[clave]
-                        avisos += transformations.validar_serie(serie, puntos, fecha)
-                        escritos += deps.guardar_series(engine, serie, puntos)
-                    e.detalle = f"{escritos} puntos nuevos o revisados" + "".join(f"; {a}" for a in avisos)
-                    if avisos:
-                        e.estado = ADVERTENCIA
+                avisos += transformations.validar_serie(serie, puntos, fecha)
+                escritos += deps.guardar_series(engine, serie, puntos)
             except Exception as exc:
-                log.exception("No se pudieron guardar las series monetarias")
-                e.estado = ADVERTENCIA
-                e.detalle = f"{type(exc).__name__}: {exc}"
+                log.warning("Serie %s sin guardar: %s", clave, exc)
+                avisos.append(f"{clave}: {type(exc).__name__}: {exc}")
+        e.detalle = f"{escritos} puntos nuevos o revisados" + "".join(f"; {a}" for a in avisos)
+        if avisos:
+            e.estado = ADVERTENCIA
 
 
 def _guardar_vista_previa(carpeta: Path, html: str, imagenes: dict[str, bytes], fecha: date) -> None:
@@ -606,9 +688,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--forzar", action="store_true",
                         help="Repite el día aunque la fila ya exista (pisa sus valores y vuelve a mandar el mail)")
     parser.add_argument("--enviar-a", nargs="+", metavar="MAIL",
-                        help="Manda el mail solo a estas direcciones, en lugar de a las listas del .env")
+                        help="Con --dry-run: manda el mail solo a estas direcciones, en lugar de a las listas del .env")
     parser.add_argument("--con-ia", action="store_true",
-                        help="Con --dry-run: pide a Gemini los comentarios por gráfico (una llamada) sin guardarlos")
+                        help="Con --dry-run: pide a Gemini los comentarios por gráfico, sin guardarlos (una llamada, más los reintentos)")
     parser.add_argument("--salida", type=Path, help="Carpeta para los gráficos y la vista previa")
     parser.add_argument("--log-archivo", type=Path, help="Además de la consola, escribe el log en este archivo")
     parser.add_argument("--json", type=Path, help="Escribe el resultado de la corrida como JSON en este archivo")
@@ -617,6 +699,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.dry_run and args.salida and args.salida.resolve() == PREVIEWS:
         parser.error("--salida no puede ser Previews/ en un dry-run: esa carpeta se commitea y se pushea sola")
+
+    # Sin dry-run, --enviar-a guardaría la fila del día y mandaría el mail solo a
+    # esas direcciones: la corrida programada vería la fila y la lista se quedaría sin reporte.
+    if args.enviar_a and not args.dry_run:
+        parser.error("--enviar-a va con --dry-run")
+    if args.con_ia and not args.dry_run:
+        parser.error("--con-ia va con --dry-run: en una corrida real la IA se pide sola")
 
     if args.enviar_a:
         try:

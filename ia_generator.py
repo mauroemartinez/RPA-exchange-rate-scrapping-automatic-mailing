@@ -24,6 +24,10 @@ MODELOS = ["gemini-3.5-flash", "gemini-2.5-flash"]
 MAX_INTENTOS = 3
 MENSAJE_FALLA = "No se pudo generar el análisis automatizado de mercado."
 
+# Por defecto google-genai espera sin límite: un Gemini colgado dejaba la corrida
+# esperando hasta que app.py la mataba a la hora, con la fila guardada y sin mail.
+TIMEOUT_MS = 120_000
+
 # 25 ruedas hacia atrás más la de hoy
 FILAS_MINIMAS = 26
 
@@ -51,7 +55,7 @@ def generar_con_failover(prompt, config=None):
         for model in MODELOS:
             attempts += 1
             try:
-                client = genai.Client(api_key=key)
+                client = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=TIMEOUT_MS))
                 response = client.models.generate_content(model=model, contents=prompt, config=config)
                 return response.text, model, attempts
 
@@ -138,11 +142,17 @@ Instrucciones:
 
 
 def generar_parrafo(prompt: str, config=None) -> tuple[str | None, str | None]:
-    """(texto, modelo) con hasta MAX_INTENTOS llamadas en total. (None, None) si no hubo caso."""
+    """(texto, modelo), o (None, None) si no hubo caso.
+
+    Reintenta mientras se hayan consumido menos de MAX_INTENTOS intentos. Cada
+    vuelta de generar_con_failover puede gastar más de uno (una key agotada pasa a
+    la siguiente, un modelo saturado al otro), así que en el peor caso son unas
+    cuatro llamadas. Es la lógica que tenía el notebook.
+    """
     total = 0
     while total < MAX_INTENTOS:
         respuesta, modelo, usados = generar_con_failover(prompt, config=config)
-        total += usados if usados is not None else 1
+        total += usados
         if respuesta is not None:
             return respuesta, modelo
         if total >= MAX_INTENTOS:
@@ -362,6 +372,18 @@ def guardar_secciones(engine, fecha: date, secciones: SeccionesIA, modelo: str |
         )
     log.info("Gemini: secciones del %s guardadas con %s (filas afectadas: %d)", fecha, modelo, result.rowcount)
     return result.rowcount
+
+
+def limpiar_secciones(engine, fecha: date) -> int:
+    """Borra los comentarios por gráfico de la fila de `fecha`.
+
+    Si una corrida repetida (--forzar) terminó en el párrafo único, los comentarios
+    de la corrida anterior describirían otros valores.
+    """
+    with engine.begin() as conn:
+        return conn.execute(
+            text(f'UPDATE "{TABLA}" SET "ai_secciones" = NULL WHERE "Fecha" = :f'), {"f": fecha}
+        ).rowcount
 
 
 def comentarios_por_grafico(secciones: dict | SeccionesIA | None) -> dict[str, list[tuple[str, str]]]:

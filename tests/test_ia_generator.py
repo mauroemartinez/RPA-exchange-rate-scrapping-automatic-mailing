@@ -101,10 +101,13 @@ class _ClienteFalso:
 
     guion: dict = {}
     llamadas: list = []
+    timeouts: list = []
 
-    def __init__(self, api_key):
+    def __init__(self, api_key, http_options=None):
         self.api_key = api_key
+        self.http_options = http_options
         self.models = self
+        _ClienteFalso.timeouts.append(http_options.timeout if http_options else None)
 
     def generate_content(self, model, contents, config=None):
         _ClienteFalso.llamadas.append((self.api_key, model))
@@ -116,7 +119,7 @@ class _ClienteFalso:
 
 @pytest.fixture
 def cliente_falso(monkeypatch):
-    _ClienteFalso.guion, _ClienteFalso.llamadas = {}, []
+    _ClienteFalso.guion, _ClienteFalso.llamadas, _ClienteFalso.timeouts = {}, [], []
     monkeypatch.setattr(ia_generator.genai, "Client", _ClienteFalso)
     return _ClienteFalso
 
@@ -144,3 +147,25 @@ def test_generar_parrafo_respeta_el_maximo_de_intentos(monkeypatch):
     monkeypatch.setattr(ia_generator, "generar_con_failover", lambda p, config=None: llamadas.append(1) or (None, None, 1))
     assert ia_generator.generar_parrafo("prompt") == (None, None)
     assert len(llamadas) == ia_generator.MAX_INTENTOS
+
+
+def test_cada_llamada_a_gemini_tiene_timeout(cliente_falso):
+    ia_generator.generar_con_failover("prompt")
+    assert cliente_falso.timeouts and all(t == ia_generator.TIMEOUT_MS for t in cliente_falso.timeouts)
+
+
+def test_limpiar_secciones():
+    ejecutado = []
+
+    class Engine:
+        @contextmanager
+        def begin(self):
+            class Conn:
+                def execute(self, sql, params):
+                    ejecutado.append((str(sql), params))
+                    return type("R", (), {"rowcount": 1})()
+
+            yield Conn()
+
+    assert ia_generator.limpiar_secciones(Engine(), date(2026, 10, 6)) == 1
+    assert '"ai_secciones" = NULL' in ejecutado[0][0] and ejecutado[0][1] == {"f": date(2026, 10, 6)}

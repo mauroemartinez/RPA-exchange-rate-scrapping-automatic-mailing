@@ -23,7 +23,7 @@ class EngineFalso:
 @pytest.fixture
 def entorno(historico, resultados, btc_crudo, tmp_path):
     """(Dependencias falsas, registro de lo que se hizo, carpeta de salida)."""
-    hechos = {"filas": [], "parrafos": [], "mails": [], "alertas": [], "previews": []}
+    hechos = {"filas": [], "parrafos": [], "mails": [], "alertas": [], "previews": [], "limpiezas": []}
 
     def guardar_fila(engine, fila, sobrescribir=False):
         hechos["filas"].append((fila, sobrescribir))
@@ -49,6 +49,7 @@ def entorno(historico, resultados, btc_crudo, tmp_path):
         alertar_validacion=lambda exc: hechos["alertas"].append("validacion") or True,
         tabla_series=lambda engine: False,
         columna_secciones=lambda engine: False,
+        limpiar_secciones=lambda engine, fecha: hechos["limpiezas"].append(fecha) or 1,
         feriado=lambda fecha: None,
         hoy=lambda: HOY,
         ahora=lambda: datetime(2026, 10, 6, 16, 43),
@@ -422,3 +423,72 @@ def test_el_log_no_lleva_secretos_ni_destinatarios(tmp_path):
 def test_redactar_tapa_la_url_de_la_base_entera():
     url = "postgresql://usuario:clave@127.0.0.1:1/inexistente"
     assert pipeline.redactar(f"no conecta a {url}") == "no conecta a ***"
+
+
+def test_una_fila_sin_parrafo_no_cuenta_como_dia_hecho(entorno, historico):
+    # La corrida anterior insertó la fila y murió antes de la IA y del mail
+    deps, hechos, salida = entorno
+    con_hoy = historico.copy()
+    con_hoy.loc[0, "Fecha"] = str(HOY)
+    con_hoy.loc[0, "ai_paragraph"] = None
+
+    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, leer_historico=lambda e: (con_hoy, "supabase")))
+
+    assert r.estado == "error" and not r.exitosa
+    control = next(e for e in r.etapas if e.nombre == "control")
+    assert control.estado == "error" and "no terminó" in control.detalle
+    assert hechos["mails"] == [] and len(hechos["alertas"]) == 1
+
+
+def test_si_el_insert_encuentra_la_fila_no_se_manda_otro_mail(entorno):
+    deps, hechos, salida = entorno
+    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, guardar_fila=lambda e, f, sobrescribir=False: False))
+    assert r.estado == "omitida" and r.exitosa
+    assert hechos["mails"] == [] and hechos["parrafos"] == []
+
+
+def test_una_excepcion_en_la_ia_estructurada_cae_al_parrafo_unico(entorno):
+    deps, hechos, salida = entorno
+
+    def generar(prompt):
+        raise TimeoutError("Gemini no respondió")
+
+    deps = replace(deps, columna_secciones=lambda engine: True, generar_secciones=generar)
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+
+    assert _estados(r)["ia"] == "advertencia"
+    assert hechos["parrafos"] == [HOY] and hechos["limpiezas"] == [HOY]
+    html = hechos["mails"][0][0].get_payload()[0].get_payload(decode=True).decode()
+    assert "Párrafo de Gemini" in html
+
+
+def test_si_no_se_pueden_guardar_las_secciones_cae_al_parrafo_unico(entorno):
+    deps, hechos, salida = entorno
+
+    def guardar(engine, fecha, secciones, modelo):
+        raise ConnectionError("Supabase no responde")
+
+    deps = replace(deps, columna_secciones=lambda engine: True,
+                   generar_secciones=lambda prompt: (_secciones(), "gemini-x"), guardar_secciones=guardar)
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+    assert _estados(r)["ia"] == "advertencia" and hechos["parrafos"] == [HOY]
+
+
+def test_una_serie_rota_no_frena_a_las_demas(entorno):
+    deps, hechos, salida = entorno
+    series = _series_falsas()
+    series["m2"] = []  # discontinuada
+    guardadas = []
+    deps = replace(deps, tabla_series=lambda engine: True, descargar_series=lambda desde: series,
+                   guardar_series=lambda engine, serie, puntos: guardadas.append(serie.clave) or len(puntos))
+
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+
+    assert _estados(r)["series"] == "advertencia"
+    assert "m2" not in guardadas and len(guardadas) == len(agregados.SERIES) - 1
+
+
+@pytest.mark.parametrize("argumentos", [["--enviar-a", "yo@example.com"], ["--con-ia"]])
+def test_opciones_que_solo_van_con_dry_run(argumentos):
+    with pytest.raises(SystemExit):
+        pipeline.main(argumentos)

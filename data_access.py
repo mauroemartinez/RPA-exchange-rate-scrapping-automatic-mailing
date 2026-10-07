@@ -81,7 +81,8 @@ def leer_historico(engine: Engine, respaldo_csv: bool = True) -> tuple[pd.DataFr
         if not respaldo_csv:
             raise
         log.exception("No se pudo leer Supabase; se usa el CSV de contingencia %s", settings.ruta_bbdd)
-        df = pd.read_csv(settings.ruta_bbdd, encoding="latin1")
+        # UTF-8 y no latin1: leerlo como latin1 era lo que rompía las tildes de los párrafos
+        df = pd.read_csv(settings.ruta_bbdd, encoding="utf-8", encoding_errors="replace")
         if "Fecha" in df.columns:
             df = _normalizar_fecha(df)
         return df, "csv"
@@ -132,13 +133,20 @@ def candado_corrida(engine: Engine):
     cualquier combinación de disparadores (API, cron, GitHub Actions, alguien a mano)
     porque vive en la base. Se libera solo si el proceso muere, ya que es de sesión.
     """
-    with engine.connect() as conn:
+    # AUTOCOMMIT: el lock es de sesión, así que no hace falta una transacción, y una
+    # conexión "idle in transaction" durante toda la corrida es candidata a que la corten.
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         obtenido = bool(conn.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": CLAVE_CANDADO}).scalar())
         try:
             yield obtenido
         finally:
             if obtenido:
-                conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": CLAVE_CANDADO})
+                try:
+                    conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": CLAVE_CANDADO})
+                except Exception as exc:
+                    # Con la sesión cortada el lock ya se liberó; no vale poner en rojo
+                    # una corrida que a esta altura ya mandó el mail
+                    log.warning("No se pudo liberar el candado de corrida (%s)", exc)
 
 
 # ── Series con su frecuencia original (fase 3) ──────────────────────────────
@@ -172,7 +180,10 @@ def columna_existe(engine: Engine, columna: str, tabla: str = TABLA) -> bool:
     """Si la columna ya fue creada. La fase 4 (ai_secciones) se activa sola cuando existe."""
     with engine.connect() as conn:
         return bool(conn.execute(
-            text("SELECT 1 FROM information_schema.columns WHERE table_name = :t AND column_name = :c"),
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = :t AND column_name = :c"
+            ),
             {"t": tabla, "c": columna},
         ).scalar())
 
@@ -188,7 +199,7 @@ def sentencia_series():
         index_elements=["serie", "Fecha"],
         set_={"valor": stmt.excluded.valor, "unidad": stmt.excluded.unidad, "actualizado_en": func.now()},
         where=series_macro.c.valor != stmt.excluded.valor,
-    )
+    ).returning(series_macro.c.serie)
 
 
 def guardar_series(engine: Engine, serie, puntos: list[tuple[date, float]]) -> int:
@@ -202,10 +213,12 @@ def guardar_series(engine: Engine, serie, puntos: list[tuple[date, float]]) -> i
         }
         for fecha, valor in puntos
     ]
+    # Con RETURNING se cuentan las filas de todos los lotes: con executemany, el
+    # rowcount quedaba con el del último lote de mil y la carga histórica salía subcontada
     with engine.begin() as conn:
-        escritas = conn.execute(sentencia_series(), filas).rowcount
-    log.info("Supabase: %s, %d puntos nuevos o revisados de %d", serie.clave, max(escritas, 0), len(puntos))
-    return max(escritas, 0)
+        escritas = len(conn.execute(sentencia_series(), filas).all())
+    log.info("Supabase: %s, %d puntos nuevos o revisados de %d", serie.clave, escritas, len(puntos))
+    return escritas
 
 
 def leer_series(engine: Engine, claves: list[str]) -> pd.DataFrame:
