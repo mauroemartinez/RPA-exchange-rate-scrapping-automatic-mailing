@@ -114,7 +114,7 @@ The pipeline is a faithful port of the notebook: fed the same inputs, the four J
 | `notebooks/laboratorio_sql.ipynb` | Read-only SQL lab: every query run through its `consulta()` goes inside a `READ ONLY` transaction |
 | `scrapers/agregados.py` | Catalog of the BCRA monetary and inflation series (id, frequency, unit) and their paginated download |
 | `docs/` | Roadmap notes in Spanish: the cache evaluation, the phase 3 proposal (including the pending definition of "endeudamiento"), the PowerPoint and Streamlit evaluation, and the scheduling and monitoring guide |
-| `sql/` | One-off SQL scripts for DB setup and historical data cleaning (not part of the automated pipeline) |
+| `scripts/sql/` | SQL scripts applied by hand in Supabase: DB setup, historical data cleaning, and the migrations `06_series_macro.sql` and `07_ai_secciones.sql`, each with a plain-Spanish header (what it does, how to apply, verify and undo it) |
 | `tests/` | Offline test suite; `tests/datos/` holds the golden HTML of the mail |
 | `pyproject.toml` | pytest and ruff configuration |
 
@@ -141,11 +141,11 @@ The dashboard does not read `config.py`. It takes `DASHBOARD_DB_URL`, a read-onl
 
 ## Supabase table: `Fact_Mercado_Macro`
 
-Primary key: `Fecha` (date). Columns: `TCC_Blue`, `TCV_Blue`, `TCC_Billete`, `TCV_Billete`, `TCC_Divisas`, `TCV_Divisas`, `Solidario`, `TCV_MEP`, `riesgo_pais`, `TCC_Euro`, `TCV_Euro`, `fed_tea`, `bcra_tea`, `ai_paragraph`, `ai_model`, and once `sql/07_ai_secciones.sql` is applied, `ai_secciones` (jsonb with the per-chart comments and the model). New columns go at the end of the table: the email takes the first 14 by position. Applying `sql/07` while the notebook is still in daily use is safe: the notebook reads `SELECT *` but builds the email table from those first 14 columns, and its insert sends a fixed column list that does not include `ai_secciones`.
+Primary key: `Fecha` (date). Columns: `TCC_Blue`, `TCV_Blue`, `TCC_Billete`, `TCV_Billete`, `TCC_Divisas`, `TCV_Divisas`, `Solidario`, `TCV_MEP`, `riesgo_pais`, `TCC_Euro`, `TCV_Euro`, `fed_tea`, `bcra_tea`, `ai_paragraph`, `ai_model`, and once `scripts/sql/07_ai_secciones.sql` is applied, `ai_secciones` (jsonb with the per-chart comments and the model). New columns go at the end of the table: the email takes the first 14 by position. Applying `scripts/sql/07_ai_secciones.sql` while the notebook is still in daily use is safe: the notebook reads `SELECT *` but builds the email table from those first 14 columns, and its insert sends a fixed column list that does not include `ai_secciones`.
 
 ## Supabase table: `Fact_Series_Macro`
 
-Long format, one row per series and date: `serie`, `Fecha`, `valor`, `frecuencia` (`D`, `M`, `T`, `A`), `unidad`, `fuente`, `id_fuente`, `actualizado_en`. Primary key `(serie, Fecha)`. Values keep the unit and the dates of their source (the BCRA publishes the base in millions of ARS and M3 in thousands); convert only for display. The table is created by `sql/06_series_macro.sql`, applied by hand, never by the code. Its upsert only rewrites values that changed, so `actualizado_en` marks the last real revision.
+Long format, one row per series and date: `serie`, `Fecha`, `valor`, `frecuencia` (`D`, `M`, `T`, `A`), `unidad`, `fuente`, `id_fuente`, `actualizado_en`. Primary key `(serie, Fecha)`. Values keep the unit and the dates of their source (the BCRA publishes the base in millions of ARS and M3 in thousands); convert only for display. The table is created by `scripts/sql/06_series_macro.sql`, applied by hand, never by the code. Its upsert only rewrites values that changed, so `actualizado_en` marks the last real revision.
 
 ## Manual resend
 

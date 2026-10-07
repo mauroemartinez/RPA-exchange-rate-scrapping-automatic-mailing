@@ -91,8 +91,7 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 ├── scrapers/           Ingestion layer: Playwright scrapers + async REST clients
 ├── templates/          Jinja2 email template
 ├── notebooks/          The original orchestration notebook, kept as a reference
-├── scripts/            Operational tooling (backfills, manual resends, daily control, prototypes)
-├── sql/                Schema, migrations, bulk load and exploratory queries
+├── scripts/            Operational tooling; scripts/sql/ holds the SQL applied by hand in Supabase
 ├── tests/              Offline test suite; tests/datos/ pins the mail HTML
 ├── docs/               Roadmap evaluations and runbooks (Spanish)
 ├── dashboard/          Streamlit prototype, read-only, with its own requirements
@@ -157,8 +156,8 @@ The following modules are mapped in the architecture blueprint and are undergoin
 * **Project Modularization:** *Done.* The pipeline runs as plain Python modules through `pipeline.py`; the notebook remains only as a reference during the transition.
 * **Idempotent Warehouse Writes:** *Done.* Today's row goes in with a single atomic `INSERT ... ON CONFLICT ("Fecha")`, which keeps existing history untouched on a normal run and overwrites it only on an explicit `--forzar` rerun.
 * **Native Logging:** *Done for the pipeline.* Every module logs through `logging`, with an optional file handler (`--log-archivo`) so unattended runs leave an auditable trace. The legacy notebook still prints.
-* **Per-chart AI Commentary:** *Built, pending activation.* One structured Gemini call returns a summary plus a comment under each chart block, validated with Pydantic before it reaches the mail and stored as JSON with the model that wrote it. It switches on once `sql/07_ai_secciones.sql` adds the column; until then the single paragraph keeps working as before.
-* **API Data Persistence in Supabase:** *Built, pending activation.* The BCRA monetary aggregates and inflation series get their own long-format table, `Fact_Series_Macro`, with source dates, frequencies and units, kept up to date by the daily run once `sql/06_series_macro.sql` is applied. Nothing reads it yet; the aggregates join the email once their chart is reviewed.
+* **Per-chart AI Commentary:** *Built, pending activation.* One structured Gemini call returns a summary plus a comment under each chart block, validated with Pydantic before it reaches the mail and stored as JSON with the model that wrote it. It switches on once `scripts/sql/07_ai_secciones.sql` adds the column; until then the single paragraph keeps working as before.
+* **API Data Persistence in Supabase:** *Built, pending activation.* The BCRA monetary aggregates and inflation series get their own long-format table, `Fact_Series_Macro`, with source dates, frequencies and units, kept up to date by the daily run once `scripts/sql/06_series_macro.sql` is applied. Nothing reads it yet; the aggregates join the email once their chart is reviewed.
 * **Automated Executive PowerPoint Reporting:** *Done.* Every run builds a six-slide executive deck with the charts, spreads, key indicators and AI commentary, `Previews/Reporte Ejecutivo.pptx`, and commits it with the charts, so the repository always holds the latest one.
 * **Workflow Orchestration & Automation:** *Ready to switch on.* GitHub Actions workflows for the daily run and a daily control ship disabled; holidays and weekends are skipped, and a database lock prevents duplicate runs across schedulers. CI already runs lint and the offline tests on every push.
 * **Streamlit Dashboard:** *Prototype.* `dashboard/app.py` explores the full history read-only, with its own dependencies. Publishing it first needs a read-only database role (the SQL is in `docs/evaluacion-powerpoint-y-streamlit.md`).

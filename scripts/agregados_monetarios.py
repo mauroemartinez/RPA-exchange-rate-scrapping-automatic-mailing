@@ -2,7 +2,7 @@
 
 Las series todavía no van en el mail: este script sirve para revisarlas antes de
 sumarlas al reporte y para cargar su historia completa en Supabase una vez creada
-la tabla (sql/06_series_macro.sql). Sin --guardar no escribe nada en ningún lado
+la tabla (scripts/sql/06_series_macro.sql). Sin --guardar no escribe nada en ningún lado
 salvo el gráfico, que va a una carpeta temporal y nunca a Previews/.
 
 Uso:
@@ -63,7 +63,7 @@ def main() -> None:
     if args.guardar:
         engine = data_access.crear_engine()
         if not data_access.tabla_existe(engine):
-            raise SystemExit(f"❌ No existe {data_access.TABLA_SERIES}. Aplicá sql/06_series_macro.sql en Supabase primero.")
+            raise SystemExit(f"❌ No existe {data_access.TABLA_SERIES}. Aplicá scripts/sql/06_series_macro.sql en Supabase primero.")
         total = sum(data_access.guardar_series(engine, agregados.POR_CLAVE[c], p) for c, p in series.items())
         engine.dispose()
         print(f"✅ {data_access.TABLA_SERIES}: {total} puntos nuevos o revisados")
