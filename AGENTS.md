@@ -102,8 +102,11 @@ The pipeline is a faithful port of the notebook: fed the same inputs, the four J
 | `scripts/backfill.py` | Repairs historical `riesgo_pais` and `bcra_tea` series against their source APIs. Dry-run by default, writes only with `--apply`. |
 | `scripts/reenvio_manual.py` | Resends the latest report to arbitrary recipients without rerunning the pipeline |
 | `scripts/agregados_monetarios.py` | Summary and preview chart of the monetary aggregates; `--guardar` loads their full history into `Fact_Series_Macro` |
+| `scripts/presentacion_ejecutiva.py` | Prototype (roadmap phase 5): a 6-slide executive `.pptx` built from the stored row, its AI texts and the charts in `Previews/`. Read-only, not wired into the pipeline |
+| `dashboard/app.py` | Prototype (roadmap phase 5): Streamlit dashboard over the full history, with its own `dashboard/requirements.txt`. Read-only, does not import `config.py` |
+| `notebooks/laboratorio_sql.ipynb` | Read-only SQL lab: every query runs inside a `READ ONLY` transaction |
 | `scrapers/agregados.py` | Catalog of the BCRA monetary and inflation series (id, frequency, unit) and their paginated download |
-| `docs/` | Roadmap notes in Spanish: the cache evaluation and the phase 3 proposal, including the pending definition of "endeudamiento" |
+| `docs/` | Roadmap notes in Spanish: the cache evaluation, the phase 3 proposal (including the pending definition of "endeudamiento"), and the PowerPoint and Streamlit evaluation |
 | `sql/` | One-off SQL scripts for DB setup and historical data cleaning (not part of the automated pipeline) |
 
 ## Environment variables (`.env`)
@@ -161,4 +164,5 @@ Two guardrails worth knowing: it aborts if the newest row has no `ai_paragraph` 
 - **Gemini only writes; Python computes.** Every figure in the prompts is calculated beforehand, and the structured answer must pass `models.SeccionesIA` before it reaches the email. The schema sent to the API carries only types and required fields; the length limits live in the Pydantic model.
 - **Keep the `httpx` logger at WARNING or above.** It logs full request URLs at INFO, and the FRED request carries the API key in its query string.
 - **Column order matters in the email.** The cotizaciones table is built with `df.iloc[:, :14]`, so it depends on the column order coming back from Supabase. Adding a column to the table in the wrong position silently reshuffles the mail.
+- **Analysis tools only read.** The SQL lab, the presentation prototype and the dashboard never write to Supabase and never reimplement the report: they consume the warehouse and the existing modules. The dashboard must not get the pipeline's credentials; if it is ever published, give it a read-only role (`docs/evaluacion-powerpoint-y-streamlit.md` has the SQL, including the RLS policy that role needs).
 - **Writing style for this repo: no em dashes,** in documentation, comments, or commit messages.
