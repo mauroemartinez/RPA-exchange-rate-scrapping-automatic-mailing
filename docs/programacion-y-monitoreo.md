@@ -8,12 +8,13 @@ Hoy la corrida se lanza a mano desde el notebook. En los últimos 90 días queda
 
 | Pedido del roadmap | Cómo quedó |
 |---|---|
-| Evitar corridas duplicadas entre mecanismos | Advisory lock de Postgres durante toda la corrida (`data_access.candado_corrida`), más el control de "la fila de hoy ya existe". Dos disparadores a la vez: uno corre y el otro termina como `omitida`. Uno detrás del otro: el segundo ve la fila y no repite el mail. **El notebook no respeta ninguno de los dos**: con un programador activo, dejalo de usar. |
+| Evitar corridas duplicadas entre mecanismos | Advisory lock de Postgres durante toda la corrida (`data_access.candado_corrida`), el control de "la fila de hoy ya existe" y un INSERT que no pisa. Dos disparadores a la vez: uno corre y el otro termina como `omitida`. Uno detrás del otro: el segundo ve la fila y no repite el mail. Si igual se cruzaran (por ejemplo, uno que leyó el CSV de respaldo y no vio la fila), el INSERT encuentra la fila y la corrida termina como `omitida`, también sin mail. **El notebook no respeta nada de esto**: con un programador activo, dejalo de usar. |
 | Operar de forma previsible | Los fines de semana y los feriados nacionales (API de ArgentinaDatos, puentes incluidos) la corrida se omite. Con `--forzar` corre igual. Si el calendario no responde, corre: un mail de más es menos grave que un día sin reporte. |
+| Corridas que mueren a mitad de camino | Si una corrida insertó la fila y murió antes del párrafo y del mail (timeout, reinicio, la PC suspendida), la siguiente no la toma como día hecho: termina en error, con una alerta que dice cómo rehacer el día (`--forzar`). Cada llamada a Gemini tiene un timeout de 120 s, para que una respuesta colgada no se coma la hora de la corrida. |
 | Registrar duración y resultado de cada etapa | Cada etapa queda con estado y segundos en el log (`--log-archivo`) y en un JSON (`--json`). El código de salida es 1 si alguna etapa terminó en error. |
-| Alertas útiles | Un error en cualquier etapa manda un único mail con el resumen. `scripts/control_diario.py` cubre la corrida que nunca arrancó: si a la hora del control no está la fila de hoy, falla y alerta. Corriendo en GitHub Actions, cada falla además dispara el aviso por mail de GitHub, que no depende de la contraseña de Gmail del reporte. |
+| Alertas útiles | Un error en cualquier etapa manda un único mail con el resumen. `scripts/control_diario.py` cubre la corrida que nunca arrancó: si a la hora del control no está la fila de hoy, falla y alerta. Corriendo en GitHub Actions, cada falla además dispara el aviso por mail de GitHub, que no depende de la contraseña de Gmail del reporte. Las alertas van a `EMAIL_ALERTAS` (si está vacía, a `EMAIL_RECEIVER_CSV`); como llevan tracebacks, conviene que sea solo quien mantiene el proyecto. |
 | Endpoints y credenciales | `/run` compara la key con `secrets.compare_digest` y no se habilita sin key. Los logs tapan cada secreto del `.env` y cada dirección de destinatario (ver "Logs públicos", abajo). |
-| CI sin efectos externos | `.github/workflows/ci.yml`: `ruff check` (incluye el orden de los imports), importa todos los módulos y corre los tests, que fallan si intentan salir a la red o abrir una conexión SMTP. Corre en cada push a `main` (salvo los commits de `Previews/`) y en cada PR. |
+| CI sin efectos externos | `.github/workflows/ci.yml`: `ruff check` (incluye el orden de los imports), importa todos los módulos y corre los tests, que fallan si intentan salir a la red, abrir una conexión SMTP, bajar datos de Yahoo o lanzar un navegador. Corre en cada push a `main` (salvo los commits de `Previews/`) y en cada PR. |
 
 Sobre "formato": el CI verifica el estilo con las reglas de `ruff check`, no con un formateador. Aplicar `ruff format` hoy cambiaría unas 800 líneas en 26 archivos, también en código que esta rama no tocó; conviene hacerlo en un commit aparte, solo de formato, y recién ahí sumar `ruff format --check` al CI.
 
@@ -33,7 +34,7 @@ Mi recomendación es **GitHub Actions**, con una condición: que las webs argent
 
 ### GitHub Actions, paso a paso
 
-1. En el repo: Settings > Secrets and variables > Actions > New repository secret. Cargar `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECEIVER`, `EMAIL_RECEIVER_CSV`, `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`, `FED_API_KEY` y `SUPABASE_DB_URL`, con los mismos valores del `.env`.
+1. En el repo: Settings > Secrets and variables > Actions > New repository secret. Cargar `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECEIVER`, `EMAIL_RECEIVER_CSV`, `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`, `FED_API_KEY` y `SUPABASE_DB_URL`, con los mismos valores del `.env`. Opcional: `EMAIL_ALERTAS`.
 2. Actions > Corrida diaria > Run workflow, con modo `dry-run`. Scrapea y arma todo sin escribir ni mandar nada. Si la etapa `scraping` termina en `ok`, las webs responden desde GitHub.
 3. Un día que no hayas corrido el notebook: Run workflow con modo `real`. Es la corrida completa: escribe en Supabase, manda el mail y pushea `Previews/`.
 4. En `.github/workflows/corrida-diaria.yml`, descomentar el bloque `schedule` (17:00 de Argentina, de lunes a viernes) y hacer lo mismo en `control-diario.yml` (19:30). Commitear en `main`.
@@ -56,3 +57,9 @@ venv\Scripts\python.exe pipeline.py --log-archivo logs\pipeline.log
 ```
 
 Y otra a las 19:30 con `venv\Scripts\python.exe scripts\control_diario.py`.
+
+## Dos reglas para cualquier programador
+
+**Sin reintentos automáticos.** No actives los reintentos del programador (el "Retry On Fail" de un nodo de n8n, o el "Si la tarea no se ejecuta correctamente, reiniciar cada" del Programador de tareas; GitHub Actions no reintenta solo). Una corrida que falló después de insertar la fila no se puede repetir a ciegas: una de las dos variantes del mail puede haber salido. Con la alerta en la mano, el día se rehace con `--forzar` o se reenvía con `scripts/reenvio_manual.py`. Repetir sin `--forzar` es seguro en el otro sentido: omite un día terminado y frena con error en uno a medio hacer.
+
+**`SUPABASE_DB_URL` en modo sesión.** El candado es de sesión: Postgres lo suelta cuando se cierra la conexión, así que una corrida que muere no lo deja puesto. Detrás del pooler de Supabase en modo transacción (puerto 6543), tomarlo y soltarlo pueden caer en conexiones distintas del servidor, y el candado quedaría tomado. Por eso la URL tiene que ir al pooler en modo sesión (puerto 5432, como hoy) o a la conexión directa. Si aun así quedara tomado, cada corrida terminaría como `omitida` sin escribir la fila, y eso es justamente lo que detecta `scripts/control_diario.py`.

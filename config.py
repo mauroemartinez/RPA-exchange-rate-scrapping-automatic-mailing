@@ -164,7 +164,7 @@ def reemplazos_sensibles() -> list[tuple[str, str]]:
     clave_base = urlparse(settings.supabase_db_url.get_secret_value()).password
     if clave_base:
         pares.append((clave_base, "***"))
-    destinatarios = {str(m) for m in [*settings.email_receiver, *settings.email_receiver_csv]}
+    destinatarios = {str(m) for m in [*settings.email_receiver, *settings.email_receiver_csv, *settings.email_alertas]}
     pares += [(m, "[destinatario]") for m in destinatarios]
     return sorted((p for p in pares if p[0]), key=lambda p: len(p[0]), reverse=True)
 
