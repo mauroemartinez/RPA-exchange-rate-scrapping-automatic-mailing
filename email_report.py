@@ -161,14 +161,19 @@ def renderizar(
     parrafo_ia: str,
     performance_segundos: float,
     graficos: list[str] | None = None,
+    comentarios: dict[str, list[tuple[str, str]]] | None = None,
 ) -> str:
     """El HTML del reporte desde templates/report_email.html.
 
     `df` es el histórico con brechas y variaciones, todavía con las TEA numéricas.
     `graficos` son los cid presentes; si falta uno (por ejemplo, Yahoo no respondió
-    y no hay gráfico de BTC) el template no deja la imagen rota.
+    y no hay gráfico de BTC) el template no deja la imagen rota. `comentarios` son
+    los textos de Gemini por gráfico ({cid: [(título, texto)]}); sin ellos, el
+    mail sale exactamente como antes de la fase 4.
     """
-    contexto = contexto_template(df, inflacion_12, fwd_oficial, fwd_blue, parrafo_ia, performance_segundos, graficos)
+    contexto = contexto_template(
+        df, inflacion_12, fwd_oficial, fwd_blue, parrafo_ia, performance_segundos, graficos, comentarios
+    )
     return template().render(**contexto)
 
 
@@ -180,6 +185,7 @@ def contexto_template(
     parrafo_ia: str,
     performance_segundos: float,
     graficos: list[str] | None = None,
+    comentarios: dict[str, list[tuple[str, str]]] | None = None,
 ) -> dict:
     """Las variables que recibe el template (celda 47)."""
     df_mail = preparar_df_mail(df)
@@ -203,6 +209,7 @@ def contexto_template(
         bcra_api_url=bcra.API_BASE,
         performance_segundos=performance_segundos,
         graficos=graficos if graficos is not None else [f"image{i + 1}" for i in range(len(ORDEN_EN_MAIL))],
+        comentarios=comentarios or {},
     )
 
 

@@ -4,14 +4,18 @@ Lee el historial de Supabase, calcula variaciones de 1 y 25 ruedas, arma el prom
 llama a Gemini rotando keys y modelos, y guarda el texto en la fila del día.
 """
 
+import json
 import logging
 from datetime import date
 
 import pandas as pd
 from google import genai
+from google.genai import types
+from pydantic import ValidationError
 from sqlalchemy import text
 
 from config import settings
+from models import SeccionesIA
 
 log = logging.getLogger(__name__)
 
@@ -190,3 +194,184 @@ def procesar_y_guardar_parrafo(engine, fecha_esperada: date | None = None) -> st
     except Exception as e:
         log.error("Gemini: proceso interrumpido: %s", e)
         return MENSAJE_FALLA
+
+
+# ── Fase 4: un comentario por gráfico en una sola llamada ────────────────────
+
+# Ruedas hacia atrás de la comparación "mensual", igual que el párrafo diario
+VENTANA = 25
+
+# Qué sección va debajo de qué gráfico del mail (cid) y con qué título
+SECCIONES_POR_GRAFICO = {
+    "image1": [("Cotizaciones paralelas", "paralelas"), ("Cotizaciones oficiales", "oficiales"),
+               ("Riesgo país", "riesgo_pais")],
+    "image4": [("Bitcoin", "btc")],
+}
+
+
+def _esquema_respuesta():
+    """El esquema que se le pide a Gemini: solo tipos y campos obligatorios.
+
+    Los largos mínimos y máximos los controla models.SeccionesIA al recibir la
+    respuesta, así no depende de qué restricciones acepte la API en el esquema.
+    """
+    texto = types.Schema(type=types.Type.STRING)
+    return types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "resumen": texto, "paralelas": texto, "oficiales": texto, "riesgo_pais": texto,
+            "btc": types.Schema(type=types.Type.STRING, nullable=True),
+        },
+        required=["resumen", "paralelas", "oficiales", "riesgo_pais"],
+        property_ordering=["resumen", "paralelas", "oficiales", "riesgo_pais", "btc"],
+    )
+
+
+def _var(a: float, b: float) -> float:
+    return (a / b - 1) * 100
+
+
+def _hechos_btc(btc: pd.DataFrame) -> list[str]:
+    """Los datos de BTC a comentar, sobre la salida de charts.preparar_btc()."""
+    cierre = btc["Close"]
+    ultimo, fecha = float(cierre.iloc[-1]), btc.index[-1]
+    ma7, ma30 = float(btc["MA7"].iloc[-1]), float(btc["MA30"].iloc[-1])
+    cruce = (btc["MA7"] > btc["MA30"]).astype(int).diff().iloc[-7:]
+    vol, vol_media = float(btc["Volatility"].iloc[-1]), float(btc["Volatility"].mean())
+    lineas = [
+        f"- Último cierre: USD {ultimo:,.0f} ({fecha:%d/%m/%Y})",
+        f"- Variación 7 días: {_var(ultimo, float(cierre.iloc[-8])):+.2f}% | 30 días: {_var(ultimo, float(cierre.iloc[-31])):+.2f}%",
+        f"- Media móvil de 7 días: USD {ma7:,.0f}, {'por encima' if ma7 > ma30 else 'por debajo'} de la de 30 días (USD {ma30:,.0f})",
+        f"- Máximo de 12 meses: USD {cierre.max():,.0f} ({cierre.idxmax():%d/%m/%Y}) | Mínimo: USD {cierre.min():,.0f} ({cierre.idxmin():%d/%m/%Y})",
+        f"- Volatilidad de 20 días: {vol:.2f}% (promedio de 12 meses: {vol_media:.2f}%)",
+    ]
+    if (cruce == 1).any():
+        lineas.append("- En la última semana la media de 7 días cruzó hacia arriba a la de 30")
+    elif (cruce == -1).any():
+        lineas.append("- En la última semana la media de 7 días cruzó hacia abajo a la de 30")
+    return lineas
+
+
+def armar_prompt_secciones(df: pd.DataFrame, btc: pd.DataFrame | None, fwd_oficial: float) -> str:
+    """El prompt de la llamada estructurada. `df` es el histórico más nuevo primero, con la fila de hoy.
+
+    Todas las cifras van calculadas: a Gemini solo se le pide que las redacte.
+    """
+    hoy, ayer, mes = df.iloc[0], df.iloc[1], df.iloc[VENTANA]
+    ventana = df.iloc[: VENTANA + 1]
+    fecha = pd.to_datetime(hoy["Fecha"]).strftime("%d/%m/%Y")
+
+    def dia_mes(col: str) -> str:
+        return f"Día: {_var(hoy[col], ayer[col]):+.2f}% | {VENTANA} ruedas: {_var(hoy[col], mes[col]):+.2f}%"
+
+    blue, mep = hoy["TCV_Blue"], hoy["TCV_MEP"]
+    barato = "Blue" if blue < mep else "MEP"
+    fechas_ventana = pd.to_datetime(ventana["Fecha"])
+    rp = ventana["riesgo_pais"]
+    rp_max, rp_min = rp.idxmax(), rp.idxmin()
+
+    resumen = [
+        f"- Blue: ${blue} ({dia_mes('TCV_Blue')})",
+        f"- MEP: ${mep}",
+        f"- Brecha: {abs(_var(blue, mep)):.2f}% entre el Blue (${blue}) y el MEP (${mep}); más barato: {barato}",
+        f"- Billete: ${hoy['TCV_Billete']} ({dia_mes('TCV_Billete')})",
+        f"- Riesgo País: {hoy['riesgo_pais']:.0f} pts (Día: {hoy['riesgo_pais'] - ayer['riesgo_pais']:+.0f} pts | "
+        f"{VENTANA} ruedas: {hoy['riesgo_pais'] - mes['riesgo_pais']:+.0f} pts)",
+        f"- TEA BCRA (BADLAR): {hoy['bcra_tea']:.2f}% | TEA FED: {hoy['fed_tea']:.2f}%",
+    ]
+    paralelas = [
+        f"- Blue venta: ${blue} ({dia_mes('TCV_Blue')}); compra: ${hoy['TCC_Blue']}",
+        f"- Blue venta, rango de las últimas {VENTANA} ruedas: máximo ${ventana['TCV_Blue'].max()}, mínimo ${ventana['TCV_Blue'].min()} (no es una banda cambiaria)",
+        f"- MEP: ${mep} ({dia_mes('TCV_MEP')})",
+        f"- Euro blue venta: ${hoy['TCV_Euro']} ({dia_mes('TCV_Euro')})",
+        f"- Solidario: ${hoy['Solidario']:.2f} (Día: {_var(hoy['Solidario'], ayer['Solidario']):+.2f}%)",
+        f"- Brecha MEP contra Blue: {_var(mep, blue):+.2f}% | Solidario contra Blue: {_var(hoy['Solidario'], blue):+.2f}%",
+    ]
+    oficiales = [
+        f"- Billete BNA venta: ${hoy['TCV_Billete']} ({dia_mes('TCV_Billete')}); compra: ${hoy['TCC_Billete']}",
+        f"- Divisas BNA venta: ${hoy['TCV_Divisas']} ({dia_mes('TCV_Divisas')}); compra: ${hoy['TCC_Divisas']}",
+        f"- Diferencia entre billete y divisas (venta): {_var(hoy['TCV_Billete'], hoy['TCV_Divisas']):+.2f}%",
+        f"- Forward oficial a 3 meses por paridad de tasas de Fisher (BADLAR contra FED): ${fwd_oficial:,.2f}, "
+        f"{_var(fwd_oficial, hoy['TCV_Billete']):+.2f}% sobre el billete",
+    ]
+    riesgo = [
+        f"- Hoy: {hoy['riesgo_pais']:.0f} pts (Día: {hoy['riesgo_pais'] - ayer['riesgo_pais']:+.0f} pts, "
+        f"{_var(hoy['riesgo_pais'], ayer['riesgo_pais']):+.2f}%)",
+        f"- Hace {VENTANA} ruedas: {mes['riesgo_pais']:.0f} pts ({hoy['riesgo_pais'] - mes['riesgo_pais']:+.0f} pts)",
+        f"- Máximo de la ventana: {rp[rp_max]:.0f} pts ({fechas_ventana[rp_max]:%d/%m}) | "
+        f"Mínimo: {rp[rp_min]:.0f} pts ({fechas_ventana[rp_min]:%d/%m})",
+    ]
+    hechos_btc = _hechos_btc(btc) if btc is not None and len(btc) > 31 else ["- Sin datos de BTC hoy"]
+
+    bloques = {
+        "resumen": resumen, "paralelas": paralelas, "oficiales": oficiales,
+        "riesgo_pais": riesgo, "btc": hechos_btc,
+    }
+    datos = "\n\n".join(f"[{clave}]\n" + "\n".join(lineas) for clave, lineas in bloques.items())
+
+    return f"""
+Actuá como analista financiero Senior. Escribí los comentarios de un reporte diario del mercado argentino,
+en castellano rioplatense, con tono seco y profesional. No somos asesores financieros: no recomiendes
+comprar ni vender. Usá solo las cifras de abajo, ya calculadas, sin inventar datos.
+
+DATOS AL {fecha}:
+
+{datos}
+
+Devolvé un JSON con estas claves:
+- resumen: un párrafo de 3 a 4 líneas. Mencioná la brecha con los valores explícitos de Blue y MEP, usá la
+  frase "siendo la opción más económica de las dos" al compararlos y analizá la tendencia de las últimas
+  {VENTANA} ruedas para Blue, Billete y Riesgo País cuando sea relevante.
+- paralelas: 2 o 3 oraciones sobre blue, MEP, euro blue y solidario.
+- oficiales: 2 o 3 oraciones sobre billete y divisas del BNA y el forward de Fisher.
+- riesgo_pais: 2 o 3 oraciones sobre el nivel, la variación del día y la de las últimas {VENTANA} ruedas.
+- btc: 2 o 3 oraciones sobre precio, medias móviles y volatilidad; null si no hay datos de BTC.
+No repitas en una sección lo que ya dijiste en otra.
+"""
+
+
+def generar_secciones(prompt: str) -> tuple[SeccionesIA | None, str | None]:
+    """(secciones validadas, modelo). Si la respuesta no cumple el esquema, se pide una vez más."""
+    config = types.GenerateContentConfig(response_mime_type="application/json", response_schema=_esquema_respuesta())
+    for intento in (1, 2):
+        texto, modelo = generar_parrafo(prompt, config=config)
+        if texto is None:
+            return None, None
+        try:
+            return SeccionesIA.model_validate_json(texto), modelo
+        except ValidationError as exc:
+            log.warning("Gemini: la respuesta estructurada no cumple el esquema (intento %d): %s", intento, exc)
+    return None, None
+
+
+def guardar_secciones(engine, fecha: date, secciones: SeccionesIA, modelo: str | None) -> int:
+    """El resumen va a ai_paragraph, como siempre; los comentarios por gráfico, a ai_secciones (JSON).
+
+    ai_paragraph sigue teniendo el párrafo general, así el reenvío manual, el CSV
+    adjunto y el notebook funcionan igual que antes.
+    """
+    contenido = secciones.model_dump(exclude={"resumen"})
+    contenido["modelo"] = modelo
+    with engine.begin() as conn:
+        result = conn.execute(
+            text(
+                f'UPDATE "{TABLA}" SET "ai_paragraph" = :p, "ai_model" = :m, '
+                '"ai_secciones" = CAST(:s AS jsonb) WHERE "Fecha" = :f'
+            ),
+            {"p": secciones.resumen, "m": modelo, "s": json.dumps(contenido, ensure_ascii=False), "f": fecha},
+        )
+    log.info("Gemini: secciones del %s guardadas con %s (filas afectadas: %d)", fecha, modelo, result.rowcount)
+    return result.rowcount
+
+
+def comentarios_por_grafico(secciones: dict | SeccionesIA | None) -> dict[str, list[tuple[str, str]]]:
+    """{cid: [(título, texto), ...]} para el template, desde las secciones guardadas o recién generadas."""
+    if secciones is None:
+        return {}
+    datos = secciones.model_dump() if isinstance(secciones, SeccionesIA) else dict(secciones)
+    comentarios = {}
+    for cid, items in SECCIONES_POR_GRAFICO.items():
+        presentes = [(titulo, datos[clave]) for titulo, clave in items if datos.get(clave)]
+        if presentes:
+            comentarios[cid] = presentes
+    return comentarios

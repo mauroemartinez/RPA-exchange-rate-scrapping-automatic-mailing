@@ -141,6 +141,11 @@
             <div style="text-align:center; width:100%; margin:20px 0;">
               {%- for cid in graficos | default(['image1', 'image2', 'image3', 'image4']) %}
               <img src='cid:{{ cid }}' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+              {#- Comentarios de Gemini sobre este gráfico (fase 4). Sin comentarios no
+                  se agrega nada, ni siquiera un salto de línea. #}
+              {%- for titulo, texto in (comentarios or {}).get(cid, []) %}
+              <div class="comentario-ia" style="margin:0 0 18px 0; padding:10px 14px; background-color:#f4f6f8; border-left:3px solid #f39c12; border-radius:4px; text-align:left;"><b style="font-size:11px; color:#2c3e50; text-transform:uppercase; letter-spacing:0.5px;">🤖 {{ titulo | e }}</b><br><span style="color:#1a252f;">{{ texto | e }}</span></div>
+              {%- endfor %}
               {%- endfor %}
             </div>
 

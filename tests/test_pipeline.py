@@ -48,6 +48,7 @@ def entorno(historico, resultados, btc_crudo, tmp_path):
         alertar_scraper=lambda exc: hechos["alertas"].append("scraper") or True,
         alertar_validacion=lambda exc: hechos["alertas"].append("validacion") or True,
         tabla_series=lambda engine: False,
+        columna_secciones=lambda engine: False,
         hoy=lambda: HOY,
         ahora=lambda: datetime(2026, 10, 6, 16, 43),
     )
@@ -289,3 +290,68 @@ def test_una_falla_en_las_series_no_pone_la_corrida_en_rojo(entorno):
     assert _estados(r)["series"] == "advertencia"
     assert r.estado == "advertencia" and r.exitosa
     assert len(hechos["mails"]) == 2
+
+
+def _secciones():
+    from models import SeccionesIA
+
+    return SeccionesIA(
+        resumen="Resumen estructurado del día, con la brecha entre el Blue y el MEP y la tendencia de las 25 ruedas.",
+        paralelas="Comentario sobre las cotizaciones paralelas.",
+        oficiales="Comentario sobre las cotizaciones oficiales.",
+        riesgo_pais="Comentario sobre el riesgo país del día.",
+        btc="Comentario sobre BTC y sus medias móviles.",
+    )
+
+
+def test_con_la_columna_ai_secciones_sale_la_llamada_estructurada(entorno):
+    deps, hechos, salida = entorno
+    guardadas = []
+    deps = replace(
+        deps,
+        columna_secciones=lambda engine: True,
+        generar_secciones=lambda prompt: (_secciones(), "gemini-x"),
+        guardar_secciones=lambda engine, fecha, secciones, modelo: guardadas.append((fecha, modelo)) or 1,
+    )
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+
+    assert _estados(r)["ia"] == "ok"
+    assert guardadas == [(HOY, "gemini-x")]
+    assert hechos["parrafos"] == []  # no hizo falta el párrafo único
+    html = hechos["mails"][0][0].get_payload()[0].get_payload(decode=True).decode()
+    assert "Resumen estructurado del día" in html
+    assert "Comentario sobre las cotizaciones paralelas." in html and "Comentario sobre BTC" in html
+
+
+def test_si_falla_la_estructurada_vuelve_al_parrafo_unico(entorno):
+    deps, hechos, salida = entorno
+    deps = replace(deps, columna_secciones=lambda engine: True, generar_secciones=lambda prompt: (None, None))
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+
+    assert _estados(r)["ia"] == "advertencia"
+    assert hechos["parrafos"] == [HOY]
+    html = hechos["mails"][0][0].get_payload()[0].get_payload(decode=True).decode()
+    assert "Párrafo de Gemini" in html and "comentario-ia" not in html
+
+
+def test_dry_run_con_ia_prueba_los_comentarios_sin_guardar(entorno):
+    deps, hechos, salida = entorno
+    llamadas, guardadas = [], []
+    deps = replace(
+        deps,
+        generar_secciones=lambda prompt: llamadas.append(prompt) or (_secciones(), "gemini-x"),
+        guardar_secciones=lambda *a: guardadas.append(a) or 1,
+    )
+    r = pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida, probar_ia=True), deps)
+
+    assert _estados(r)["ia"] == "ok" and len(llamadas) == 1 and guardadas == []
+    vista = (salida / "mail_preview.html").read_text(encoding="utf-8")
+    assert "Comentario sobre el riesgo país del día." in vista
+
+
+def test_dry_run_sin_con_ia_no_llama_a_gemini(entorno):
+    deps, hechos, salida = entorno
+    llamadas = []
+    deps = replace(deps, generar_secciones=lambda prompt: llamadas.append(prompt) or (None, None))
+    pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida), deps)
+    assert llamadas == []

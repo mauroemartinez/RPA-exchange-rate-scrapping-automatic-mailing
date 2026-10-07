@@ -46,6 +46,7 @@ import charts
 import data_access
 import email_report
 import fechas
+import ia_generator
 import transformations
 from config import settings
 from scrapers import bcra
@@ -115,10 +116,15 @@ def main() -> None:
     inflacion_12 = armar_inflacion()
     imagenes = leer_imagenes()
 
+    # Los comentarios por gráfico de la fase 4, si la fila los tiene
+    secciones = df["ai_secciones"].iloc[0] if "ai_secciones" in df.columns else None
+    comentarios = ia_generator.comentarios_por_grafico(secciones if isinstance(secciones, dict) else None)
+
     html = email_report.renderizar(
         df, inflacion_12, fwd_oficial, fwd_blue, parrafo,
         performance_segundos=time.perf_counter() - comienzo,
         graficos=email_report.cids_disponibles(imagenes),
+        comentarios=comentarios,
     )
 
     # Con un solo destinatario va derecho en Para, que es lo habitual en un
