@@ -26,6 +26,10 @@ on:
         type: choice
         options: [dry-run, real, sin-mail]
         default: dry-run
+      probar_mail:
+        description: "Solo con dry-run: manda el reporte de prueba a EMAIL_ALERTAS (o, si no está, a EMAIL_SENDER), nunca a la lista"
+        type: boolean
+        default: false
   schedule:
     - cron: "13 20 * * 1-5"   # 17:13 en Argentina (UTC-3), de lunes a viernes
 
@@ -98,5 +102,11 @@ jobs:
           case "${{ github.event_name }}:${{ inputs.modo }}" in
             schedule:*|*:real) python pipeline.py --origen github-actions ;;
             *:sin-mail) python pipeline.py --sin-mail --origen github-actions ;;
-            *) python pipeline.py --dry-run --origen github-actions ;;
+            *)
+              if [ "${{ inputs.probar_mail }}" = "true" ]; then
+                # Prueba el envío desde GitHub sin tocar la base ni la lista: un solo mail, al de alertas
+                python pipeline.py --dry-run --enviar-a "${EMAIL_ALERTAS:-$EMAIL_SENDER}" --origen github-actions
+              else
+                python pipeline.py --dry-run --origen github-actions
+              fi ;;
           esac
