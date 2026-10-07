@@ -10,12 +10,15 @@ Etapas, en el mismo orden que el notebook:
   persistencia  INSERT de la fila sin duplicar la fecha
   ia            párrafo de Gemini, guardado en la misma fila; con la columna ai_secciones,
                 además un comentario por gráfico, en la misma llamada (fase 4)
-  graficos      los cuatro .jpg; si Yahoo no responde, el mail sale sin el de BTC
+  indicadores   agregados monetarios, inflación y deuda del BCRA, y la deuda bruta de la
+                Secretaría de Finanzas, para sus gráficos; si una fuente falla, es una advertencia
+                y el mail sale sin esos gráficos
+  graficos      los seis .jpg; si Yahoo no responde, el mail sale sin el de BTC
   mail          las dos variantes del reporte (con y sin CSV)
   presentacion  el PowerPoint del día (presentacion.ARCHIVO), en la carpeta de los gráficos;
                 si falla, es una advertencia: el mail ya salió
-  previews      commit y push de Previews/: los cuatro .jpg y el .pptx
-  series        agregados monetarios e inflación a Fact_Series_Macro (fase 3, todavía fuera del mail)
+  previews      commit y push de Previews/: los .jpg y el .pptx
+  series        guarda en Fact_Series_Macro lo que bajó la etapa indicadores (fase 3)
 
 Cada etapa queda registrada con estado y duración. Una etapa en "error" pone la
 corrida en rojo (código de salida 1) y dispara un mail de alerta con el resumen.
@@ -49,12 +52,13 @@ import data_access
 import email_report
 import fechas
 import ia_generator
+import indicadores
 import mailer
 import preview_git
 import scrapers
 import transformations
 from config import redactar, reemplazos_sensibles, settings
-from scrapers import agregados, btc, feriados
+from scrapers import agregados, btc, feriados, finanzas
 from scrapers.utils import ScraperError
 
 # python-pptx puede faltar en un venv instalado antes de que entrara a requirements.txt.
@@ -72,8 +76,9 @@ PREVIEWS = RAIZ / "Previews"
 
 OK, ADVERTENCIA, ERROR, OMITIDA = "ok", "advertencia", "error", "omitida"
 
-# Ventana que la etapa de series vuelve a pedir cada día: alcanza para el último
-# M3 mensual (sale con unos dos meses de rezago) y para tomar las revisiones del BCRA
+# Ventana de las series diarias que la etapa de series vuelve a guardar cada día:
+# alcanza para tomar las revisiones del BCRA. Las mensuales (el M3 sale con unos
+# dos meses de rezago, la deuda bruta con uno) se guardan enteras.
 DIAS_SERIES = 120
 
 
@@ -165,6 +170,7 @@ class Dependencias:
     publicar_presentacion: Callable = preview_git.publicar_presentacion
     tabla_series: Callable = data_access.tabla_existe
     descargar_series: Callable = agregados.descargar
+    descargar_deuda: Callable = finanzas.descargar
     guardar_series: Callable = data_access.guardar_series
     alertar: Callable = mailer.enviar_alerta
     alertar_scraper: Callable = mailer.alertar_scraper_caido
@@ -361,20 +367,28 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
         parrafo_existente, secciones_existentes,
     )
 
+    series, provisorios = _etapa_indicadores(deps, registro, fecha)
+
     inflacion = transformations.serie_inflacion(res.bcra["inflacion_mensual"])
     inflacion_12 = transformations.ultimos_meses(inflacion)
     carpeta = _carpeta_de_salida(opciones)
     if opciones.dry_run or carpeta != PREVIEWS:
         resultado.salida = carpeta
-    generados = _etapa_graficos(registro, carpeta, df, inflacion, inflacion_12, btc_df, falla_btc)
+    generados = _etapa_graficos(
+        registro, carpeta, df, inflacion, inflacion_12, btc_df, falla_btc, series, provisorios, fecha,
+    )
+    # Solo de los gráficos que se generaron: una explicación sin su gráfico no tiene sentido
+    explicaciones = indicadores.explicaciones(
+        series, provisorios, cids=email_report.cids_disponibles({nombre: b"" for nombre in generados}),
+    )
 
     _etapa_mail(
         opciones, deps, registro, fecha, comienzo, df, df_base, inflacion_12, fwd_oficial, fwd_blue,
-        parrafo, texto_ia, comentarios, generados,
+        parrafo, texto_ia, comentarios, generados, explicaciones,
     )
-    deck = _etapa_presentacion(registro, carpeta, df_base, parrafo, comentarios, generados)
+    deck = _etapa_presentacion(registro, carpeta, df_base, parrafo, comentarios, generados, explicaciones)
     _etapa_previews(opciones, deps, registro, carpeta, deck, fecha)
-    _etapa_series(opciones, deps, registro, engine, fecha)
+    _etapa_series(opciones, deps, registro, engine, fecha, series)
 
 
 def _no_es_dia_habil(opciones: Opciones, deps: Dependencias, registro: _Registro, fecha: date) -> bool:
@@ -502,9 +516,52 @@ def _carpeta_de_salida(opciones: Opciones) -> Path:
     return carpeta
 
 
-def _etapa_graficos(registro: _Registro, carpeta: Path, df, inflacion, inflacion_12, btc_df, falla_btc) -> dict[str, Path]:
-    """Los cuatro .jpg. Devuelve solo los que se generaron en esta corrida."""
+def _etapa_indicadores(deps: Dependencias, registro: _Registro, fecha: date) -> tuple[dict, set]:
+    """Series para los gráficos de agregados y deuda: (series por clave, meses provisorios de la deuda bruta).
+
+    Baja las del BCRA (dos años, para tener un año de variación interanual) y la
+    deuda bruta de la Secretaría de Finanzas. Cada serie se valida por separado:
+    una rota se descarta y una atrasada se usa igual, con aviso. Nada de esto
+    escribe: también corre en un dry-run. Si una fuente no responde, el mail sale
+    sin el gráfico que la necesita, así que es una advertencia y no un error.
+    """
+    series: dict = {}
+    provisorios: set = set()
+    with registro.etapa("indicadores", critica=False) as e:
+        avisos = []
+        try:
+            series.update(deps.descargar_series(indicadores.desde(fecha)))
+        except Exception as exc:
+            log.warning("Sin series del BCRA: %s", exc)
+            avisos.append(f"BCRA: {type(exc).__name__}: {exc}")
+        try:
+            series[agregados.DEUDA_BRUTA.clave], provisorios = deps.descargar_deuda()
+        except Exception as exc:
+            log.warning("Sin deuda bruta de la Secretaría de Finanzas: %s", exc)
+            avisos.append(f"Secretaría de Finanzas: {type(exc).__name__}: {exc}")
+
+        for clave in list(series):
+            serie = agregados.CATALOGO[clave]
+            try:
+                avisos += transformations.validar_serie(serie, series[clave], fecha)
+            except ValueError as exc:
+                log.warning("Serie %s descartada: %s", clave, exc)
+                avisos.append(str(exc))
+                del series[clave]
+
+        e.detalle = f"{len(series)} series" + "".join(f"; {a}" for a in avisos)
+        if avisos:
+            e.estado = ADVERTENCIA
+    return series, provisorios
+
+
+def _etapa_graficos(
+    registro: _Registro, carpeta: Path, df, inflacion, inflacion_12, btc_df, falla_btc,
+    series: dict | None = None, provisorios=frozenset(), hoy: date | None = None,
+) -> dict[str, Path]:
+    """Los .jpg del mail. Devuelve solo los que se generaron en esta corrida."""
     generados: dict[str, Path] = {}
+    series = series or {}
     with registro.etapa("graficos", critica=False) as e:
         data = charts.preparar_datos(df)
         pendientes = [
@@ -523,9 +580,30 @@ def _etapa_graficos(registro: _Registro, carpeta: Path, df, inflacion, inflacion
                 log.exception("No se pudo generar %s", nombre)
                 fallas.append(f"{nombre}: {type(exc).__name__}: {exc}")
 
+        # Agregados y deuda dependen de fuentes de afuera, como BTC: si faltan datos
+        # o el gráfico no se puede armar con lo que llegó, el mail sale sin él
+        avisos = []
+        faltan = [c for c in charts.CLAVES_AGREGADOS if c not in series]
+        if faltan:
+            motivo = "no llegaron sus series" if len(faltan) == len(charts.CLAVES_AGREGADOS) else f"faltan {', '.join(faltan)}"
+            avisos.append(f"sin gráfico de agregados ({motivo})")
+        else:
+            _grafico_opcional(generados, avisos, charts.AGREGADOS,
+                              lambda: charts.grafico_agregados(*charts.preparar_agregados(series, hoy), carpeta))
+        # El de deuda se dibuja con lo que haya: la deuda bruta sola, o las series del
+        # BCRA con el tipo de cambio para pasarlas a dólares; un panel sin datos lo dice
+        hay_bcra = "tipo_cambio_mayorista" in series and any(c in series for c in charts.CLAVES_DEUDA_BCRA[:-1])
+        if agregados.DEUDA_BRUTA.clave not in series and not hay_bcra:
+            avisos.append("sin gráfico de deuda (no llegaron sus series)")
+        else:
+            _grafico_opcional(generados, avisos, charts.DEUDA,
+                              lambda: charts.grafico_deuda(charts.preparar_deuda(series, hoy, provisorios), carpeta))
+
         if btc_df is None:
+            avisos.insert(0, f"sin gráfico de BTC ({falla_btc})")
+        if avisos:
             e.estado = ADVERTENCIA
-            e.detalle = f"sin gráfico de BTC ({falla_btc})"
+            e.detalle = "; ".join(avisos)
         if fallas:
             # A diferencia de BTC, estos no dependen de un tercero: si fallan, es un bug
             e.estado = ERROR
@@ -533,10 +611,18 @@ def _etapa_graficos(registro: _Registro, carpeta: Path, df, inflacion, inflacion
     return generados
 
 
+def _grafico_opcional(generados: dict, avisos: list, nombre: str, generar: Callable) -> None:
+    try:
+        generados[nombre] = generar()
+    except Exception as exc:
+        log.exception("No se pudo generar %s", nombre)
+        avisos.append(f"{nombre}: {type(exc).__name__}: {exc}")
+
+
 def _etapa_mail(
     opciones: Opciones, deps: Dependencias, registro: _Registro, fecha: date, comienzo: float, df, df_base,
     inflacion_12, fwd_oficial: float, fwd_blue: float, parrafo: str, texto_ia: str | None, comentarios: dict,
-    generados: dict[str, Path],
+    generados: dict[str, Path], explicaciones: dict | None = None,
 ) -> None:
     resultado = registro.resultado
     with registro.etapa("mail", critica=False) as e:
@@ -548,6 +634,7 @@ def _etapa_mail(
             performance_segundos=time.perf_counter() - comienzo,
             graficos=email_report.cids_disponibles(imagenes),
             comentarios=comentarios,
+            explicaciones=explicaciones,
         )
         if resultado.salida:
             _guardar_vista_previa(resultado.salida, html, imagenes, fecha)
@@ -579,6 +666,7 @@ def _etapa_mail(
 
 def _etapa_presentacion(
     registro: _Registro, carpeta: Path, df_base, parrafo: str, comentarios: dict, generados: dict[str, Path],
+    explicaciones: dict | None = None,
 ) -> Path | None:
     """El PowerPoint del día, con los datos, los textos de IA y los gráficos de esta corrida.
 
@@ -593,7 +681,9 @@ def _etapa_presentacion(
             e.detalle = f"no se pudo importar presentacion ({FALTA_PRESENTACION}): pip install -r requirements.txt"
             return None
         try:
-            ruta = presentacion.armar(df_base, generados, carpeta, parrafo=parrafo, comentarios=comentarios)
+            ruta = presentacion.armar(
+                df_base, generados, carpeta, parrafo=parrafo, comentarios=comentarios, explicaciones=explicaciones,
+            )
         except Exception as exc:
             log.exception("No se pudo armar la presentación")
             e.estado = ADVERTENCIA
@@ -641,11 +731,15 @@ def _etapa_previews(
                 e.estado = OMITIDA
 
 
-def _etapa_series(opciones: Opciones, deps: Dependencias, registro: _Registro, engine, fecha: date) -> None:
-    """Series monetarias (fase 3): se guardan para ir armando la historia, todavía no van en el mail.
+def _etapa_series(
+    opciones: Opciones, deps: Dependencias, registro: _Registro, engine, fecha: date, series: dict | None = None,
+) -> None:
+    """Guarda en Fact_Series_Macro lo que bajó la etapa indicadores, ya validado (fase 3).
 
-    Por eso un problema acá queda como advertencia y no pone la corrida en rojo.
-    Cada serie se valida y se guarda por separado: una discontinuada no frena a las demás.
+    No vuelve a descargar. De las series diarias guarda los últimos DIAS_SERIES
+    días, que alcanzan para tomar las revisiones del BCRA; las mensuales, enteras.
+    Un problema acá queda como advertencia y no pone la corrida en rojo, y cada
+    serie se guarda por separado: una que falla no frena a las demás.
     """
     if opciones.dry_run:
         registro.omitir("series", "dry-run")
@@ -656,19 +750,23 @@ def _etapa_series(opciones: Opciones, deps: Dependencias, registro: _Registro, e
                 e.estado = OMITIDA
                 e.detalle = f"falta la tabla {data_access.TABLA_SERIES} (sql/06_series_macro.sql)"
                 return
-            series = deps.descargar_series(fecha - timedelta(days=DIAS_SERIES))
         except Exception as exc:
-            log.exception("No se pudieron descargar las series monetarias")
+            log.exception("No se pudo consultar la tabla de series")
             e.estado = ADVERTENCIA
             e.detalle = f"{type(exc).__name__}: {exc}"
             return
+        if not series:
+            e.estado = OMITIDA
+            e.detalle = "no hay series para guardar (ver la etapa indicadores)"
+            return
 
+        corte = fecha - timedelta(days=DIAS_SERIES)
         avisos, escritos = [], 0
         for clave, puntos in series.items():
-            serie = agregados.POR_CLAVE[clave]
+            serie = agregados.CATALOGO[clave]
+            recientes = [(f, v) for f, v in puntos if f >= corte] if serie.frecuencia == "D" else puntos
             try:
-                avisos += transformations.validar_serie(serie, puntos, fecha)
-                escritos += deps.guardar_series(engine, serie, puntos)
+                escritos += deps.guardar_series(engine, serie, recientes)
             except Exception as exc:
                 log.warning("Serie %s sin guardar: %s", clave, exc)
                 avisos.append(f"{clave}: {type(exc).__name__}: {exc}")

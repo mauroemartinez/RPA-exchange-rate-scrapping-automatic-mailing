@@ -26,7 +26,7 @@ import mailer
 from charts import COTIZACIONES_A_MOSTRAR, ORDEN_EN_MAIL
 from config import settings
 from models import COLUMNAS_FILA
-from scrapers import ambito, bcra, bna, dolarhoy, fed, riesgo_pais
+from scrapers import ambito, bcra, bna, dolarhoy, fed, finanzas, riesgo_pais
 from transformations import etiqueta_mes
 
 log = logging.getLogger(__name__)
@@ -143,7 +143,7 @@ def resumen_ejecutivo(df: pd.DataFrame) -> dict:
 
 
 def cids_disponibles(imagenes: dict[str, bytes]) -> list[str]:
-    """'image1'..'image4' de los gráficos que efectivamente están, en orden fijo."""
+    """'image1'..'imageN' de los gráficos que efectivamente están, en el orden fijo de ORDEN_EN_MAIL."""
     return [f"image{i + 1}" for i, nombre in enumerate(ORDEN_EN_MAIL) if nombre in imagenes]
 
 
@@ -160,6 +160,7 @@ def renderizar(
     performance_segundos: float,
     graficos: list[str] | None = None,
     comentarios: dict[str, list[tuple[str, str]]] | None = None,
+    explicaciones: dict[str, dict] | None = None,
 ) -> str:
     """El HTML del reporte desde templates/report_email.html.
 
@@ -167,10 +168,12 @@ def renderizar(
     `graficos` son los cid presentes; si falta uno (por ejemplo, Yahoo no respondió
     y no hay gráfico de BTC) el template no deja la imagen rota. `comentarios` son
     los textos de Gemini por gráfico ({cid: [(título, texto)]}); sin ellos, el
-    mail sale exactamente como antes de la fase 4.
+    mail sale exactamente como antes de la fase 4. `explicaciones` son las de los
+    gráficos de agregados y deuda (indicadores.explicaciones), debajo de cada uno.
     """
     contexto = contexto_template(
-        df, inflacion_12, fwd_oficial, fwd_blue, parrafo_ia, performance_segundos, graficos, comentarios
+        df, inflacion_12, fwd_oficial, fwd_blue, parrafo_ia, performance_segundos, graficos, comentarios,
+        explicaciones,
     )
     return template().render(**contexto)
 
@@ -184,10 +187,13 @@ def contexto_template(
     performance_segundos: float,
     graficos: list[str] | None = None,
     comentarios: dict[str, list[tuple[str, str]]] | None = None,
+    explicaciones: dict[str, dict] | None = None,
 ) -> dict:
     """Las variables que recibe el template (celda 47)."""
     df_mail = preparar_df_mail(df)
     tabla_infl, interanual = tabla_inflacion(inflacion_12)
+    if graficos is None:
+        graficos = [f"image{i + 1}" for i in range(len(ORDEN_EN_MAIL))]
     return dict(
         **resumen_ejecutivo(df_mail),
         fwd_oficial=fwd_oficial,
@@ -205,9 +211,12 @@ def contexto_template(
         web_euro=ambito.WEB_EURO,
         fed_api_url=fed.API_URL,
         bcra_api_url=bcra.API_BASE,
+        # Las fuentes de agregados y deuda van al pie solo si alguno de esos gráficos viaja
+        fuente_deuda=finanzas.PAGINA if any(cid in graficos for cid in explicaciones or {}) else None,
         performance_segundos=performance_segundos,
-        graficos=graficos if graficos is not None else [f"image{i + 1}" for i in range(len(ORDEN_EN_MAIL))],
+        graficos=graficos,
         comentarios=comentarios or {},
+        explicaciones=explicaciones or {},
     )
 
 

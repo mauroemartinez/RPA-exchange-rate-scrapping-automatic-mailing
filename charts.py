@@ -1,4 +1,4 @@
-"""Preparación y generación de los cuatro gráficos del reporte (celdas 39 a 43).
+"""Preparación y generación de los gráficos del reporte (celdas 39 a 43, más agregados y deuda).
 
 Cada gráfico se dibuja sobre una Figure propia, sin pyplot, y dentro de su propio
 rc_context. En el notebook el estilo era estado global: el gráfico de BTC dejaba
@@ -9,7 +9,8 @@ no se notaba; en la API o en los tests, que corren varias veces seguidas, sí.
 Los meses salen en español sin usar el locale del sistema (ver fechas.MESES_ABREV).
 Los gráficos quedan idénticos, byte a byte, a los que generaba el notebook, salvo
 dos cambios a propósito: la inflación acumulada de Variaciones.jpg y el decimal
-del eje derecho de Gráficos Inflación.jpg.
+del eje derecho de Gráficos Inflación.jpg. Los de agregados monetarios y deuda
+son nuevos (fase 3) y no tienen equivalente en el notebook.
 """
 
 import logging
@@ -35,12 +36,15 @@ from transformations import etiqueta_mes
 log = logging.getLogger(__name__)
 
 # Nombres de archivo y orden en el mail: el template los referencia como
-# cid:image1 .. cid:image4, en este orden.
+# cid:image1 .. cid:image6, en este orden. Los dos nuevos van al final para que
+# los cid de los cuatro de siempre no cambien.
 TIPOS_DE_CAMBIO = "Gráficos Tipos de Cambios y Riesgo País.jpg"
 INFLACION = "Gráficos Inflación.jpg"
 VARIACIONES = "Variaciones.jpg"
 BTC = "Gráfico BTC.jpg"
-ORDEN_EN_MAIL = (TIPOS_DE_CAMBIO, INFLACION, VARIACIONES, BTC)
+AGREGADOS = "Agregados Monetarios.jpg"
+DEUDA = "Deuda en Dólares.jpg"
+ORDEN_EN_MAIL = (TIPOS_DE_CAMBIO, INFLACION, VARIACIONES, BTC, AGREGADOS, DEUDA)
 
 COTIZACIONES_A_MOSTRAR = 25
 
@@ -536,13 +540,13 @@ def grafico_btc(btc_df: pd.DataFrame, carpeta: Path) -> Path:
         return _guardar(fig, carpeta, BTC, dpi=150, facecolor="#0a0a0a", edgecolor="none", bbox_inches="tight")
 
 
-# ── Agregados monetarios (fase 3, todavía fuera del mail) ────────────────────
-
-AGREGADOS = "Agregados Monetarios.jpg"
+# ── Agregados monetarios (fase 3) ────────────────────────────────────────────
 
 # Series del panel de niveles y del de variación interanual, con su rótulo
 NIVELES = {"base_monetaria": "Base monetaria", "circulacion_monetaria": "Circulación monetaria", "m2": "M2"}
 INTERANUALES = {"base_monetaria": "Base monetaria", "m2": "M2", "m3": "M3 (mensual)"}
+# Lo que tiene que haber bajado bien para dibujar el gráfico
+CLAVES_AGREGADOS = (*dict.fromkeys([*NIVELES, *INTERANUALES]), "inflacion_interanual")
 
 
 def preparar_agregados(series: dict, hoy) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -617,3 +621,145 @@ def grafico_agregados(niveles: pd.DataFrame, interanual: pd.DataFrame, carpeta: 
 
         fig.tight_layout(pad=1)
         return _guardar(fig, carpeta, AGREGADOS)
+
+
+# ── Deuda, en dólares (fase 3) ───────────────────────────────────────────────
+
+# Meses de deuda bruta del Tesoro en el panel de arriba: dos años muestran la
+# tendencia sin aplastar los últimos meses
+MESES_DEUDA_BRUTA = 24
+# Las series del BCRA van en pesos y se pasan a dólares con el mayorista de cada día
+CLAVES_DEUDA_BCRA = (
+    "prestamos_sector_privado", "letras_bcra_pesos", "letras_bcra_moneda_extranjera",
+    "adelantos_transitorios", "tipo_cambio_mayorista",
+)
+LETRAS = "Letras del BCRA (en pesos y en dólares)"
+ADELANTOS = "Adelantos transitorios del BCRA al Tesoro"
+
+
+def _sumar_por_fecha(*series: list[tuple]) -> list[tuple]:
+    """La suma de varias series fecha por fecha, arrastrando el último valor de la que no publicó ese día."""
+    presentes = [transformations.serie_a_frame(s).set_index("Fecha")["valor"] for s in series if s]
+    if not presentes:
+        return []
+    suma = pd.concat(presentes, axis=1).sort_index().ffill().dropna().sum(axis=1)
+    return [(fecha.date(), float(valor)) for fecha, valor in suma.items()]
+
+
+def preparar_deuda(series: dict, hoy, provisorios=frozenset()) -> dict:
+    """Los tres paneles del gráfico de deuda, en miles de millones de USD; un panel sin datos queda en None.
+
+    `tesoro` es la deuda bruta mensual de los últimos MESES_DEUDA_BRUTA meses, con
+    una columna que marca los provisorios. `prestamos` y `bcra` son las series
+    diarias del último año pasadas de pesos a dólares con el mayorista de cada día;
+    `bcra` trae las letras (pesos más moneda extranjera) y los adelantos al Tesoro.
+    """
+    corte = pd.Timestamp(hoy) - pd.DateOffset(years=1)
+    datos: dict = {"tesoro": None, "prestamos": None, "bcra": None}
+
+    if series.get("deuda_bruta_tesoro"):
+        tesoro = transformations.serie_a_frame(series["deuda_bruta_tesoro"]).tail(MESES_DEUDA_BRUTA)
+        tesoro = tesoro.assign(
+            miles_de_millones=tesoro["valor"] / 1e3, provisorio=tesoro["Fecha"].dt.date.isin(set(provisorios)),
+            # El dato es el saldo al último día del mes; se dibuja al principio del mes
+            # para que quede sobre su rótulo y no pegado al del mes siguiente
+            Mes=tesoro["Fecha"].dt.to_period("M").dt.to_timestamp(),
+        )
+        datos["tesoro"] = tesoro.reset_index(drop=True)
+
+    cambio = series.get("tipo_cambio_mayorista")
+    if not cambio:
+        return datos
+
+    def en_dolares(puntos: list[tuple]) -> pd.DataFrame | None:
+        if not puntos:
+            return None
+        df = transformations.a_dolares(puntos, cambio)
+        df = df[df["Fecha"] >= corte]
+        return None if df.empty else df.assign(miles_de_millones=df["usd"] / 1e3).reset_index(drop=True)
+
+    datos["prestamos"] = en_dolares(series.get("prestamos_sector_privado"))
+    partes = {
+        LETRAS: en_dolares(_sumar_por_fecha(series.get("letras_bcra_pesos"), series.get("letras_bcra_moneda_extranjera"))),
+        ADELANTOS: en_dolares(series.get("adelantos_transitorios")),
+    }
+    partes = [df.assign(serie=rotulo) for rotulo, df in partes.items() if df is not None]
+    datos["bcra"] = pd.concat(partes, ignore_index=True) if partes else None
+    return datos
+
+
+def _anotar_ultimo(ax, fechas, valores, color) -> None:
+    ax.annotate(
+        f"{valores.iloc[-1]:,.1f}", xy=(fechas.iloc[-1], valores.iloc[-1]), xytext=(5, 0), textcoords="offset points",
+        va="center", fontproperties=fm.FontProperties(weight="bold", size=9), color=color,
+    )
+
+
+def _sin_datos(ax, texto: str) -> None:
+    ax.text(0.5, 0.5, texto, transform=ax.transAxes, ha="center", va="center", fontsize=12, color="dimgray")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
+def grafico_deuda(datos: dict, carpeta: Path) -> Path:
+    """Deuda bruta del Tesoro, préstamos al sector privado y deuda del BCRA, todo en dólares."""
+    with _estilo_base():
+        fig = Figure(figsize=(10, 12))
+        ax = fig.subplots(3, 1)
+        fig.suptitle("Endeudamiento, en dólares", fontweight="bold", fontsize=18)
+        paleta = sns.color_palette("dark")
+
+        # 1. Deuda bruta del Tesoro: un punto por mes, huecos los provisorios
+        tesoro = datos.get("tesoro")
+        hay_tesoro = tesoro is not None and not tesoro.empty
+        if not hay_tesoro:
+            _sin_datos(ax[0], "Sin datos de la Secretaría de Finanzas para este día")
+        else:
+            color = paleta[0]
+            ax[0].plot(tesoro["Mes"], tesoro["miles_de_millones"], color=color, linewidth=2, label="Deuda bruta")
+            firmes, prov = tesoro[~tesoro["provisorio"]], tesoro[tesoro["provisorio"]]
+            ax[0].plot(firmes["Mes"], firmes["miles_de_millones"], linestyle="none", marker="o", markersize=6, color=color)
+            if not prov.empty:
+                ax[0].plot(prov["Mes"], prov["miles_de_millones"], linestyle="none", marker="o", markersize=7,
+                           markerfacecolor="white", markeredgecolor=color, markeredgewidth=1.8, label="Provisorio")
+            _anotar_ultimo(ax[0], tesoro["Mes"], tesoro["miles_de_millones"], color)
+            ax[0].xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+        ax[0].set_title("Deuda bruta del Tesoro nacional, a fin de cada mes", fontweight="bold", fontsize=12)
+
+        # 2. Préstamos de los bancos a familias y empresas
+        prestamos = datos.get("prestamos")
+        if prestamos is None:
+            _sin_datos(ax[1], "Sin datos del BCRA para este día")
+        else:
+            ax[1].plot(prestamos["Fecha"], prestamos["miles_de_millones"], color=paleta[2], linewidth=2,
+                       label="Préstamos al sector privado")
+            _anotar_ultimo(ax[1], prestamos["Fecha"], prestamos["miles_de_millones"], paleta[2])
+            ax[1].xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+        ax[1].set_title("Préstamos de los bancos a familias y empresas", fontweight="bold", fontsize=12)
+
+        # 3. Deuda del BCRA: letras y adelantos al Tesoro
+        bcra = datos.get("bcra")
+        if bcra is None:
+            _sin_datos(ax[2], "Sin datos del BCRA para este día")
+        else:
+            colores = {LETRAS: paleta[4], ADELANTOS: paleta[3]}
+            for rotulo, serie in bcra.groupby("serie", sort=False):
+                ax[2].plot(serie["Fecha"], serie["miles_de_millones"], color=colores[rotulo], linewidth=2, label=rotulo)
+                _anotar_ultimo(ax[2], serie["Fecha"], serie["miles_de_millones"], colores[rotulo])
+            ax[2].set_ylim(bottom=0)
+            ax[2].xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+        ax[2].set_title("Deuda del BCRA y adelantos al Tesoro", fontweight="bold", fontsize=12)
+
+        for axis, tiene_datos in zip(ax, [hay_tesoro, prestamos is not None, bcra is not None]):
+            if not tiene_datos:
+                continue
+            axis.set_ylabel("Miles de millones de USD", fontsize=11, fontweight="bold")
+            axis.yaxis.set_major_formatter(FuncFormatter("{:,.0f}".format))
+            axis.xaxis.set_major_formatter(_formato_mes("%b/%y"))
+            axis.grid(color="silver", linestyle="--", linewidth=0.5)
+            # Las letras del BCRA vienen bajando: en un lugar fijo, la leyenda las tapaba
+            axis.legend(prop={"size": 8}, loc="best", shadow=True)
+            setp(axis.xaxis.get_majorticklabels(), rotation=45)
+
+        fig.tight_layout(pad=1)
+        return _guardar(fig, carpeta, DEUDA)

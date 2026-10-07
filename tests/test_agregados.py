@@ -143,3 +143,66 @@ def test_upsert_de_series_en_sql_de_postgres():
     assert 'ON CONFLICT (serie, "Fecha") DO UPDATE SET valor = excluded.valor' in sql
     # Solo se reescriben los valores que cambiaron
     assert 'WHERE "Fact_Series_Macro".valor != excluded.valor' in sql
+
+
+# ── Deuda (endeudamiento C, D y A) ───────────────────────────────────────────
+
+def test_el_catalogo_trae_la_deuda_y_el_tipo_de_cambio():
+    ids = {s.clave: s.id_bcra for s in agregados.SERIES}
+    assert ids["letras_bcra_pesos"] == 1258 and ids["letras_bcra_moneda_extranjera"] == 1259
+    assert ids["adelantos_transitorios"] == 1268 and ids["prestamos_sector_privado"] == 26
+    assert ids["tipo_cambio_mayorista"] == 5
+    # La posición neta de pases (1261) quedó afuera: está en cero desde 2024
+    assert 1261 not in ids.values()
+    assert set(agregados.CATALOGO) == {*agregados.POR_CLAVE, "deuda_bruta_tesoro"}
+
+
+def test_a_dolares_usa_el_tipo_de_cambio_vigente_cada_dia():
+    pesos = [(date(2026, 10, 1), 1500.0), (date(2026, 10, 2), 3000.0), (date(2026, 10, 5), 1500.0)]
+    cambio = [(date(2026, 9, 30), 1000.0), (date(2026, 10, 2), 1500.0)]
+    df = t.a_dolares(pesos, cambio)
+    # El 1/10 no hubo cotización: vale la del 30/9. El 5/10, la del 2/10
+    assert df["usd"].round(2).tolist() == [1.5, 2.0, 1.0]
+    # Antes del primer tipo de cambio no hay conversión posible
+    assert t.a_dolares([(date(2026, 9, 1), 10.0)], cambio).empty
+
+
+def test_preparar_deuda_pasa_todo_a_miles_de_millones_de_dolares(series_indicadores):
+    series, provisorios = series_indicadores
+    datos = charts.preparar_deuda(series, HOY, provisorios)
+
+    tesoro = datos["tesoro"]
+    assert len(tesoro) == charts.MESES_DEUDA_BRUTA
+    assert tesoro["miles_de_millones"].iloc[-1] == pytest.approx(484.917)
+    assert tesoro["provisorio"].tolist()[-2:] == [True, True] and not tesoro["provisorio"].iloc[0]
+    # Se dibuja al principio del mes: el saldo al 31/8 queda sobre el rótulo de agosto
+    assert tesoro["Mes"].iloc[-1] == pd.Timestamp("2026-08-01")
+
+    prestamos = datos["prestamos"]
+    assert prestamos["Fecha"].min() >= pd.Timestamp(HOY) - pd.DateOffset(years=1)
+    assert prestamos["miles_de_millones"].iloc[-1] == pytest.approx(148.7e6 / 1520 / 1e3)
+
+    bcra = datos["bcra"]
+    assert list(bcra["serie"].unique()) == [charts.LETRAS, charts.ADELANTOS]
+    letras = bcra[bcra["serie"] == charts.LETRAS]["miles_de_millones"].iloc[-1]
+    assert letras == pytest.approx((2.3e5 + 7.4e6) / 1520 / 1e3)
+
+
+def test_preparar_deuda_sin_tipo_de_cambio_deja_solo_el_tesoro(series_indicadores):
+    series, provisorios = series_indicadores
+    datos = charts.preparar_deuda({"deuda_bruta_tesoro": series["deuda_bruta_tesoro"]}, HOY, provisorios)
+    assert datos["tesoro"] is not None and datos["prestamos"] is None and datos["bcra"] is None
+
+
+@pytest.mark.parametrize("quitar", [[], ["deuda_bruta_tesoro"], ["tipo_cambio_mayorista"]])
+def test_grafico_de_deuda_con_lo_que_haya(series_indicadores, tmp_path, quitar):
+    series, provisorios = series_indicadores
+    series = {k: v for k, v in series.items() if k not in quitar}
+    ruta = charts.grafico_deuda(charts.preparar_deuda(series, HOY, provisorios), tmp_path)
+    assert ruta.name == charts.DEUDA and ruta.read_bytes()[:2] == b"\xff\xd8"
+
+
+def test_grafico_de_agregados_con_las_series_del_pipeline(series_indicadores, tmp_path):
+    series, _ = series_indicadores
+    ruta = charts.grafico_agregados(*charts.preparar_agregados(series, HOY), tmp_path)
+    assert ruta.name == charts.AGREGADOS and ruta.stat().st_size > 10_000

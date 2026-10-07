@@ -17,8 +17,9 @@ import pytest
 
 import email_report
 import ia_generator
+import indicadores
 import transformations as t
-from conftest import HOY
+from conftest import HOY, series_sinteticas
 
 DATOS = Path(__file__).resolve().parent / "datos"
 
@@ -36,9 +37,11 @@ def _html(resultados, historico, comentarios) -> str:
     fwd_oficial, fwd_blue = t.forwards_fisher(base)
     df = t.agregar_brechas_y_variaciones(base)
     inflacion_12 = t.ultimos_meses(t.serie_inflacion(resultados.bcra["inflacion_mensual"]))
+    # Con comentarios va el mail completo de hoy: también las explicaciones de agregados y deuda
+    explicaciones = indicadores.explicaciones(*series_sinteticas()) if comentarios else None
     return email_report.renderizar(
         df, inflacion_12, fwd_oficial, fwd_blue, "Párrafo de prueba con <, & y \"comillas\".", 1.0,
-        comentarios=ia_generator.comentarios_por_grafico(comentarios),
+        comentarios=ia_generator.comentarios_por_grafico(comentarios), explicaciones=explicaciones,
     )
 
 

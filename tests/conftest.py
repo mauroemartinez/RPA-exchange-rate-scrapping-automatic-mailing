@@ -140,3 +140,46 @@ def btc_crudo() -> pd.DataFrame:
     columnas = pd.MultiIndex.from_tuples([(c, "BTC-USD") for c in ["Close", "High", "Low", "Open", "Volume"]])
     datos = np.column_stack([precio, precio * 1.01, precio * 0.99, precio, np.full(len(indice), 1e9)])
     return pd.DataFrame(datos, index=pd.DatetimeIndex(indice, name=None), columns=columnas)
+
+
+def series_sinteticas(hoy: date = HOY) -> tuple[dict, set]:
+    """Dos años de las series de los gráficos de agregados y deuda, y los meses provisorios de la deuda bruta.
+
+    Las diarias van semanales para que los tests sean livianos; las mensuales,
+    a fin de cada mes hasta agosto. Los valores siguen el orden de magnitud real
+    (millones de ARS, miles de ARS el M3, millones de USD la deuda bruta) y crecen
+    parejo, así las variaciones interanuales y la conversión a dólares dan números
+    razonables.
+    """
+    semanas = pd.date_range(end=pd.Timestamp(hoy) - pd.Timedelta(days=4), periods=110, freq="7D")
+    meses = pd.date_range(end="2026-08-31", periods=30, freq="ME")
+
+    def diaria(inicio: float, fin: float) -> list[tuple[date, float]]:
+        return [(f.date(), float(v)) for f, v in zip(semanas, np.linspace(inicio, fin, len(semanas)))]
+
+    def mensual(inicio: float, fin: float) -> list[tuple[date, float]]:
+        return [(f.date(), float(v)) for f, v in zip(meses, np.linspace(inicio, fin, len(meses)))]
+
+    series = {
+        "base_monetaria": diaria(25e6, 46e6),
+        "circulacion_monetaria": diaria(17e6, 28.9e6),
+        "billetes_publico": diaria(15e6, 26.7e6),
+        "m2": diaria(60e6, 95.6e6),
+        "m2_transaccional_privado": diaria(45e6, 69.4e6),
+        "m3": mensual(120e9, 186.9e9),
+        "inflacion_mensual": mensual(2.4, 1.7),
+        "inflacion_interanual": mensual(45.0, 33.5),
+        "letras_bcra_pesos": diaria(2.9e5, 2.3e5),
+        "letras_bcra_moneda_extranjera": diaria(12.8e6, 7.4e6),
+        "adelantos_transitorios": diaria(4.09e6, 4.09e6),
+        "prestamos_sector_privado": diaria(70e6, 148.7e6),
+        "tipo_cambio_mayorista": diaria(1050.0, 1520.0),
+        "deuda_bruta_tesoro": mensual(440_000.0, 484_917.0),
+    }
+    provisorios = {meses[-2].date(), meses[-1].date()}
+    return series, provisorios
+
+
+@pytest.fixture
+def series_indicadores() -> tuple[dict, set]:
+    return series_sinteticas()
