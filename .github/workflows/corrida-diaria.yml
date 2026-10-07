@@ -1,11 +1,16 @@
 # La corrida diaria del reporte en GitHub Actions (fase 6 del roadmap).
 #
-# APAGADA POR DEFECTO: solo se dispara a mano, desde Actions > Corrida diaria >
-# Run workflow, y por defecto en dry-run (no escribe ni manda nada). Para
-# programarla, seguí docs/programacion-y-monitoreo.md y descomentá el bloque
-# `schedule`. No la programes si la corrida también se dispara desde otro lado
-# (EasyPanel, el notebook): el candado en Supabase evita dos corridas a la vez,
-# pero el notebook no lo respeta.
+# CÓMO SE PRENDE: el horario de abajo solo corre si existe la variable del repo
+# CORRIDA_AUTOMATICA con el valor si (Settings > Secrets and variables > Actions >
+# Variables). Sin ella, el trabajo figura cada día como salteado y no hace nada.
+# Para apagarlo, cambiá la variable a no o borrala. A mano (Actions > Corrida
+# diaria > Run workflow) siempre se puede correr, en dry-run por defecto.
+# Con la variable en si, dejá de correr el notebook: no respeta el candado que
+# evita dos corridas el mismo día. Pasos completos: docs/programacion-y-monitoreo.md.
+#
+# El horario está en UTC, no en hora argentina: 20:13 UTC son las 17:13 en
+# Argentina. Va a los 13 minutos y no en punto porque GitHub recomienda evitar el
+# comienzo de cada hora, cuando más se atrasan las corridas programadas.
 #
 # El repo es público, así que el log de cada corrida también lo es. GitHub tapa
 # los secretos completos y pipeline.py tapa además cada clave y cada dirección
@@ -21,11 +26,11 @@ on:
         type: choice
         options: [dry-run, real]
         default: dry-run
-  # schedule:
-  #   - cron: "0 20 * * 1-5"   # 17:00 en Argentina (UTC-3), de lunes a viernes
+  schedule:
+    - cron: "13 20 * * 1-5"   # 17:13 en Argentina (UTC-3), de lunes a viernes
 
 permissions:
-  contents: write  # para el commit y push de Previews/
+  contents: write  # para el commit de Previews/ y la rama del PowerPoint
 
 concurrency:
   group: corrida-diaria
@@ -33,6 +38,8 @@ concurrency:
 
 jobs:
   corrida:
+    # El horario solo corre con el interruptor prendido; a mano, siempre
+    if: github.event_name != 'schedule' || vars.CORRIDA_AUTOMATICA == 'si'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -64,12 +71,15 @@ jobs:
           pip install -r requirements.txt
           python -m playwright install --with-deps chromium
 
-      - name: Identidad de git para el commit de Previews/
+      - name: Identidad de git para los commits
         # Los commits salen a nombre del dueño del repo, con su dirección noreply de
-        # GitHub (la que GitHub asocia a la cuenta), no a nombre de un bot.
+        # GitHub (la que GitHub asocia a la cuenta), no a nombre de un bot. Si en el
+        # primer commit automático no aparece tu foto (pasa con algunas cuentas
+        # creadas antes de 2017), creá la variable del repo EMAIL_COMMITS con el mail
+        # de tus commits y se usa esa.
         run: |
           git config user.name "${{ github.repository_owner }}"
-          git config user.email "${{ github.repository_owner_id }}+${{ github.repository_owner }}@users.noreply.github.com"
+          git config user.email "${{ vars.EMAIL_COMMITS || format('{0}+{1}@users.noreply.github.com', github.repository_owner_id, github.repository_owner) }}"
 
       - name: Corrida
         run: |

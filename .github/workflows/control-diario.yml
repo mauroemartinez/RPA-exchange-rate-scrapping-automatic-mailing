@@ -3,10 +3,10 @@
 # pipeline no pueden ver. Cuando falla, GitHub le avisa por mail al dueño del
 # repo: un canal que no depende de la contraseña de Gmail del reporte.
 #
-# APAGADO POR DEFECTO, como la corrida: se dispara a mano y, si no se pide lo
-# contrario, sin mandar el mail de alerta. Para programarlo, descomentá
-# `schedule` (ver docs/programacion-y-monitoreo.md). Tiene que correr después
-# del horario de la corrida: antes, la fila todavía no existe y falla.
+# Se prende con el mismo interruptor que la corrida: la variable del repo
+# CORRIDA_AUTOMATICA en si. A mano se puede correr siempre y, si no se pide lo
+# contrario, sin mandar el mail de alerta. Corre a las 19:43 de Argentina (22:43
+# UTC), después de la corrida de las 17:13: antes, la fila todavía no existe.
 name: Control diario
 
 on:
@@ -16,14 +16,15 @@ on:
         description: "Mandar también el mail de alerta si falta la fila"
         type: boolean
         default: false
-  # schedule:
-  #   - cron: "30 22 * * 1-5"   # 19:30 en Argentina (UTC-3), de lunes a viernes
+  schedule:
+    - cron: "43 22 * * 1-5"   # 19:43 en Argentina (UTC-3), de lunes a viernes
 
 permissions:
   contents: read
 
 jobs:
   control:
+    if: github.event_name != 'schedule' || vars.CORRIDA_AUTOMATICA == 'si'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
