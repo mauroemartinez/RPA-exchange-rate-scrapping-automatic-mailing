@@ -73,6 +73,7 @@ See "Manual resend" below.
 7. **graficos:** `charts.py` draws the four JPGs. BTC/USD comes from Yahoo Finance through `scrapers/btc.py`; if Yahoo fails, the mail goes out without that chart instead of the whole run dying
 8. **mail:** `email_report.py` renders `templates/report_email.html` with Jinja2 and sends the two variants in parallel: one to `EMAIL_RECEIVER`, and one to `EMAIL_RECEIVER_CSV` with the full history attached as CSV, generated at send time from the same data as the report. A failed send marks the run as failed
 9. **previews:** `preview_git.py` commits and pushes `Previews/`, only from the `main` branch, and checks the exit code of every git command
+10. **series:** `scrapers/agregados.py` refetches the last 120 days of the monetary aggregates and the inflation series and upserts them into `Fact_Series_Macro`. They are not in the email yet (roadmap phase 3, see `docs/fase-3-agregados-y-deuda.md`). Without the table the stage is skipped with a notice, and a failure here is only a warning
 
 Any stage in `error` sets exit code 1 and triggers one summary alert email, unless the failure already sent its own (scraper down, validation). The calculations (spreads, daily changes, Irving Fisher forwards, inflation accumulations) live in `transformations.py` as pure functions with no I/O.
 
@@ -100,6 +101,9 @@ The pipeline is a faithful port of the notebook: fed the same inputs, the four J
 | `notebooks/Argentinian_Macroeconomic_Automatic_Mailing.ipynb` | The original pipeline, kept as a reference during the transition |
 | `scripts/backfill.py` | Repairs historical `riesgo_pais` and `bcra_tea` series against their source APIs. Dry-run by default, writes only with `--apply`. |
 | `scripts/reenvio_manual.py` | Resends the latest report to arbitrary recipients without rerunning the pipeline |
+| `scripts/agregados_monetarios.py` | Summary and preview chart of the monetary aggregates; `--guardar` loads their full history into `Fact_Series_Macro` |
+| `scrapers/agregados.py` | Catalog of the BCRA monetary and inflation series (id, frequency, unit) and their paginated download |
+| `docs/` | Roadmap notes in Spanish: the cache evaluation and the phase 3 proposal, including the pending definition of "endeudamiento" |
 | `sql/` | One-off SQL scripts for DB setup and historical data cleaning (not part of the automated pipeline) |
 
 ## Environment variables (`.env`)
@@ -123,6 +127,10 @@ SERVICE_ROUTE            # Deployment URL (optional, currently unread)
 ## Supabase table: `Fact_Mercado_Macro`
 
 Primary key: `Fecha` (date). Columns: `TCC_Blue`, `TCV_Blue`, `TCC_Billete`, `TCV_Billete`, `TCC_Divisas`, `TCV_Divisas`, `Solidario`, `TCV_MEP`, `riesgo_pais`, `TCC_Euro`, `TCV_Euro`, `fed_tea`, `bcra_tea`, `ai_paragraph`, `ai_model`.
+
+## Supabase table: `Fact_Series_Macro`
+
+Long format, one row per series and date: `serie`, `Fecha`, `valor`, `frecuencia` (`D`, `M`, `T`, `A`), `unidad`, `fuente`, `id_fuente`, `actualizado_en`. Primary key `(serie, Fecha)`. Values keep the unit and the dates of their source (the BCRA publishes the base in millions of ARS and M3 in thousands); convert only for display. The table is created by `sql/06_series_macro.sql`, applied by hand, never by the code. Its upsert only rewrites values that changed, so `actualizado_en` marks the last real revision.
 
 ## Manual resend
 
