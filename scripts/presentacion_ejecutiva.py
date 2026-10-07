@@ -15,12 +15,15 @@ Uso:
 """
 
 import argparse
+import datetime as dt
 import sys
 import tempfile
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
+
+import pandas as pd
 
 import charts
 import data_access
@@ -39,7 +42,18 @@ def main(argv: list[str] | None = None) -> Path:
     finally:
         engine.dispose()
 
-    imagenes = {n: args.graficos / n for n in charts.ORDEN_EN_MAIL if (args.graficos / n).exists()}
+    # Como en el reenvío manual: un gráfico más viejo que el reporte es de otro día
+    # (ese día falló) y no tiene que entrar en esta presentación
+    fecha = pd.to_datetime(df["Fecha"].iloc[0]).date()
+    imagenes = {}
+    for nombre in charts.ORDEN_EN_MAIL:
+        ruta = args.graficos / nombre
+        if not ruta.exists():
+            continue
+        if dt.date.fromtimestamp(ruta.stat().st_mtime) < fecha:
+            print(f"  {nombre} es anterior al reporte del {fecha:%d/%m/%Y}: va sin ese gráfico")
+            continue
+        imagenes[nombre] = ruta
     ruta = presentacion.armar(df, imagenes, args.salida or Path(tempfile.mkdtemp(prefix="presentacion_")))
     print(f"Presentación: {ruta}")
     return ruta
