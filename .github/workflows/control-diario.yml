@@ -1,0 +1,57 @@
+# Control diario (fase 6 del roadmap): falla si un día hábil no quedó la fila de
+# hoy en Supabase. Cubre la corrida que nunca arrancó, que las alertas del
+# pipeline no pueden ver. Cuando falla, GitHub le avisa por mail al dueño del
+# repo: un canal que no depende de la contraseña de Gmail del reporte.
+#
+# APAGADO POR DEFECTO, como la corrida: se dispara a mano y, si no se pide lo
+# contrario, sin mandar el mail de alerta. Para programarlo, descomentá
+# `schedule` (ver docs/programacion-y-monitoreo.md). Tiene que correr después
+# del horario de la corrida: antes, la fila todavía no existe y falla.
+name: Control diario
+
+on:
+  workflow_dispatch:
+    inputs:
+      alertar:
+        description: "Mandar también el mail de alerta si falta la fila"
+        type: boolean
+        default: false
+  # schedule:
+  #   - cron: "30 22 * * 1-5"   # 19:30 en Argentina (UTC-3), de lunes a viernes
+
+permissions:
+  contents: read
+
+jobs:
+  control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+      EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+      EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
+      EMAIL_RECEIVER_CSV: ${{ secrets.EMAIL_RECEIVER_CSV }}
+      GEMINI_API_KEY_1: ${{ secrets.GEMINI_API_KEY_1 }}
+      FED_API_KEY: ${{ secrets.FED_API_KEY }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      RUTA_BBDD: data/no-existe.csv
+      RUTA_REPO: .
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Dependencias
+        run: pip install -r requirements.txt
+
+      - name: Control
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.alertar }}" = "true" ]; then
+            python scripts/control_diario.py
+          else
+            python scripts/control_diario.py --sin-alerta
+          fi
