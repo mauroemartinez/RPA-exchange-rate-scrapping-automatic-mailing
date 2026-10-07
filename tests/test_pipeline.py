@@ -49,6 +49,7 @@ def entorno(historico, resultados, btc_crudo, tmp_path):
         alertar_validacion=lambda exc: hechos["alertas"].append("validacion") or True,
         tabla_series=lambda engine: False,
         columna_secciones=lambda engine: False,
+        feriado=lambda fecha: None,
         hoy=lambda: HOY,
         ahora=lambda: datetime(2026, 10, 6, 16, 43),
     )
@@ -355,3 +356,69 @@ def test_dry_run_sin_con_ia_no_llama_a_gemini(entorno):
     deps = replace(deps, generar_secciones=lambda prompt: llamadas.append(prompt) or (None, None))
     pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida), deps)
     assert llamadas == []
+
+
+def test_no_corre_un_feriado(entorno):
+    deps, hechos, salida = entorno
+    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, feriado=lambda fecha: "Día de prueba"))
+    assert r.estado == "omitida"
+    assert "feriado (Día de prueba)" in r.etapas[0].detalle
+    assert hechos["filas"] == [] and hechos["mails"] == []
+
+
+def test_no_corre_un_fin_de_semana(entorno):
+    deps, hechos, salida = entorno
+    sabado = HOY + timedelta(days=4)
+    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, hoy=lambda: sabado))
+    assert r.estado == "omitida" and "fin de semana" in r.etapas[0].detalle
+
+
+def test_forzar_corre_aunque_sea_feriado(entorno):
+    deps, hechos, salida = entorno
+    r = pipeline.correr(pipeline.Opciones(salida=salida, forzar=True), replace(deps, feriado=lambda fecha: "Día de prueba"))
+    assert r.estado == "ok" and len(hechos["mails"]) == 2
+
+
+def test_si_el_calendario_no_responde_se_corre_igual(entorno):
+    deps, hechos, salida = entorno
+
+    def feriado(fecha):
+        raise ConnectionError("ArgentinaDatos no responde")
+
+    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, feriado=feriado))
+    assert r.estado == "ok" and len(hechos["mails"]) == 2
+
+
+def test_dry_run_un_feriado_corre_igual(entorno):
+    deps, hechos, salida = entorno
+    r = pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida), replace(deps, feriado=lambda fecha: "Día de prueba"))
+    assert r.estado == "ok"
+
+
+def test_el_log_no_lleva_secretos_ni_destinatarios(tmp_path):
+    import logging
+    import smtplib
+
+    archivo = tmp_path / "corrida.log"
+    pipeline.configurar_logging(archivo)
+    try:
+        log = logging.getLogger("pipeline.test")
+        log.error("FRED respondió 400 para https://api.stlouisfed.org/fred?api_key=fred-falsa&x=1")
+        try:
+            raise smtplib.SMTPRecipientsRefused({"uno@example.com": (550, b"no existe")})
+        except smtplib.SMTPRecipientsRefused:
+            log.exception("falló el envío con clave no-es-una-clave")
+        for handler in logging.getLogger().handlers:
+            handler.flush()
+        texto = archivo.read_text(encoding="utf-8")
+    finally:
+        logging.basicConfig(force=True)
+
+    for sensible in ("fred-falsa", "no-es-una-clave", "uno@example.com", "clave@127.0.0.1"):
+        assert sensible not in texto
+    assert "api_key=***" in texto and "[destinatario]" in texto
+
+
+def test_redactar_tapa_la_url_de_la_base_entera():
+    url = "postgresql://usuario:clave@127.0.0.1:1/inexistente"
+    assert pipeline.redactar(f"no conecta a {url}") == "no conecta a ***"

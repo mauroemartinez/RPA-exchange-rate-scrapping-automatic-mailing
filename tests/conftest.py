@@ -56,6 +56,18 @@ def sin_smtp_real(monkeypatch):
     monkeypatch.setattr(smtplib, "SMTP", _prohibido)
 
 
+@pytest.fixture(autouse=True)
+def sin_red_real(monkeypatch):
+    """Cualquier request HTTP real falla; los httpx.MockTransport de los tests siguen andando."""
+    import httpx
+
+    def _prohibido(self, request):
+        raise AssertionError(f"un test intentó salir a la red: {request.url.host}")
+
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", _prohibido)
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", _prohibido)
+
+
 def _dias_habiles_hacia_atras(desde: date, cantidad: int) -> list[date]:
     dias, actual = [], desde
     while len(dias) < cantidad:
