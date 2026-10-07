@@ -41,7 +41,7 @@ Por qué estas y no otras:
 | `data_access.py` | Tabla `Fact_Series_Macro` y su upsert, que solo reescribe valores que cambiaron (el BCRA revisa datos ya publicados) |
 | `scripts/sql/06_series_macro.sql` | La migración: formato largo `(serie, Fecha)`, con unidad, frecuencia y fuente; RLS activado como en `Fact_Mercado_Macro` |
 | `charts.py` | `grafico_agregados`: niveles del último año en billones de ARS y variación interanual contra la inflación |
-| `pipeline.py` | Etapa `series`: cada día vuelve a pedir los últimos 120 días y los guarda. Cada serie se valida y se guarda por separado, así que una discontinuada no frena a las demás. Sin la tabla se omite con un aviso; si falla, queda como advertencia y no pone la corrida en rojo |
+| `pipeline.py` | Etapa `indicadores`: baja las series para los gráficos. Etapa `series`: guarda lo que bajó `indicadores` (de las diarias, los últimos 120 días), sin volver a pedirlo. Cada serie se valida y se guarda por separado, así que una discontinuada no frena a las demás. Sin la tabla se omite con un aviso; si falla, queda como advertencia y no pone la corrida en rojo |
 | `scripts/agregados_monetarios.py` | Resumen por serie y gráfico de prueba; con `--guardar`, carga toda la historia |
 
 Verificación: la migración, el upsert (1000 filas la primera vez, 0 al repetir, 1 al revisar un valor) y RLS se probaron contra un PostgreSQL 16 local descartable, no contra Supabase. El resto tiene tests sin red (`tests/test_agregados.py`).
@@ -58,15 +58,15 @@ El gráfico va en el mail diario (`Agregados Monetarios.jpg`), con un texto fijo
 
 Gemini no escribe ni la explicación ni esa frase. La corrida baja las series en cada ejecución, en la etapa `indicadores`, así que el gráfico sale aunque la tabla todavía no exista.
 
-### Para guardar la historia en Supabase (pasos tuyos)
+### Para guardar la historia en Supabase (pasos manuales)
 
-1. Aplicar `scripts/sql/06_series_macro.sql` en el SQL Editor de Supabase. Es lo único que toca la base de producción, y por eso no lo hice yo.
+1. Aplicar `scripts/sql/06_series_macro.sql` en el SQL Editor de Supabase. Es lo único que toca la base de producción, y por eso se hace a mano.
 2. Cargar la historia de todas las series, agregados y deuda: `python scripts/agregados_monetarios.py --guardar` (unos 7.500 puntos por serie diaria, desde 1996).
 3. Desde ahí, la corrida diaria mantiene la tabla al día sola.
 
 ## 2. Endeudamiento
 
-"Endeudamiento" puede querer decir cosas muy distintas, con fuentes y frecuencias que no se parecen. Estas son las opciones que encontré, verificadas el 6 de octubre de 2026:
+"Endeudamiento" puede querer decir cosas muy distintas, con fuentes y frecuencias que no se parecen. Estas son las opciones evaluadas, verificadas el 6 de octubre de 2026:
 
 | | Qué mide | Fuente | Frecuencia y rezago | Unidad | Cómo se obtiene | Esfuerzo |
 |---|---|---|---|---|---|---|
@@ -75,7 +75,7 @@ Gemini no escribe ni la explicación ni esa frase. La corrida baja las series en
 | **C** | Pasivos del BCRA y financiamiento al Tesoro: letras del BCRA en pesos (id 1258) y en moneda extranjera (1259), posición neta de pases (1261), adelantos transitorios al Gobierno (1268) | BCRA | Diaria, 2 o 3 días hábiles | millones de ARS | La misma API de los agregados: se agregan filas al catálogo | Mínimo |
 | **D** | Endeudamiento de familias y empresas: préstamos de las entidades al sector privado (id 26) | BCRA | Diaria, 2 o 3 días hábiles | millones de ARS | La misma API | Mínimo |
 
-Lo que descarté: la API de series de tiempo de datos.gob.ar tiene series de deuda, pero las que encontré están discontinuadas (la deuda externa privada termina en 2017 y el gasto en servicios de deuda en 2023).
+Lo que descarté: la API de series de tiempo de datos.gob.ar tiene series de deuda, pero las disponibles están discontinuadas (la deuda externa privada termina en 2017 y el gasto en servicios de deuda en 2023).
 
 La recomendación fue **C y D ya**, porque salen de la misma API con el mismo código y se actualizan todos los días, y **A como dato mensual**, para tener la deuda pública propiamente dicha aunque dependa de un Excel. B quedó afuera del mail diario.
 

@@ -2,7 +2,7 @@
 
 Roadmap, fase 2: *evaluar una caché para las consultas repetidas, definida por fuente, período y fecha de publicación*.
 
-**Conclusión: no conviene implementar una caché hoy.** Ninguna fuente HTTP pesa ni tarda lo suficiente para que valga la complejidad, y la parte lenta de la corrida es un dato en vivo que por definición no se puede reutilizar. Abajo están las mediciones y lo que sí recomiendo.
+**Conclusión: no conviene implementar una caché hoy.** Ninguna fuente HTTP pesa ni tarda lo suficiente para que valga la complejidad, y la parte lenta de la corrida es un dato en vivo que por definición no se puede reutilizar. Abajo están las mediciones y lo que sí conviene.
 
 ## Mediciones (6 de octubre de 2026, desde la PC de desarrollo)
 
@@ -34,7 +34,7 @@ En la corrida real las seis primeras fuentes van en paralelo y la etapa de scrap
 | Párrafo de Gemini | Uno por día | Ya está resuelto | Se guarda en `ai_paragraph`. El reenvío manual lo reutiliza y una corrida con `--forzar` lo regenera a propósito. |
 | Historial de Supabase | Una fila por día | No | 1,4 s para 7107 filas, y la corrida necesita la tabla completa para el CSV adjunto. |
 
-## Lo que sí recomiendo
+## Lo que sí conviene
 
 1. **Persistir la serie de inflación en Supabase** en lugar de cachearla. Es lo que proponía el README ("API Data Persistence in Supabase") y encaja con la fase 3, que va a necesitar una tabla para series mensuales con su fecha de publicación. Con la inflación guardada, `scripts/reenvio_manual.py` dejaría de depender de la API del BCRA, que hoy es lo único que vuelve a consultar. Estado: la tabla está definida (`Fact_Series_Macro`, ver [fase-3-agregados-y-deuda.md](fase-3-agregados-y-deuda.md)) y, una vez aplicada su migración, la corrida diaria la mantiene al día; pero todavía nadie lee de ella, así que el reenvío sigue pidiendo la inflación a la API.
 2. **Si hace falta acelerar la corrida, el lugar es BNA**, no las APIs: son 13 de los 25 segundos. Por ejemplo, bloquear imágenes y fuentes con `page.route()` antes del `goto`. Es una optimización de scraping y conviene medirla aparte, porque toca un selector que ya se rompió una vez.

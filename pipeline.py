@@ -17,7 +17,7 @@ Etapas, en el mismo orden que el notebook:
   mail          las dos variantes del reporte (con y sin CSV)
   presentacion  el PowerPoint del día (presentacion.ARCHIVO), en la carpeta de los gráficos;
                 si falla, es una advertencia: el mail ya salió
-  previews      commit y push de Previews/: los .jpg y el .pptx
+  previews      commit y push de los .jpg en Previews/ (main); el .pptx, a la rama reporte-ejecutivo
   series        guarda en Fact_Series_Macro lo que bajó la etapa indicadores (fase 3)
 
 Cada etapa queda registrada con estado y duración. Una etapa en "error" pone la

@@ -2,7 +2,7 @@
 
 Roadmap, fase 5: *evaluar la generación automática de un PowerPoint ejecutivo* y *evaluar un dashboard en Streamlit conectado al histórico completo*, sin que ninguno se convierta en otra implementación del pipeline diario.
 
-Para evaluar con algo concreto hice un prototipo de cada uno. **El PowerPoint ya es parte de la corrida diaria** (la decisión está abajo). **El dashboard sigue siendo un prototipo** que se corre a mano y solo lee; quedó para revisarlo más adelante.
+Para evaluar con algo concreto se armó un prototipo de cada uno. **El PowerPoint ya es parte de la corrida diaria** (la decisión está abajo). **El dashboard sigue siendo un prototipo** que se corre a mano y solo lee; quedó para revisarlo más adelante.
 
 ## PowerPoint: `presentacion.py`
 
@@ -25,7 +25,7 @@ Si la fila tiene los comentarios por gráfico de la fase 4, van al lado de cada 
 
 Lo que salió de la prueba, con los datos del 6 de octubre:
 
-- **Funciona y se ve bien.** Lo exporté a imágenes con PowerPoint para revisarlo. El archivo pesa unos 460 KB.
+- **Funciona y se ve bien.** Se revisó exportándolo a imágenes con PowerPoint. El archivo pesa unos 460 KB.
 - **No suma llamadas ni datos nuevos.** Lee el histórico de Supabase (solo lectura), del que usa las dos últimas filas, y los .jpg de `Previews/`, y reutiliza `transformations`, `email_report` e `ia_generator`.
 - **Costo:** una dependencia (`python-pptx`, que trae `lxml`) y unas 200 líneas. El armado es posicional: si cambia el tamaño de un gráfico, hay que retocar la ubicación.
 - **No exporta a PDF.** `python-pptx` solo escribe .pptx; para PDF hace falta PowerPoint o LibreOffice en la máquina que corre.
@@ -61,6 +61,6 @@ GRANT SELECT ON "Fact_Mercado_Macro" TO dashboard_lectura;
 CREATE POLICY lectura_dashboard ON "Fact_Mercado_Macro" FOR SELECT TO dashboard_lectura USING (true);
 ```
 
-Con el pooler de Supabase, el usuario de la URL lleva el id del proyecto: `dashboard_lectura.<id-del-proyecto>`, y esa URL es la que va en `DASHBOARD_DB_URL`. No lo ejecuté: es un cambio de permisos en la base de producción.
+Con el pooler de Supabase, el usuario de la URL lleva el id del proyecto: `dashboard_lectura.<id-del-proyecto>`, y esa URL es la que va en `DASHBOARD_DB_URL`. No está aplicado: es un cambio de permisos en la base de producción y se hace a mano.
 
-Recomendación: **vale la pena si hay alguien que lo vaya a usar.** Para vos solo, alcanza con correrlo local. Para suscriptores, Streamlit Community Cloud es gratis para repos públicos (este lo es), con el rol de solo lectura de arriba en los secrets. Lo que no recomiendo es sumarle escritura, refresco del pipeline o cálculos propios: en ese momento pasaría a ser una segunda implementación del reporte.
+Recomendación: **vale la pena si hay alguien que lo vaya a usar.** Para uso personal, alcanza con correrlo local. Para suscriptores, Streamlit Community Cloud es gratis para repos públicos (este lo es), con el rol de solo lectura de arriba en los secrets. Lo que no conviene es sumarle escritura, refresco del pipeline o cálculos propios: en ese momento pasaría a ser una segunda implementación del reporte.
