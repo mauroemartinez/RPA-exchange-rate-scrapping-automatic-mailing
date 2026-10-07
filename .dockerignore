@@ -35,6 +35,8 @@ logs/
 # El notebook ya no se ejecuta en el contenedor: /run corre pipeline.py
 notebooks/
 tests/
+# Prototipos de la fase 5: no corren en el contenedor del pipeline
+dashboard/
 .github/
 requirements-dev.*
 pyproject.toml
