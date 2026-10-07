@@ -53,6 +53,8 @@ ruff check .
 
 The test suite loads fake credentials over any real `.env` and fails any test that tries to open a real SMTP connection, so it is always safe to run. It covers the transformations, charts, email assembly, the pipeline orchestration through fake dependencies, the idempotent insert, `preview_git` against temporary git repos, the Gemini failover, the API and the manual resend.
 
+**Scheduling and monitoring:** `.github/workflows/` holds the CI (lint, imports, tests; runs on push and PR) and two workflows that are **off by default**: `corrida-diaria.yml` (the daily run, manual dispatch only, dry-run unless asked otherwise) and `control-diario.yml` (fails when a business day has no row). Their `schedule` blocks are commented out on purpose; enabling one is a decision documented in `docs/programacion-y-monitoreo.md`, which also compares GitHub Actions, EasyPanel and the Windows Task Scheduler. `python scripts/control_diario.py --sin-alerta` checks today's row without sending the alert email.
+
 **Resend today's report to one person:**
 ```bash
 python scripts/reenvio_manual.py alguien@mail.com
@@ -64,7 +66,7 @@ See "Manual resend" below.
 
 `pipeline.py` runs these stages in order. Each one is recorded with its state (`ok`, `advertencia`, `error` or `omitida`) and its duration, and the whole run returns a `ResultadoCorrida`:
 
-1. **Control:** takes a Postgres advisory lock (`data_access.candado_corrida`) so two triggers cannot run at once, and skips the day when its row already exists, unless `--forzar`
+1. **Control:** skips weekends and national holidays (`scrapers/feriados.py`, ArgentinaDatos, bridge days included; if the calendar API fails, the run goes ahead), takes a Postgres advisory lock (`data_access.candado_corrida`) so two triggers cannot run at once, and skips the day when its row already exists. `--forzar` overrides the calendar and the existing-row checks
 2. **historico:** `data_access.leer_historico()` reads the full `Fact_Mercado_Macro` table, newest row first; falls back to the local CSV at `RUTA_BBDD` if Supabase fails
 3. **scraping:** `scrapers.run_all_sync()` runs all six sources concurrently via `asyncio.gather()` and returns their results in a fixed order: BNA (billetes + divisas tabs), DolarHoy (blue), Ambito (MEP + euro blue), riesgo país, BCRA (BADLAR id=140 and monthly inflation id=27), and the St. Louis FED (EFFR). The three HTTP sources share one `httpx.AsyncClient`. A `ScraperError` emails an alert and stops the run
 4. **validacion:** `transformations.armar_fila_nueva()` builds today's row and `models.FilaMacro` validates it. If a scraper returned invalid, non-positive, or malformed values, the run emails the developer and stops before anything is persisted
@@ -102,6 +104,9 @@ The pipeline is a faithful port of the notebook: fed the same inputs, the four J
 | `scripts/backfill.py` | Repairs historical `riesgo_pais` and `bcra_tea` series against their source APIs. Dry-run by default, writes only with `--apply`. |
 | `scripts/reenvio_manual.py` | Resends the latest report to arbitrary recipients without rerunning the pipeline |
 | `scripts/agregados_monetarios.py` | Summary and preview chart of the monetary aggregates; `--guardar` loads their full history into `Fact_Series_Macro` |
+| `scripts/control_diario.py` | Dead man's switch: on a business day without today's row, exits 1 and emails an alert (`--sin-alerta` only reports). Read-only |
+| `scrapers/feriados.py` | National holidays from ArgentinaDatos, used to skip non-business days |
+| `.github/workflows/` | CI, plus the daily run and the daily control, both off until their `schedule` is uncommented |
 | `scripts/presentacion_ejecutiva.py` | Prototype (roadmap phase 5): a 6-slide executive `.pptx` built from the stored row, its AI texts and the charts in `Previews/`. Read-only, not wired into the pipeline |
 | `dashboard/app.py` | Prototype (roadmap phase 5): Streamlit dashboard over the full history, with its own `dashboard/requirements.txt`. Read-only, does not import `config.py` |
 | `notebooks/laboratorio_sql.ipynb` | Read-only SQL lab: every query runs inside a `READ ONLY` transaction |
@@ -163,6 +168,8 @@ Two guardrails worth knowing: it aborts if the newest row has no `ai_paragraph` 
 - **Send failures.** In the pipeline a failed send marks the run as failed (exit code 1) and is logged with the SMTP error. The notebook still catches and prints them, so there a bad Gmail App Password surfaces as a `535` line and nothing else. Since alerts use the same credentials, they fail with it; the exit code is the signal that survives. Test SMTP changes with `python pipeline.py --dry-run --enviar-a <your address>`.
 - **Gemini only writes; Python computes.** Every figure in the prompts is calculated beforehand, and the structured answer must pass `models.SeccionesIA` before it reaches the email. The schema sent to the API carries only types and required fields; the length limits live in the Pydantic model.
 - **Keep the `httpx` logger at WARNING or above.** It logs full request URLs at INFO, and the FRED request carries the API key in its query string.
+- **Logs can be public.** On GitHub Actions in this public repo, anyone can read a run's log. `pipeline.configurar_logging` installs a formatter that replaces every secret from `.env` with `***` and every recipient address with `[destinatario]`, tracebacks included, and `--json` output goes through the same `redactar()`. Keep new output inside `logging`, and never upload the mail preview or error details as workflow artifacts.
+- **Anything that can send mail is verified with the sending stubbed or disabled.** `pipeline.py --dry-run`, `scripts/reenvio_manual.py --dry-run`, `scripts/control_diario.py --sin-alerta`. A real run of the control before the day's run sends a real (false) alert.
 - **Column order matters in the email.** The cotizaciones table is built with `df.iloc[:, :14]`, so it depends on the column order coming back from Supabase. Adding a column to the table in the wrong position silently reshuffles the mail.
 - **Analysis tools only read.** The SQL lab, the presentation prototype and the dashboard never write to Supabase and never reimplement the report: they consume the warehouse and the existing modules. The dashboard must not get the pipeline's credentials; if it is ever published, give it a read-only role (`docs/evaluacion-powerpoint-y-streamlit.md` has the SQL, including the RLS policy that role needs).
 - **Writing style for this repo: no em dashes,** in documentation, comments, or commit messages.
