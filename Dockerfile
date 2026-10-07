@@ -34,12 +34,15 @@ RUN playwright install --with-deps chromium
 # Por defecto un contenedor corre como root. Si alguien logra ejecutar código
 # acá adentro, tenerlo como usuario común limita bastante el daño.
 RUN useradd --create-home --shell /bin/bash appuser \
- && mkdir -p /app/Previews \
- && chmod -R a+rX /ms-playwright \
- && chown -R appuser:appuser /app
+ && chmod -R a+rX /ms-playwright
 
 # ── código del proyecto ───────────────────────────────────────────────────────
-COPY --chown=appuser:appuser . .
+# El código queda de root y solo lectura para appuser: /run ejecuta pipeline.py
+# en cada corrida, y un proceso comprometido no tiene que poder reescribirlo.
+# appuser escribe solo los gráficos y los logs.
+COPY . .
+RUN mkdir -p /app/Previews /app/logs \
+ && chown appuser:appuser /app/Previews /app/logs
 
 USER appuser
 

@@ -43,7 +43,7 @@ def entorno(historico, resultados, btc_crudo, tmp_path):
         descargar_btc=lambda desde, hasta: btc_crudo.copy(),
         generar_parrafo=generar_parrafo,
         enviar_mail=lambda mensaje, destinatarios: hechos["mails"].append((mensaje, destinatarios)),
-        actualizar_previews=lambda repo: hechos["previews"].append(repo) or (True, "ok"),
+        actualizar_previews=lambda repo, archivos=None: hechos["previews"].append(repo) or (True, "ok"),
         alertar=lambda asunto, cuerpo: hechos["alertas"].append(asunto) or True,
         alertar_scraper=lambda exc: hechos["alertas"].append("scraper") or True,
         alertar_validacion=lambda exc: hechos["alertas"].append("validacion") or True,

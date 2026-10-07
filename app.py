@@ -28,7 +28,9 @@ PIPELINE = BASE_DIR / "pipeline.py"
 
 TIMEOUT_CORRIDA = 3600
 
-app = FastAPI(title="Seguimiento Macroeconómico", version="3.0")
+# Sin /docs ni /openapi.json: el servicio solo lo llama un programador, y la
+# documentación interactiva le mostraba /run a cualquiera que encontrara la URL.
+app = FastAPI(title="Seguimiento Macroeconómico", version="3.0", docs_url=None, redoc_url=None, openapi_url=None)
 
 # Una corrida a la vez. Sin esto, dos POST simultáneos ejecutan el pipeline dos
 # veces en paralelo: doble scraping, doble mail y dos INSERT compitiendo por la
@@ -54,7 +56,9 @@ def run_pipeline(x_api_key: str | None = Header(default=None), dry_run: bool = F
     # Falla cerrado: si no hay API key configurada, el endpoint no se habilita.
     # La versión anterior hacía `if API_KEY and ...`, o sea que un .env sin la
     # variable dejaba /run abierto a cualquiera.
-    if settings.api_key_easy_panel is None:
+    # config.py ya convierte una key vacía en None; se chequea igual, porque una
+    # key vacía con un header vacío pasaría compare_digest.
+    if settings.api_key_easy_panel is None or not settings.api_key_easy_panel.get_secret_value().strip():
         logger.error("API_KEY_EASY_PANEL no está configurada; /run deshabilitado")
         raise HTTPException(status_code=503, detail="Servicio no configurado")
 
@@ -72,7 +76,8 @@ def run_pipeline(x_api_key: str | None = Header(default=None), dry_run: bool = F
             archivo_json = Path(tmp) / "resultado.json"
             comando = [sys.executable, str(PIPELINE), "--origen", "api", "--json", str(archivo_json)]
             if dry_run:
-                comando.append("--dry-run")
+                # La vista previa queda adentro de la carpeta temporal y se borra con ella
+                comando += ["--dry-run", "--salida", str(Path(tmp) / "vista-previa")]
 
             logger.info("Iniciando la corrida%s", " (dry-run)" if dry_run else "")
             # Proceso aparte y no una llamada en este mismo proceso, por dos motivos:

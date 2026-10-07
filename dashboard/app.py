@@ -3,16 +3,18 @@
 Solo lee Fact_Mercado_Macro, dentro de una transacción READ ONLY, o el CSV que
 llega adjunto en el mail. No importa config.py a propósito: config exige todas
 las credenciales del pipeline (mail, Gemini, FRED) y un dashboard publicado no
-tiene por qué tenerlas. Le alcanza con una URL de base de datos, idealmente de
-un usuario de solo lectura (ver docs/evaluacion-powerpoint-y-streamlit.md).
+tiene por qué tenerlas. Le alcanza con DASHBOARD_DB_URL, la URL de un usuario de
+solo lectura (ver docs/evaluacion-powerpoint-y-streamlit.md).
 
 Uso:
     pip install -r dashboard/requirements.txt
-    streamlit run dashboard/app.py                       # lee SUPABASE_DB_URL del entorno o del .env
+    streamlit run dashboard/app.py                       # DASHBOARD_DB_URL, o SUPABASE_DB_URL con aviso
     DASHBOARD_CSV="Seguimiento Macroeconómico.csv" streamlit run dashboard/app.py   # sin base, desde el CSV
 """
 
+import logging
 import os
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -35,14 +37,31 @@ COTIZACIONES = {
 st.set_page_config(page_title="Seguimiento Macroeconómico", page_icon="📈", layout="wide")
 
 
-def _url_base() -> str | None:
-    """SUPABASE_DB_URL de los secrets de Streamlit, del entorno o del .env del proyecto."""
+def _secreto(nombre: str) -> str | None:
+    """Un valor de los secrets de Streamlit o del entorno."""
     try:
-        if "SUPABASE_DB_URL" in st.secrets:
-            return st.secrets["SUPABASE_DB_URL"]
+        if nombre in st.secrets:
+            return st.secrets[nombre]
     except Exception:
         pass  # sin secrets.toml
-    return os.environ.get("SUPABASE_DB_URL") or dotenv_values(RAIZ / ".env").get("SUPABASE_DB_URL")
+    return os.environ.get(nombre)
+
+
+def _url_base() -> tuple[str | None, bool]:
+    """(URL, es la del pipeline). DASHBOARD_DB_URL primero; si no está, SUPABASE_DB_URL.
+
+    La del pipeline es el usuario postgres, que puede escribir y borrar todo: sirve
+    para correrlo en la PC propia, pero el dashboard avisa en pantalla.
+    """
+    propia = _secreto("DASHBOARD_DB_URL")
+    if propia:
+        return propia, False
+    return _secreto("SUPABASE_DB_URL") or dotenv_values(RAIZ / ".env").get("SUPABASE_DB_URL"), True
+
+
+def _sin_markdown(texto: str) -> str:
+    """El texto de Gemini tal cual: sin que un link, un encabezado o un par de $ (LaTeX) se interpreten."""
+    return re.sub(r"([\\`*_{}\[\]()#+\-.!|<>~$])", r"\\\1", texto)
 
 
 @st.cache_data(ttl=3600, show_spinner="Leyendo el histórico...")
@@ -51,20 +70,29 @@ def historico() -> pd.DataFrame:
     if csv:
         df = pd.read_csv(csv)
     else:
-        url = _url_base()
+        url, _ = _url_base()
         if not url:
-            st.error("Falta SUPABASE_DB_URL (secrets de Streamlit, variable de entorno o .env).")
+            st.error("Falta DASHBOARD_DB_URL (secrets de Streamlit o variable de entorno).")
             st.stop()
-        engine = create_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 30})
-        with engine.connect() as conn:
-            conn.execute(text("SET TRANSACTION READ ONLY"))
-            df = pd.read_sql_query(text(f'SELECT * FROM "{TABLA}" ORDER BY "Fecha"'), conn)
-        engine.dispose()
+        try:
+            engine = create_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 30})
+            with engine.connect() as conn:
+                conn.execute(text("SET TRANSACTION READ ONLY"))
+                df = pd.read_sql_query(text(f'SELECT * FROM "{TABLA}" ORDER BY "Fecha"'), conn)
+            engine.dispose()
+        except Exception:
+            # El detalle (host, usuario) queda en el log del servidor, no en la página
+            logging.getLogger(__name__).exception("No se pudo leer la base")
+            st.error("No se pudo leer la base de datos. El detalle está en el log del servidor.")
+            st.stop()
     df["Fecha"] = pd.to_datetime(df["Fecha"])
     return df.drop(columns=["ai_secciones"], errors="ignore").sort_values("Fecha").reset_index(drop=True)
 
 
 df = historico()
+if not os.environ.get("DASHBOARD_CSV") and _url_base()[1]:
+    st.warning("Conectado con SUPABASE_DB_URL, el usuario del pipeline. Antes de publicar este dashboard, "
+               "configurá DASHBOARD_DB_URL con un usuario de solo lectura.")
 ultima = df.iloc[-1]
 anterior = df.iloc[-2]
 
@@ -117,7 +145,7 @@ with ia:
     if parrafos.empty:
         st.info("No hay párrafos de IA en el período.")
     for fecha, parrafo in parrafos.head(10).items():
-        st.markdown(f"**{fecha:%d/%m/%Y}**  \n{parrafo}")
+        st.markdown(f"**{fecha:%d/%m/%Y}**  \n{_sin_markdown(parrafo)}")
 with datos:
     st.dataframe(periodo.sort_index(ascending=False), width="stretch")
     st.download_button("Descargar CSV", periodo.to_csv().encode("utf-8"), "seguimiento_macroeconomico.csv", "text/csv")
