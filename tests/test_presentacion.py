@@ -1,18 +1,13 @@
 """Prototipo de presentación ejecutiva: arma el .pptx con datos sintéticos, sin red."""
 
-import sys
-from pathlib import Path
-
 import pytest
 
 pytest.importorskip("pptx")
-from pptx import Presentation  # noqa: E402
+from pptx import Presentation
 
-import charts  # noqa: E402
-from conftest import jpeg_minimo  # noqa: E402
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-import presentacion_ejecutiva  # noqa: E402
+import charts
+import presentacion_ejecutiva
+from conftest import jpeg_minimo
 
 
 def _textos(slide) -> str:

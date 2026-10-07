@@ -21,7 +21,7 @@ def df(resultados, historico):
 
 @pytest.fixture
 def inflacion_12(resultados):
-    return t.ultimos_meses(t.serie_inflacion(resultados.bcra["inflacion_mensual"], 23.66))
+    return t.ultimos_meses(t.serie_inflacion(resultados.bcra["inflacion_mensual"]))
 
 
 def test_formato_de_meses_en_espanol_sin_locale():
@@ -85,7 +85,7 @@ def test_rango_de_descarga_de_btc_incluye_el_margen():
 def test_la_inflacion_acumulada_arranca_con_el_periodo(df, resultados):
     # Regresión: con solo los últimos 12 meses, la inflación acumulada arrancaba
     # meses después que las cotizaciones
-    inflacion = t.serie_inflacion(resultados.bcra["inflacion_mensual"], 23.66)
+    inflacion = t.serie_inflacion(resultados.bcra["inflacion_mensual"])
     va = charts.preparar_variaciones(charts.preparar_datos(df), inflacion, "2026-08-01")
 
     primera_inflacion = va.dropna(subset=["Inflación Mensual"])["Fecha"].min()

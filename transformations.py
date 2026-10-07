@@ -11,9 +11,8 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from data_access import COLUMNAS_FILA
 from fechas import mes_abreviado
-from models import FilaMacro
+from models import COLUMNAS_FILA, FilaMacro
 
 
 @dataclass(frozen=True)
@@ -104,7 +103,7 @@ def agregar_brechas_y_variaciones(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def serie_inflacion(inflacion_mensual: list[tuple[date, float]], bcra_tea: float) -> pd.DataFrame:
+def serie_inflacion(inflacion_mensual: list[tuple[date, float]]) -> pd.DataFrame:
     """Serie completa de inflación con los acumulados de 2, 3 y 12 meses (celda 21).
 
     Ascendente, con Fecha como datetime. inflacion_mensual es la lista (fecha, valor)
@@ -118,7 +117,6 @@ def serie_inflacion(inflacion_mensual: list[tuple[date, float]], bcra_tea: float
     inflacion["Inflación Bimestral"] = (factor.rolling(2).apply(np.prod, raw=True) - 1) * 100
     inflacion["Inflación Trimestral"] = (factor.rolling(3).apply(np.prod, raw=True) - 1) * 100
     inflacion["Inflación Anual"] = (factor.rolling(12, min_periods=12).apply(np.prod, raw=True) - 1) * 100
-    inflacion["bcra_tea"] = bcra_tea
     return inflacion
 
 

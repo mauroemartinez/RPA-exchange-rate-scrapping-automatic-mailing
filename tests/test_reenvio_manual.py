@@ -1,16 +1,11 @@
 import sys
-from pathlib import Path
 
 import pytest
 
 import charts
 import email_report
+import reenvio_manual
 from conftest import jpeg_minimo
-
-RAIZ = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(RAIZ / "scripts"))
-
-import reenvio_manual  # noqa: E402
 
 
 @pytest.fixture
@@ -18,7 +13,10 @@ def entorno(monkeypatch, historico, resultados, tmp_path):
     con_hoy = historico.copy()
     monkeypatch.setattr(reenvio_manual.data_access, "crear_engine", lambda: None)
     monkeypatch.setattr(reenvio_manual.data_access, "leer_historico", lambda engine, respaldo_csv=True: (con_hoy, "supabase"))
-    monkeypatch.setattr(reenvio_manual, "run_async", lambda coro: (coro.close(), resultados.bcra)[1])
+    monkeypatch.setattr(
+        reenvio_manual.agregados, "descargar",
+        lambda claves=None, desde=None: {"inflacion_mensual": resultados.bcra["inflacion_mensual"]},
+    )
 
     previews = tmp_path / "Previews"
     previews.mkdir()

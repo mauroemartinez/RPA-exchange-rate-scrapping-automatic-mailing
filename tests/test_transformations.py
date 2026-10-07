@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 import transformations as t
 from conftest import HOY
-from data_access import COLUMNAS_FILA
+from models import COLUMNAS_FILA
 
 
 def test_fila_nueva_respeta_el_orden_de_la_tabla(resultados):
@@ -89,7 +89,7 @@ def test_ffill_rellena_huecos_antes_de_variar():
 
 
 def test_serie_de_inflacion(inflacion_mensual):
-    inflacion = t.serie_inflacion(inflacion_mensual, bcra_tea=25.0)
+    inflacion = t.serie_inflacion(inflacion_mensual)
 
     assert inflacion["Fecha"].is_monotonic_increasing
     a, b, c = (inflacion["Inflación Mensual"].iloc[k] / 100 for k in (-3, -2, -1))
@@ -98,11 +98,10 @@ def test_serie_de_inflacion(inflacion_mensual):
     assert inflacion["Inflación Anual"].iloc[:11].isna().all()
     anual = math.prod(1 + v / 100 for v in inflacion["Inflación Mensual"].iloc[-12:])
     assert inflacion["Inflación Anual"].iloc[-1] == pytest.approx((anual - 1) * 100)
-    assert (inflacion["bcra_tea"] == 25.0).all()
 
 
 def test_ultimos_meses_ascendentes(inflacion_mensual):
-    ultimos = t.ultimos_meses(t.serie_inflacion(inflacion_mensual, 25.0))
+    ultimos = t.ultimos_meses(t.serie_inflacion(inflacion_mensual))
     assert len(ultimos) == 12
     assert ultimos["Fecha"].is_monotonic_increasing
     assert ultimos["Fecha"].iloc[-1].date() == inflacion_mensual[-1][0]

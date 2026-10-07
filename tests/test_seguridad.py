@@ -100,7 +100,7 @@ def test_el_parrafo_de_ia_se_escapa_en_el_mail(resultados, historico):
     import transformations as t
 
     df = t.agregar_brechas_y_variaciones(t.sumar_al_historico(t.armar_fila_nueva(resultados, historico["Fecha"].iloc[0]), historico))
-    inflacion = t.ultimos_meses(t.serie_inflacion(resultados.bcra["inflacion_mensual"], 23.66))
+    inflacion = t.ultimos_meses(t.serie_inflacion(resultados.bcra["inflacion_mensual"]))
     html = email_report.renderizar(df, inflacion, 1.0, 1.0, '<a href="http://phishing">clic</a>', 1.0)
     assert '<a href="http://phishing">' not in html
     assert "&lt;a href=" in html

@@ -13,8 +13,8 @@ diaria ya dejó hecho:
   - los .jpg que quedaron en Previews/
 
 La única fuente externa que sí se vuelve a pedir es la serie de inflación mensual
-del BCRA (GET, solo lectura): no se persiste en Fact_Mercado_Macro, así que no hay
-de dónde replayearla.
+del BCRA (GET, solo lectura): no está en Fact_Mercado_Macro, así que no hay de
+dónde replayearla.
 
 El HTML sale de email_report, el mismo módulo que usa el pipeline diario, así que
 es idéntico al del mail del día salvo la línea de performance. Con varios
@@ -49,14 +49,13 @@ import fechas
 import ia_generator
 import transformations
 from config import settings
-from scrapers import bcra
-from scrapers.utils import run_async
+from scrapers import agregados
 
 
 def armar_inflacion() -> pd.DataFrame:
     """Los últimos 12 meses de inflación, como en el mail diario."""
-    resultado = run_async(bcra.run())
-    inflacion = transformations.serie_inflacion(resultado["inflacion_mensual"], resultado["bcra_tea"])
+    mensual = agregados.descargar(claves=["inflacion_mensual"])["inflacion_mensual"]
+    inflacion = transformations.serie_inflacion(mensual)
     return transformations.ultimos_meses(inflacion)
 
 
@@ -117,8 +116,7 @@ def main() -> None:
     imagenes = leer_imagenes(dt.date.fromisoformat(ultima))
 
     # Los comentarios por gráfico de la fase 4, si la fila los tiene
-    secciones = df["ai_secciones"].iloc[0] if "ai_secciones" in df.columns else None
-    comentarios = ia_generator.comentarios_por_grafico(secciones if isinstance(secciones, dict) else None)
+    comentarios = ia_generator.comentarios_por_grafico(df.iloc[0].get("ai_secciones"))
 
     html = email_report.renderizar(
         df, inflacion_12, fwd_oficial, fwd_blue, parrafo,

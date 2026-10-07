@@ -20,6 +20,22 @@ SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 
 
+def enviar_smtp(mensaje, destinatarios: list[str]) -> None:
+    """Un sendmail por Gmail con TLS. Levanta ante cualquier fallo, incluidos los rechazos parciales.
+
+    Es el único lugar que habla SMTP: lo usan las alertas y el reporte.
+    """
+    context = ssl.create_default_context()
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=60) as smtp:
+        smtp.ehlo()
+        smtp.starttls(context=context)
+        smtp.ehlo()
+        smtp.login(settings.email_sender, settings.email_password.get_secret_value())
+        rechazados = smtp.sendmail(settings.email_sender, destinatarios, mensaje.as_string())
+    if rechazados:
+        raise smtplib.SMTPRecipientsRefused(rechazados)
+
+
 def enviar_alerta(asunto: str, cuerpo: str) -> bool:
     """Mail de texto plano a la lista de alertas. Devuelve si pudo enviarlo.
 
@@ -35,12 +51,7 @@ def enviar_alerta(asunto: str, cuerpo: str) -> bool:
     em.attach(MIMEText(cuerpo, "plain"))
 
     try:
-        context = ssl.create_default_context()
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=60) as smtp:
-            smtp.ehlo()
-            smtp.starttls(context=context)
-            smtp.login(settings.email_sender, settings.email_password.get_secret_value())
-            smtp.sendmail(settings.email_sender, destinatarios, em.as_string())
+        enviar_smtp(em, destinatarios)
         log.info("Alerta enviada: %s", asunto)
         return True
     except Exception as exc:

@@ -26,19 +26,11 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Engine
 
 from config import settings
+from models import COLUMNAS_FILA, COLUMNAS_VALORES
 
 log = logging.getLogger(__name__)
 
 TABLA = "Fact_Mercado_Macro"
-
-# Orden real de las columnas en Supabase. El mail arma la tabla de cotizaciones
-# con df.iloc[:, :14], así que este orden no es cosmético.
-COLUMNAS_VALORES = [
-    "TCC_Blue", "TCV_Blue", "TCC_Billete", "TCV_Billete", "TCC_Divisas", "TCV_Divisas",
-    "Solidario", "TCV_MEP", "riesgo_pais", "TCC_Euro", "TCV_Euro", "fed_tea", "bcra_tea",
-]
-COLUMNAS_FILA = ["Fecha", *COLUMNAS_VALORES]
-COLUMNAS_TABLA = [*COLUMNAS_FILA, "ai_paragraph", "ai_model"]
 
 # Identificador del advisory lock de Postgres que impide dos corridas a la vez.
 # Es un número cualquiera; solo tiene que ser el mismo en todos los disparadores.
@@ -118,11 +110,6 @@ def guardar_fila(engine: Engine, fila: pd.DataFrame, sobrescribir: bool = False)
         log.info("Supabase: la fila del %s ya existía, no se modificó", valores["Fecha"])
     return bool(escritas)
 
-
-def fecha_mas_reciente(engine: Engine) -> date | None:
-    """La última Fecha guardada. Sirve para confirmar qué fila va a tocar un UPDATE."""
-    with engine.connect() as conn:
-        return conn.execute(text(f'SELECT MAX("Fecha") FROM "{TABLA}"')).scalar()
 
 
 @contextmanager
@@ -209,7 +196,7 @@ def guardar_series(engine: Engine, serie, puntos: list[tuple[date, float]]) -> i
     filas = [
         {
             "serie": serie.clave, "Fecha": fecha, "valor": valor, "frecuencia": serie.frecuencia,
-            "unidad": serie.unidad, "fuente": "BCRA", "id_fuente": str(serie.id_bcra),
+            "unidad": serie.unidad, "fuente": serie.fuente, "id_fuente": str(serie.id_bcra),
         }
         for fecha, valor in puntos
     ]
@@ -219,13 +206,3 @@ def guardar_series(engine: Engine, serie, puntos: list[tuple[date, float]]) -> i
         escritas = len(conn.execute(sentencia_series(), filas).all())
     log.info("Supabase: %s, %d puntos nuevos o revisados de %d", serie.clave, escritas, len(puntos))
     return escritas
-
-
-def leer_series(engine: Engine, claves: list[str]) -> pd.DataFrame:
-    """Las series pedidas en formato largo, ordenadas por serie y fecha."""
-    with engine.connect() as conn:
-        return pd.read_sql_query(
-            text(f'SELECT * FROM "{TABLA_SERIES}" WHERE serie = ANY(:claves) ORDER BY serie, "Fecha"'),
-            conn,
-            params={"claves": list(claves)},
-        )
