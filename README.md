@@ -85,6 +85,7 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 ├── transformations.py  Today's row, validation, spreads, Fisher forwards, inflation
 ├── charts.py           The four report charts
 ├── email_report.py     HTML rendering, MIME assembly and sending
+├── presentacion.py     The daily executive PowerPoint deck
 ├── preview_git.py      Commit and push of Previews/
 ├── fechas.py           Argentina-time dates and Spanish month names
 ├── scrapers/           Ingestion layer: Playwright scrapers + async REST clients
@@ -97,7 +98,7 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 ├── dashboard/          Streamlit prototype, read-only, with its own requirements
 ├── .github/workflows/  CI, plus the daily run and daily control (off by default)
 ├── data/               Local CSV history (gitignored)
-├── Previews/           Generated chart assets, auto-committed by the pipeline
+├── Previews/           Daily charts and executive deck, auto-committed by the pipeline
 ├── Assets/             Architecture diagram
 ├── config.py           Typed environment configuration (Pydantic-Settings)
 ├── models.py           Row-level validation schema (Pydantic)
@@ -158,7 +159,7 @@ The following modules are mapped in the architecture blueprint and are undergoin
 * **Native Logging:** *Done for the pipeline.* Every module logs through `logging`, with an optional file handler (`--log-archivo`) so unattended runs leave an auditable trace. The legacy notebook still prints.
 * **Per-chart AI Commentary:** *Built, pending activation.* One structured Gemini call returns a summary plus a comment under each chart block, validated with Pydantic before it reaches the mail and stored as JSON with the model that wrote it. It switches on once `sql/07_ai_secciones.sql` adds the column; until then the single paragraph keeps working as before.
 * **API Data Persistence in Supabase:** *Built, pending activation.* The BCRA monetary aggregates and inflation series get their own long-format table, `Fact_Series_Macro`, with source dates, frequencies and units, kept up to date by the daily run once `sql/06_series_macro.sql` is applied. Nothing reads it yet; the aggregates join the email once their chart is reviewed.
-* **Automated Executive PowerPoint Reporting:** *Prototype.* `scripts/presentacion_ejecutiva.py` builds a six-slide executive `.pptx` with the charts, spreads, key indicators and AI commentary already stored. The evaluation recommends a weekly deck kept out of git: versioning a 460 KB file every day would bloat the repository history for good.
+* **Automated Executive PowerPoint Reporting:** *Done.* Every run builds a six-slide executive deck with the charts, spreads, key indicators and AI commentary, `Previews/Reporte Ejecutivo.pptx`, and commits it with the charts, so the repository always holds the latest one.
 * **Workflow Orchestration & Automation:** *Ready to switch on.* GitHub Actions workflows for the daily run and a daily control ship disabled; holidays and weekends are skipped, and a database lock prevents duplicate runs across schedulers. CI already runs lint and the offline tests on every push.
 * **Streamlit Dashboard:** *Prototype.* `dashboard/app.py` explores the full history read-only, with its own dependencies. Publishing it first needs a read-only database role (the SQL is in `docs/evaluacion-powerpoint-y-streamlit.md`).
 

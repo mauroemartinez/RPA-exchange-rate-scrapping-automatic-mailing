@@ -21,7 +21,7 @@ A real run has side effects: it writes to Supabase, emails the whole subscriber 
 
 **Notebook (reference during the transition):** `notebooks/Argentinian_Macroeconomic_Automatic_Mailing.ipynb` still works the old way, with the same side effects as a real run. It stays as a reference until the CLI and the API have replaced it in daily use; never run it end to end to verify a change. Its first cell walks up to the project root (it looks for `config.py`) and `chdir`s there. The kernel must use the venv Python, configured in `venv/share/jupyter/kernels/python3/kernel.json` with the full path to `venv/Scripts/python.exe`.
 
-**Via Docker (production):**
+**Via Docker (optional, only if the report ever runs on a server):**
 ```bash
 docker build -t macro-mailing .
 docker run --env-file .env -p 8000:8000 macro-mailing
@@ -31,7 +31,7 @@ curl -X POST http://localhost:8000/run -H "x-api-key: <API_KEY_EASY_PANEL>"
 curl -X POST "http://localhost:8000/run?dry_run=true" -H "x-api-key: <API_KEY_EASY_PANEL>"
 ```
 
-`/run` executes `pipeline.py` in a child process, so a hung run can be killed by the timeout and every run starts from a clean interpreter. The response carries the state and duration of each stage but no error details, which stay in the container log.
+`/run` executes `pipeline.py` in a child process, so a hung run can be killed by the timeout and every run starts from a clean interpreter. The response carries the state and duration of each stage but no error details, which stay in the container log. There is no server today: the daily run is meant for GitHub Actions or the Windows Task Scheduler (see "Scheduling and monitoring"), and `API_KEY_EASY_PANEL` is only the `/run` key, with a historical name.
 
 Scraping runs on Playwright (Chromium) in both environments, with no Edge/Chrome branching. The Dockerfile installs the browser via `playwright install --with-deps chromium` at build time; locally you need to run that once yourself (see below).
 
@@ -39,7 +39,7 @@ Scraping runs on Playwright (Chromium) in both environments, with no Edge/Chrome
 ```bash
 python -m venv venv
 .\venv\Scripts\activate                # PowerShell
-pip install -r requirements-dev.txt    # production dependencies plus notebook, pytest, ruff and python-pptx
+pip install -r requirements-dev.txt    # production dependencies plus notebook, pytest and ruff
 playwright install chromium            # required once, for the scrapers
 ```
 
@@ -53,7 +53,7 @@ ruff check .
 
 The test suite loads fake credentials over any real `.env`, and fails any test that tries to open a real SMTP connection, make a real HTTP request, download from Yahoo or launch a browser, so it is always safe to run. It covers the transformations, charts, email assembly, the pipeline orchestration through fake dependencies, the idempotent insert, `preview_git` against temporary git repos, the Gemini failover, the API and the manual resend. `tests/test_html_golden.py` pins the mail's HTML byte for byte against `tests/datos/`: when a change to the HTML is intended, regenerate those files with `ACTUALIZAR_GOLDEN=1 pytest tests/test_html_golden.py` and commit the diff together with the change.
 
-**Scheduling and monitoring:** `.github/workflows/` holds the CI (lint, imports, tests; runs on push and PR) and two workflows that are **off by default**: `corrida-diaria.yml` (the daily run, manual dispatch only, dry-run unless asked otherwise) and `control-diario.yml` (fails when a business day has no row). Their `schedule` blocks are commented out on purpose; enabling one is a decision documented in `docs/programacion-y-monitoreo.md`, which also compares GitHub Actions, EasyPanel and the Windows Task Scheduler. `python scripts/control_diario.py --sin-alerta` checks today's row without sending the alert email.
+**Scheduling and monitoring:** `.github/workflows/` holds the CI (lint, imports, tests; runs on push and PR) and two workflows that are **off by default**: `corrida-diaria.yml` (the daily run, manual dispatch only, dry-run unless asked otherwise) and `control-diario.yml` (fails when a business day has no row). Their `schedule` blocks are commented out on purpose; enabling one is a decision documented in `docs/programacion-y-monitoreo.md`, which also compares the two options that apply, GitHub Actions and the Windows Task Scheduler. Commits made by the workflow carry the repo owner's name and GitHub noreply address, never a bot's. `python scripts/control_diario.py --sin-alerta` checks today's row without sending the alert email.
 
 **Resend today's report to one person:**
 ```bash
@@ -74,8 +74,9 @@ See "Manual resend" below.
 6. **ia:** once the `ai_secciones` column exists, one structured Gemini call returns a summary (the AI box at the top) plus a comment per chart block (parallel rates, official rates, country risk, BTC); `models.SeccionesIA` validates it and `ia_generator.guardar_secciones` saves the summary to `ai_paragraph` and the comments to `ai_secciones`. Without the column, or if anything in the structured path fails (the call, the validation or the save), it falls back to `ia_generator.procesar_y_guardar_parrafo(engine, fecha_esperada=hoy)`, the original single paragraph, which refuses to write when the newest row is not today's; the fallback also clears `ai_secciones`, so a `--forzar` rerun cannot keep comments written for the previous values. Every Gemini call has a 120 s timeout. BTC is downloaded just before this stage because its comment needs it
 7. **graficos:** `charts.py` draws the four JPGs. BTC/USD comes from Yahoo Finance through `scrapers/btc.py`; if Yahoo fails, the mail goes out without that chart instead of the whole run dying
 8. **mail:** `email_report.py` renders `templates/report_email.html` with Jinja2 and sends the two variants in parallel: one to `EMAIL_RECEIVER`, and one to `EMAIL_RECEIVER_CSV` with the full history attached as CSV, generated at send time from the same data as the report. A failed send marks the run as failed
-9. **previews:** `preview_git.py` commits and pushes `Previews/`, only from the `main` branch, and checks the exit code of every git command
-10. **series:** `scrapers/agregados.py` refetches the last 120 days of the monetary aggregates and the inflation series and upserts them into `Fact_Series_Macro`. They are not in the email yet (roadmap phase 3, see `docs/fase-3-agregados-y-deuda.md`). Each series is validated and saved on its own, so a discontinued one does not stop the rest. Without the table the stage is skipped with a notice, and a failure here is only a warning
+9. **presentacion:** `presentacion.py` builds the six-slide executive deck, `Reporte Ejecutivo.pptx` (same name every day), from today's data, the AI texts of this run and the charts generated in this run; a missing chart gets a placeholder slide. A failure here is only a warning: the mail has already gone out
+10. **previews:** `preview_git.py` commits and pushes the four charts and the deck in `Previews/`, only from the `main` branch, and checks the exit code of every git command
+11. **series:** `scrapers/agregados.py` refetches the last 120 days of the monetary aggregates and the inflation series and upserts them into `Fact_Series_Macro`. They are not in the email yet (roadmap phase 3, see `docs/fase-3-agregados-y-deuda.md`). Each series is validated and saved on its own, so a discontinued one does not stop the rest. Without the table the stage is skipped with a notice, and a failure here is only a warning
 
 Any stage in `error` sets exit code 1 and triggers one summary alert email, unless the failure already sent its own (scraper down, validation). The calculations (spreads, daily changes, Irving Fisher forwards, inflation accumulations) live in `transformations.py` as pure functions with no I/O.
 
@@ -90,7 +91,8 @@ The pipeline is a faithful port of the notebook: fed the same inputs, the four J
 | `transformations.py` | Today's row, validation, spreads and daily changes, Fisher forwards, inflation series |
 | `charts.py` | Data preparation and drawing of the four charts |
 | `email_report.py` | Tables, HTML rendering, MIME assembly and sending through `mailer.enviar_smtp`; shared with the manual resend |
-| `preview_git.py` | Commit and push of `Previews/` |
+| `presentacion.py` | The daily executive `.pptx`: cover, indicators, AI summary and three chart slides with their comments |
+| `preview_git.py` | Commit and push of `Previews/` (the four charts and the executive deck) |
 | `fechas.py` | Today's date in Argentina time and Spanish month names, independent of the machine's timezone and locale |
 | `config.py` | Typed, validated settings loaded once from `.env`; import `settings` from here instead of reading `os.environ` |
 | `models.py` | The row's columns in table order (`COLUMNAS_*`), its Pydantic schema (the validation contract before persistence) and `SeccionesIA`, which validates Gemini's structured answer. It does not import `config`, so the calculation modules load without a `.env` |
@@ -107,7 +109,7 @@ The pipeline is a faithful port of the notebook: fed the same inputs, the four J
 | `scripts/control_diario.py` | Dead man's switch: on a business day without today's row, exits 1 and emails an alert (`--sin-alerta` only reports). Read-only |
 | `scrapers/feriados.py` | National holidays from ArgentinaDatos, used to skip non-business days |
 | `.github/workflows/` | CI, plus the daily run and the daily control, both off until their `schedule` is uncommented |
-| `scripts/presentacion_ejecutiva.py` | Prototype (roadmap phase 5): a 6-slide executive `.pptx` built from the stored row, its AI texts and the charts in `Previews/`. Read-only, not wired into the pipeline |
+| `scripts/presentacion_ejecutiva.py` | Builds the same deck by hand from the stored row and `Previews/` (a thin CLI over `presentacion.py`). Read-only |
 | `dashboard/app.py` | Prototype (roadmap phase 5): Streamlit dashboard over the full history, with its own `dashboard/requirements.txt`. Read-only, does not import `config.py` |
 | `notebooks/laboratorio_sql.ipynb` | Read-only SQL lab: every query run through its `consulta()` goes inside a `READ ONLY` transaction |
 | `scrapers/agregados.py` | Catalog of the BCRA monetary and inflation series (id, frequency, unit) and their paginated download |
@@ -129,7 +131,7 @@ RUTA_REPO                # Path to repo root (for the git push step)
 FED_API_KEY              # St. Louis FRED API key
 GEMINI_API_KEY_1         # Primary Gemini key
 GEMINI_API_KEY_2         # Failover Gemini key (rotated on HTTP 429)
-API_KEY_EASY_PANEL       # Auth token for the /run FastAPI endpoint (optional; without it, or blank, /run answers 503)
+API_KEY_EASY_PANEL       # Key for POST /run in app.py, only if the API runs on a server (blank: /run answers 503)
 SERVICE_ROUTE            # Deployment URL (optional, currently unread)
 ```
 
@@ -139,7 +141,7 @@ The dashboard does not read `config.py`. It takes `DASHBOARD_DB_URL`, a read-onl
 
 ## Supabase table: `Fact_Mercado_Macro`
 
-Primary key: `Fecha` (date). Columns: `TCC_Blue`, `TCV_Blue`, `TCC_Billete`, `TCV_Billete`, `TCC_Divisas`, `TCV_Divisas`, `Solidario`, `TCV_MEP`, `riesgo_pais`, `TCC_Euro`, `TCV_Euro`, `fed_tea`, `bcra_tea`, `ai_paragraph`, `ai_model`, and once `sql/07_ai_secciones.sql` is applied, `ai_secciones` (jsonb with the per-chart comments and the model). New columns go at the end of the table: the email takes the first 14 by position.
+Primary key: `Fecha` (date). Columns: `TCC_Blue`, `TCV_Blue`, `TCC_Billete`, `TCV_Billete`, `TCC_Divisas`, `TCV_Divisas`, `Solidario`, `TCV_MEP`, `riesgo_pais`, `TCC_Euro`, `TCV_Euro`, `fed_tea`, `bcra_tea`, `ai_paragraph`, `ai_model`, and once `sql/07_ai_secciones.sql` is applied, `ai_secciones` (jsonb with the per-chart comments and the model). New columns go at the end of the table: the email takes the first 14 by position. Applying `sql/07` while the notebook is still in daily use is safe: the notebook reads `SELECT *` but builds the email table from those first 14 columns, and its insert sends a fixed column list that does not include `ai_secciones`.
 
 ## Supabase table: `Fact_Series_Macro`
 
@@ -178,5 +180,5 @@ Three guardrails worth knowing: it aborts if the newest row has no `ai_paragraph
 - **No automatic retries in the scheduler.** A run that fails after inserting the row is not safe to repeat blindly: one of the two mail variants may already be out. Let it fail, read the alert, and redo the day with `--forzar` or resend with `scripts/reenvio_manual.py`. A plain rerun is safe the other way around: it skips a finished day and stops with an error on an unfinished one.
 - **The run lock needs a session-mode connection.** `pg_try_advisory_lock` holds until the session ends or is reset. On a direct connection a killed run does not leave it behind, and behind a session-mode pooler neither, as long as the pooler resets the connection it gets back (`DISCARD ALL` releases advisory locks). Behind Supabase's pooler in transaction mode (port 6543) the lock and its release can land on different server connections and the lock would stay held; keep `SUPABASE_DB_URL` on the session pooler (port 5432) or a direct connection. If it ever stayed held, every run would end as `omitida` without writing the row, which is exactly what `scripts/control_diario.py` catches.
 - **Column order matters in the email.** The cotizaciones table is built with `df.iloc[:, :14]`, so it depends on the column order coming back from Supabase. Adding a column to the table in the wrong position silently reshuffles the mail.
-- **Analysis tools only read.** The SQL lab, the presentation prototype and the dashboard never write to Supabase and never reimplement the report: they consume the warehouse and the existing modules. The dashboard must not get the pipeline's credentials; if it is ever published, give it a read-only role (`docs/evaluacion-powerpoint-y-streamlit.md` has the SQL, including the RLS policy that role needs).
+- **Analysis tools only read.** The SQL lab and the dashboard never write to Supabase and never reimplement the report: they consume the warehouse and the existing modules. The executive deck is built inside the pipeline from the same in-memory data as the mail. The dashboard must not get the pipeline's credentials; if it is ever published, give it a read-only role (`docs/evaluacion-powerpoint-y-streamlit.md` has the SQL, including the RLS policy that role needs).
 - **Writing style for this repo: no em dashes,** in documentation, comments, or commit messages.

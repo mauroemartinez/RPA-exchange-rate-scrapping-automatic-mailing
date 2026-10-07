@@ -20,33 +20,32 @@ Sobre "formato": el CI verifica el estilo con las reglas de `ruff check`, no con
 
 ## Elegir el programador
 
-| | GitHub Actions | EasyPanel (contenedor + `/run`) | Programador de tareas de Windows |
-|---|---|---|---|
-| Costo | Gratis (repo público) | El servidor de EasyPanel | Nada |
-| Dónde corre | Servidores de GitHub, en EE.UU. | Tu servidor | Tu PC, que tiene que estar prendida |
-| Logs | **Públicos** (repo público) | Privados | Privados |
-| `Previews/` en GitHub | Sí, el workflow commitea y pushea | No: el contenedor no tiene git | Sí, como hoy |
-| Aviso si falla | Mail de GitHub, además de la alerta propia | Solo la alerta propia (mismo Gmail) | Solo la alerta propia |
-| Puntualidad | El cron de GitHub puede atrasarse varios minutos | Exacta | Exacta |
-| Lo que falta | Cargar secretos y probar | Desplegar la imagen, poner `API_KEY_EASY_PANEL` y un cron (n8n u otro) que llame a `/run` | Crear la tarea |
+Hay dos opciones reales. No hace falta ningún servidor (ni EasyPanel ni otro): el `Dockerfile` y la API `/run` de `app.py` quedan para el día que haya uno (ver al final).
 
-Mi recomendación es **GitHub Actions**, con una condición: que las webs argentinas respondan desde los servidores de GitHub. Es lo único que no se puede saber sin probar, y se prueba en dos minutos con el paso 2 de abajo. Si BNA, DolarHoy o Ámbito bloquean esas IPs, la alternativa más simple es el Programador de tareas de Windows.
+| | GitHub Actions | Programador de tareas de Windows |
+|---|---|---|
+| Costo | Gratis (repo público) | Nada |
+| Dónde corre | Servidores de GitHub, en EE.UU.: tu PC puede estar apagada | Tu PC, que tiene que estar prendida (no suspendida) a las 17 |
+| Logs | **Públicos** (repo público), con los secretos tapados | Privados, en `logs/` |
+| `Previews/` (gráficos y PowerPoint) en GitHub | Sí: el workflow commitea y pushea a tu nombre | Sí, como hoy |
+| Aviso si falla | Mail de GitHub, además de la alerta propia | Solo la alerta propia |
+| Puntualidad | El cron de GitHub puede atrasarse varios minutos | Exacta |
+| Lo que falta | Mergear la rama, cargar los secretos y probar | Mergear la rama y crear la tarea |
+
+Mi recomendación es **GitHub Actions**, con una condición: que las webs argentinas respondan desde los servidores de GitHub. Es lo único que no se puede saber sin probar, y se prueba en dos minutos con el paso 3 de abajo. Si BNA, DolarHoy o Ámbito bloquean esas IPs, la alternativa más simple es el Programador de tareas de Windows.
 
 ### GitHub Actions, paso a paso
 
-1. En el repo: Settings > Secrets and variables > Actions > New repository secret. Cargar `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECEIVER`, `EMAIL_RECEIVER_CSV`, `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`, `FED_API_KEY` y `SUPABASE_DB_URL`, con los mismos valores del `.env`. Opcional: `EMAIL_ALERTAS`.
-2. Actions > Corrida diaria > Run workflow, con modo `dry-run`. Scrapea y arma todo sin escribir ni mandar nada. Si la etapa `scraping` termina en `ok`, las webs responden desde GitHub.
-3. Un día que no hayas corrido el notebook: Run workflow con modo `real`. Es la corrida completa: escribe en Supabase, manda el mail y pushea `Previews/`.
-4. En `.github/workflows/corrida-diaria.yml`, descomentar el bloque `schedule` (17:00 de Argentina, de lunes a viernes) y hacer lo mismo en `control-diario.yml` (19:30). Commitear en `main`.
-5. Dejar de correr el notebook.
+1. Mergear `roadmap/implementacion` a `main` y pushear: GitHub solo muestra y programa los workflows que están en `main`.
+2. En el repo: Settings > Secrets and variables > Actions > New repository secret. Cargar `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECEIVER`, `EMAIL_RECEIVER_CSV`, `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`, `FED_API_KEY` y `SUPABASE_DB_URL`, con los mismos valores del `.env`. Opcional: `EMAIL_ALERTAS`.
+3. Actions > Corrida diaria > Run workflow, con modo `dry-run`. Scrapea y arma todo sin escribir ni mandar nada. Si la etapa `scraping` termina en `ok`, las webs responden desde GitHub.
+4. Un día que no hayas corrido el notebook: Run workflow con modo `real`. Es la corrida completa: escribe en Supabase, manda el mail y pushea `Previews/` (los cuatro gráficos y el PowerPoint). Los commits salen a tu nombre: el workflow toma tu usuario de GitHub, no el de un bot.
+5. En `.github/workflows/corrida-diaria.yml`, descomentar el bloque `schedule` (17:00 de Argentina, de lunes a viernes) y hacer lo mismo en `control-diario.yml` (19:30). "Descomentar" es borrar el `#` del principio de esas líneas. Commitear en `main`.
+6. Dejar de correr el notebook.
 
 ### Logs públicos
 
 En un repo público, cualquiera puede leer el log de un workflow. GitHub tapa los secretos completos, pero `EMAIL_RECEIVER` se carga entero como un solo secreto y una dirección suelta (por ejemplo, la de un destinatario rechazado en un error de SMTP) no coincidiría. Por eso `pipeline.py` reemplaza en cada línea de log, traceback incluido, cada secreto del `.env` por `***` y cada dirección de destinatario por `[destinatario]`; el JSON de `--json` pasa por el mismo filtro. Los workflows tampoco suben artefactos: la vista previa del mail y el detalle de los errores no quedan publicados.
-
-### EasyPanel, en resumen
-
-Construir la imagen desde el repo con el `Dockerfile`, cargar las variables del `.env` (más `API_KEY_EASY_PANEL`) y programar un POST a `https://<servicio>/run` con el header `x-api-key`, por ejemplo con el Schedule Trigger de n8n. Para probar sin efectos: `POST /run?dry_run=true`. El control diario se puede correr en el mismo contenedor con `python scripts/control_diario.py` desde otro cron.
 
 ### Programador de tareas de Windows, en resumen
 
@@ -58,8 +57,12 @@ venv\Scripts\python.exe pipeline.py --log-archivo logs\pipeline.log
 
 Y otra a las 19:30 con `venv\Scripts\python.exe scripts\control_diario.py`.
 
+### Docker y `/run`, solo si algún día hay un servidor
+
+El repo trae un `Dockerfile` y una API (`app.py`, `POST /run`) para correr el reporte en un servidor propio y dispararlo desde afuera. Sin servidor no se usan, y no hace falta tocarlos. `API_KEY_EASY_PANEL` es solo la clave de esa API (el nombre es histórico): sin ella, `/run` no se habilita.
+
 ## Dos reglas para cualquier programador
 
-**Sin reintentos automáticos.** No actives los reintentos del programador (el "Retry On Fail" de un nodo de n8n, o el "Si la tarea no se ejecuta correctamente, reiniciar cada" del Programador de tareas; GitHub Actions no reintenta solo). Una corrida que falló después de insertar la fila no se puede repetir a ciegas: una de las dos variantes del mail puede haber salido. Con la alerta en la mano, el día se rehace con `--forzar` o se reenvía con `scripts/reenvio_manual.py`. Repetir sin `--forzar` es seguro en el otro sentido: omite un día terminado y frena con error en uno a medio hacer.
+**Sin reintentos automáticos.** No actives los reintentos del programador (en el Programador de tareas, no tildes "Si la tarea no se ejecuta correctamente, reiniciar cada"; GitHub Actions no reintenta solo). Una corrida que falló después de insertar la fila no se puede repetir a ciegas: una de las dos variantes del mail puede haber salido. Con la alerta en la mano, el día se rehace con `--forzar` o se reenvía con `scripts/reenvio_manual.py`. Repetir sin `--forzar` es seguro en el otro sentido: omite un día terminado y frena con error en uno a medio hacer.
 
 **`SUPABASE_DB_URL` en modo sesión.** El candado dura lo que la sesión de Postgres. Con una conexión directa, una corrida que muere no lo deja puesto, porque la sesión muere con ella; detrás de un pooler en modo sesión tampoco, siempre que el pooler limpie la conexión al recibirla de vuelta (`DISCARD ALL` suelta los advisory locks). Detrás del pooler de Supabase en modo transacción (puerto 6543), tomarlo y soltarlo pueden caer en conexiones distintas del servidor, y el candado quedaría tomado. Por eso la URL tiene que ir al pooler en modo sesión (puerto 5432, como hoy) o a la conexión directa. Si aun así quedara tomado, cada corrida terminaría como `omitida` sin escribir la fila, y eso es justamente lo que detecta `scripts/control_diario.py`.
