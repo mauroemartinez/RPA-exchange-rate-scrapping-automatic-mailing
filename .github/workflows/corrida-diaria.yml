@@ -65,9 +65,11 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Identidad de git para el commit de Previews/
+        # Los commits salen a nombre del dueño del repo, con su dirección noreply de
+        # GitHub (la que GitHub asocia a la cuenta), no a nombre de un bot.
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "${{ github.repository_owner }}"
+          git config user.email "${{ github.repository_owner_id }}+${{ github.repository_owner }}@users.noreply.github.com"
 
       - name: Corrida
         run: |
