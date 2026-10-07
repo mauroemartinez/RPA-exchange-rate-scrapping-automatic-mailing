@@ -1,0 +1,33 @@
+# Configuración de herramientas. El proyecto no se instala como paquete: este
+# archivo existe solo para pytest y ruff.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "scripts"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+# scripts/ también es código propio (los tests lo importan)
+src = [".", "scripts"]
+extend-exclude = ["notebooks", "venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    "E501",   # hay SQL, f-strings y URLs largas a propósito
+    "B905",   # zip() sin strict=: los zip del proyecto recorren columnas del mismo DataFrame
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Los scripts agregan la raíz al sys.path antes de importar el proyecto, y algunos
+# tests importan después de un pytest.importorskip
+"scripts/*" = ["E402"]
+"tests/*" = ["E402"]
+# El generador del diagrama arma CSS, lleno de llaves: el formato con % es a propósito
+"Assets/arquitectura/*" = ["UP031"]
+
+[tool.ruff.lint.isort]
+# conftest se importa desde los tests por sus constantes (HOY, jpeg_minimo)
+known-first-party = ["conftest"]

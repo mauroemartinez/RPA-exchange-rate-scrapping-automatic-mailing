@@ -9,6 +9,8 @@ venv/
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.ruff_cache/
 
 # IDEs
 .vscode/
@@ -22,6 +24,9 @@ Thumbs.db
 # Logs
 *.log
 
+# Secretos de Streamlit (dashboard/): llevarían la URL de la base al repo público
+.streamlit/
+
 # Claude / Anthropic local files
 .claude/
 claude/
@@ -31,3 +36,13 @@ CLAUDE.md
 
 # Apuntes personales de estudio del código
 APUNTES.md
+
+# El PowerPoint diario no va en main: se publica solo en la rama reporte-ejecutivo
+Previews/*.pptx
+
+# Archivos de bloqueo de Office (~$Reporte...): se crean al abrir un documento y
+# llevan el nombre de usuario de Office
+~$*
+
+# HTML intermedio del diagrama: se regenera con Assets/arquitectura/construir.py
+Assets/arquitectura/*.html

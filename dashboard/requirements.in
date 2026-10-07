@@ -1,0 +1,14 @@
+# Dependencias del prototipo de dashboard (fase 5). Van aparte: el dashboard no
+# las necesita todas las del pipeline y el pipeline no necesita Streamlit.
+#
+# Para regenerar dashboard/requirements.txt, desde la raíz del repo:
+#     uv pip compile dashboard/requirements.in --universal --python-version 3.14 -o dashboard/requirements.txt
+
+-c ../requirements.txt       # mismas versiones que producción para lo compartido
+-c ../requirements-dev.txt   # y que desarrollo, para que el CI pueda instalar los dos juntos
+
+streamlit
+pandas
+SQLAlchemy
+psycopg2-binary
+python-dotenv
