@@ -34,7 +34,7 @@ Por qué estas y no otras:
 | `scrapers/agregados.py` | Catálogo de las series (clave, id, frecuencia, unidad) y descarga en paralelo, con paginación para traer la historia completa |
 | `transformations.py` | `validar_serie` (vacía, fechas desordenadas, valores no finitos o no positivos, dato atrasado), `variacion_interanual`, `interanual_por_fecha` |
 | `data_access.py` | Tabla `Fact_Series_Macro` y su upsert, que solo reescribe valores que cambiaron (el BCRA revisa datos ya publicados) |
-| `sql/06_series_macro.sql` | La migración: formato largo `(serie, Fecha)`, con unidad, frecuencia y fuente; RLS activado como en `Fact_Mercado_Macro` |
+| `scripts/sql/06_series_macro.sql` | La migración: formato largo `(serie, Fecha)`, con unidad, frecuencia y fuente; RLS activado como en `Fact_Mercado_Macro` |
 | `charts.py` | `grafico_agregados`: niveles del último año en billones de ARS y variación interanual contra la inflación |
 | `pipeline.py` | Etapa `series`: cada día vuelve a pedir los últimos 120 días y los guarda. Cada serie se valida y se guarda por separado, así que una discontinuada no frena a las demás. Sin la tabla se omite con un aviso; si falla, queda como advertencia y no pone la corrida en rojo |
 | `scripts/agregados_monetarios.py` | Resumen por serie y gráfico de prueba; con `--guardar`, carga toda la historia |
@@ -47,7 +47,7 @@ En el último año todos los agregados crecieron por debajo de la inflación int
 
 ### Para activarlo (pasos tuyos)
 
-1. Aplicar `sql/06_series_macro.sql` en el SQL Editor de Supabase. Es lo único que toca la base de producción, y por eso no lo hice yo.
+1. Aplicar `scripts/sql/06_series_macro.sql` en el SQL Editor de Supabase. Es lo único que toca la base de producción, y por eso no lo hice yo.
 2. Cargar la historia: `python scripts/agregados_monetarios.py --guardar` (unos 7.500 puntos por serie diaria, desde 1996).
 3. Desde ahí, la corrida diaria mantiene la tabla al día sola.
 4. Revisar el gráfico (`python scripts/agregados_monetarios.py` lo deja en una carpeta temporal) y decidir si entra en el mail: dónde va, si lleva texto propio y si conviene sumarlo a la respuesta estructurada de Gemini (fase 4).
