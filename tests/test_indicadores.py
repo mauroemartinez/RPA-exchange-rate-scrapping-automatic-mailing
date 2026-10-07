@@ -38,13 +38,16 @@ def test_frase_de_agregados_con_sus_fechas(series_indicadores):
 ])
 def test_el_veredicto_real_depende_de_la_inflacion(series_indicadores, inflacion, veredicto):
     series, _ = series_indicadores
-    series = {**series, "inflacion_interanual": [(date(2026, 8, 31), inflacion)]}
+    # Sin la mensual, la frase usa la interanual que publica el BCRA (variable 28)
+    series = {k: v for k, v in series.items() if k != "inflacion_mensual"}
+    series["inflacion_interanual"] = [(date(2026, 8, 31), inflacion)]
     assert indicadores.frase_agregados(series).endswith(f"descontada la inflación, {veredicto}.")
 
 
 def test_sin_inflacion_o_sin_historia_no_hay_frase(series_indicadores):
     series, _ = series_indicadores
-    assert indicadores.frase_agregados({k: v for k, v in series.items() if k != "inflacion_interanual"}) is None
+    sin_inflacion = {k: v for k, v in series.items() if k not in ("inflacion_interanual", "inflacion_mensual")}
+    assert indicadores.frase_agregados(sin_inflacion) is None
     corta = {**series, "base_monetaria": series["base_monetaria"][-3:], "m2": series["m2"][-3:]}
     assert indicadores.frase_agregados(corta) is None
 
@@ -78,3 +81,28 @@ def test_explicaciones_por_cid(series_indicadores):
     # Sin series queda el texto fijo, sin la frase
     sin_datos = indicadores.explicaciones(None)
     assert all(e["dato"] is None and e["texto"] for e in sin_datos.values())
+
+
+def test_la_frase_usa_la_misma_interanual_que_la_tabla_del_mail(series_indicadores):
+    """Con la mensual, la interanual se compone como en la tabla de inflación, no se toma la del BCRA."""
+    import transformations
+
+    series, _ = series_indicadores
+    series = {**series, "inflacion_interanual": [(date(2026, 8, 31), 40.0)]}  # la publicada, distinta a propósito
+    tabla = transformations.serie_inflacion(series["inflacion_mensual"])["Inflación Anual"].iloc[-1]
+    frase = indicadores.frase_agregados(series)
+    assert f"inflación interanual de {indicadores.numero(tabla)}%" in frase and "40,0" not in frase
+
+
+def test_cerca_de_la_inflacion_no_afirma_que_cayo_ni_que_crecio(series_indicadores):
+    import transformations
+
+    series, _ = series_indicadores
+    series = {k: v for k, v in series.items() if k != "inflacion_mensual"}
+    base = transformations.variacion_interanual(series["base_monetaria"])
+    m2 = transformations.variacion_interanual(series["m2"])
+    # La inflación justo en el medio: ni la base (arriba) ni el M2 (abajo) la cruzan por más del margen
+    series["inflacion_interanual"] = [(date(2026, 8, 31), base - 0.2)]
+    frase = indicadores.frase_agregados(series)
+    assert "la base monetaria se mantuvo" in frase or "las dos se mantuvieron" in frase
+    assert m2 < base

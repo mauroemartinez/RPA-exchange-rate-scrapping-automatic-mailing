@@ -47,7 +47,8 @@ MESES = (
     "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 )
 # Diferencias menores que esto (en puntos porcentuales) cuentan como "igual que la inflación"
-TOLERANCIA_REAL = 0.05
+# Puntos porcentuales dentro de los cuales una variación se considera igual a la inflación
+TOLERANCIA_REAL = 0.5
 
 
 def desde(hoy: date) -> date:
@@ -64,12 +65,19 @@ def mes_y_anio(fecha: date) -> str:
     return f"{MESES[fecha.month - 1]} de {fecha.year}"
 
 
+def _interanual_al(puntos: list[tuple[date, float]], fecha: date) -> float | None:
+    """La variación interanual de la serie en su última fecha que no pase de `fecha`."""
+    tabla = transformations.interanual_por_fecha(puntos).dropna(subset=["interanual"])
+    previas = tabla[tabla["Fecha"] <= pd.Timestamp(fecha)]
+    return float(previas["interanual"].iloc[-1]) if not previas.empty else None
+
+
 def frase_agregados(series: dict) -> str | None:
     """La variación interanual de la base monetaria y del M2 contra la inflación, con sus fechas.
 
     None si falta la inflación o no alcanza la historia para ninguna de las dos variaciones.
     """
-    inflacion = series.get("inflacion_interanual")
+    inflacion = transformations.inflacion_interanual(series)
     if not inflacion:
         return None
     variaciones = []
@@ -77,21 +85,31 @@ def frase_agregados(series: dict) -> str | None:
         puntos = series.get(clave)
         variacion = transformations.variacion_interanual(puntos) if puntos else None
         if variacion is not None:
-            variaciones.append((nombre, variacion, puntos[-1][0]))
+            variaciones.append((nombre, variacion, puntos[-1][0], puntos))
     if not variaciones:
         return None
 
     fecha_inflacion, valor_inflacion = inflacion[-1]
     crecieron = " y ".join(
         f"{nombre} {'creció' if variacion >= 0 else 'cayó'} {numero(abs(variacion))}% (al {fecha:%d/%m/%Y})"
-        for nombre, variacion, fecha in variaciones
+        for nombre, variacion, fecha, _ in variaciones
     )
 
-    def real(variacion: float) -> str:
-        diferencia = variacion - valor_inflacion
-        return "se mantuvo" if abs(diferencia) < TOLERANCIA_REAL else "creció" if diferencia > 0 else "cayó"
+    def real(variacion: float, puntos) -> str:
+        # La variación de hoy contra la última inflación, y la del mismo mes que esa
+        # inflación: solo se afirma que creció o cayó si las dos cuentas coinciden.
+        # Cerca del cruce, comparar meses distintos podría decir algo falso.
+        diferencias = [variacion - valor_inflacion]
+        alineada = _interanual_al(puntos, fecha_inflacion)
+        if alineada is not None:
+            diferencias.append(alineada - valor_inflacion)
+        if all(d > TOLERANCIA_REAL for d in diferencias):
+            return "creció"
+        if all(d < -TOLERANCIA_REAL for d in diferencias):
+            return "cayó"
+        return "se mantuvo"
 
-    reales = [(nombre, real(variacion)) for nombre, variacion, _ in variaciones]
+    reales = [(nombre, real(variacion, puntos)) for nombre, variacion, _, puntos in variaciones]
     if len(reales) == 2 and reales[0][1] == reales[1][1]:
         plural = {"creció": "crecieron", "cayó": "cayeron", "se mantuvo": "se mantuvieron"}[reales[0][1]]
         veredicto = f"las dos {plural}"

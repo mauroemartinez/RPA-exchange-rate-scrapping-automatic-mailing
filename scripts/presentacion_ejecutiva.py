@@ -15,7 +15,6 @@ Uso:
 """
 
 import argparse
-import datetime as dt
 import sys
 import tempfile
 from pathlib import Path
@@ -28,6 +27,7 @@ import pandas as pd
 import charts
 import data_access
 import presentacion
+import preview_git
 
 
 def main(argv: list[str] | None = None) -> Path:
@@ -50,8 +50,9 @@ def main(argv: list[str] | None = None) -> Path:
         ruta = args.graficos / nombre
         if not ruta.exists():
             continue
-        if dt.date.fromtimestamp(ruta.stat().st_mtime) < fecha:
-            print(f"  {nombre} es anterior al reporte del {fecha:%d/%m/%Y}: va sin ese gráfico")
+        if preview_git.fecha_del_archivo(RAIZ, ruta) < fecha:
+            print(f"  {nombre} es anterior al reporte del {fecha:%d/%m/%Y}: va sin ese gráfico "
+                  "(si la corrida es en GitHub Actions, hacé git pull antes)")
             continue
         imagenes[nombre] = ruta
     ruta = presentacion.armar(df, imagenes, args.salida or Path(tempfile.mkdtemp(prefix="presentacion_")))

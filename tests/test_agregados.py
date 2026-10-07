@@ -229,3 +229,36 @@ def test_un_429_se_reintenta():
     error = lambda codigo: httpx.HTTPStatusError("x", request=pedido, response=httpx.Response(codigo, request=pedido))  # noqa: E731
     assert _es_error_http_transitorio(error(429)) and _es_error_http_transitorio(error(503))
     assert not _es_error_http_transitorio(error(404))
+
+
+def test_a_dolares_no_usa_un_tipo_de_cambio_de_hace_mas_de_una_semana():
+    pesos = [(date(2026, 9, 1), 1000.0), (date(2026, 9, 20), 2000.0)]
+    cambio = [(date(2026, 8, 30), 1000.0)]  # y después nada
+    convertida = t.a_dolares(pesos, cambio)
+    assert list(convertida["Fecha"].dt.date) == [date(2026, 9, 1)]
+
+
+def test_la_suma_de_letras_no_arrastra_una_serie_que_dejo_de_publicar():
+    dias = [date(2026, 9, 1) + timedelta(days=i) for i in range(20)]
+    sigue = [(d, 1.0) for d in dias]
+    corta = [(d, 10.0) for d in dias[:3]]  # deja de publicar el 03/09
+    suma = charts._sumar_por_fecha(sigue, corta)
+    # Se arrastra 5 días como mucho: después, la suma deja de mostrarse en vez de inventar
+    assert suma[-1][0] == dias[2] + timedelta(days=5)
+
+
+def test_inflacion_interanual_compone_la_mensual_y_si_no_hay_usa_la_publicada():
+    mensual = [(date(2025, 1, 31) + pd.DateOffset(months=i), 2.0) for i in range(14)]
+    mensual = [(d.date() if hasattr(d, "date") else d, v) for d, v in mensual]
+    compuesta = t.inflacion_interanual({"inflacion_mensual": mensual})
+    assert compuesta[-1][1] == pytest.approx((1.02 ** 12 - 1) * 100)
+    publicada = [(date(2026, 8, 31), 33.5)]
+    assert t.inflacion_interanual({"inflacion_interanual": publicada}) == publicada
+
+
+def test_el_m3_tiene_su_propio_margen_de_atraso():
+    m3 = agregados.POR_CLAVE["m3"]
+    hace_90 = [(HOY - timedelta(days=90 + 31 * i), 1.0) for i in range(3)][::-1]
+    assert t.validar_serie(m3, hace_90, HOY) == []  # 90 días: normal para el M3
+    hace_110 = [(HOY - timedelta(days=110 + 31 * i), 1.0) for i in range(3)][::-1]
+    assert t.validar_serie(m3, hace_110, HOY)  # 110: avisa

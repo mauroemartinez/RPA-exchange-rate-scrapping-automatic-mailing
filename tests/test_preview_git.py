@@ -168,3 +168,20 @@ def test_si_main_avanzo_durante_la_corrida_se_trae_y_se_reintenta(repo, tmp_path
     assert hecho is True
     asuntos = _git(remoto, "log", "--format=%s", "-3").splitlines()
     assert asuntos[:2] == [preview_git.MENSAJE, "cambio de otro lado"]
+
+
+def test_la_fecha_de_un_grafico_es_la_de_su_commit_salvo_que_tenga_cambios(repo):
+    import datetime as dt
+    import os as so
+
+    local, _ = repo
+    ruta = local / "Previews" / "grafico.jpg"
+    # Commiteado y sin cambios: la fecha del commit, aunque el archivo se haya tocado hoy (como hace git pull)
+    _git(local, "commit", "--allow-empty", "-m", "x")
+    hoy = dt.date.today()
+    so.utime(ruta, (dt.datetime(2020, 1, 1).timestamp(),) * 2)
+    assert preview_git.fecha_del_archivo(local, ruta) == hoy
+    # Con cambios sin commitear: la fecha de modificación
+    ruta.write_bytes(b"generado en esta PC")
+    so.utime(ruta, (dt.datetime(2026, 1, 15, 12).timestamp(),) * 2)
+    assert preview_git.fecha_del_archivo(local, ruta) == dt.date(2026, 1, 15)
