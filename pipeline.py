@@ -36,7 +36,7 @@ import tempfile
 import time
 from collections.abc import Callable
 from contextlib import ExitStack, contextmanager
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -110,16 +110,12 @@ class ResultadoCorrida:
             lineas.append(f"  salida: {self.salida}")
         return "\n".join(lineas)
 
-    def como_dict(self, con_detalle: bool = True) -> dict:
-        """Serializable a JSON. Sin detalle, para respuestas HTTP: un mensaje de error
-        puede arrastrar datos de conexión."""
+    def como_dict(self) -> dict:
+        """Serializable a JSON (--json). app.py lee de acá estado y etapas, sin el detalle."""
         datos = asdict(self)
         datos["fecha"] = self.fecha.isoformat()
         datos["salida"] = str(self.salida) if self.salida else None
         datos["exitosa"] = self.exitosa
-        if not con_detalle:
-            for etapa in datos["etapas"]:
-                etapa.pop("detalle")
         return datos
 
 
@@ -213,7 +209,7 @@ def correr(opciones: Opciones | None = None, deps: Dependencias | None = None) -
     deps = deps or Dependencias()
     if opciones.dry_run:
         # En una prueba no sale ningún mail que no se haya pedido explícitamente
-        deps = Dependencias(**{**deps.__dict__, "alertar": _solo_log, "alertar_scraper": _solo_log, "alertar_validacion": _solo_log})
+        deps = replace(deps, alertar=_solo_log, alertar_scraper=_solo_log, alertar_validacion=_solo_log)
 
     comienzo = time.perf_counter()
     resultado = ResultadoCorrida(fecha=deps.hoy(), origen=opciones.origen)
@@ -354,7 +350,7 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
         parrafo_existente, secciones_existentes,
     )
 
-    inflacion = transformations.serie_inflacion(res.bcra["inflacion_mensual"], res.bcra["bcra_tea"])
+    inflacion = transformations.serie_inflacion(res.bcra["inflacion_mensual"])
     inflacion_12 = transformations.ultimos_meses(inflacion)
     carpeta = _carpeta_de_salida(opciones)
     if opciones.dry_run or carpeta != PREVIEWS:

@@ -17,7 +17,7 @@ def df(resultados, historico):
 
 @pytest.fixture
 def inflacion_12(resultados):
-    return t.ultimos_meses(t.serie_inflacion(resultados.bcra["inflacion_mensual"], 23.66))
+    return t.ultimos_meses(t.serie_inflacion(resultados.bcra["inflacion_mensual"]))
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def test_pintar_variacion():
 def test_tabla_de_inflacion_va_de_vieja_a_nueva_y_la_interanual_es_la_ultima(inflacion_12):
     # Regresión: el reenvío manual mostraba la tabla al revés y la interanual de hace 12 meses
     tabla, interanual = er.tabla_inflacion(inflacion_12)
-    assert interanual == "{0:,.2f}%".format(inflacion_12["Inflación Anual"].iloc[-1])
+    assert interanual == f"{inflacion_12['Inflación Anual'].iloc[-1]:,.2f}%"
     primera = t.etiqueta_mes(inflacion_12["Fecha"].iloc[0])
     ultima = t.etiqueta_mes(inflacion_12["Fecha"].iloc[-1])
     assert tabla.index(primera) < tabla.index(ultima)

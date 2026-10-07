@@ -93,8 +93,7 @@ def armar(df, imagenes: dict[str, Path], salida: Path) -> Path:
     fecha = date.fromisoformat(hoy["Fecha"])
     fwd_oficial, fwd_blue = transformations.forwards_fisher(df)
     resumen = email_report.resumen_ejecutivo(transformations.agregar_brechas_y_variaciones(df))
-    secciones = hoy.get("ai_secciones") if isinstance(hoy.get("ai_secciones"), dict) else None
-    comentarios = ia_generator.comentarios_por_grafico(secciones)
+    comentarios = ia_generator.comentarios_por_grafico(hoy.get("ai_secciones"))
 
     prs = Presentation()
     prs.slide_width, prs.slide_height = ANCHO, ALTO

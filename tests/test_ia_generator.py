@@ -55,8 +55,11 @@ def test_prompt_menciona_la_tea_cuando_se_movio():
 
 @pytest.fixture
 def con_historial(monkeypatch):
+    """read_sql falso que se comporta como el SELECT: más nuevo primero y con LIMIT."""
     def _usar(df):
-        monkeypatch.setattr(ia_generator.pd, "read_sql", lambda sql, con: df.copy())
+        monkeypatch.setattr(
+            ia_generator.pd, "read_sql", lambda sql, con, params: df.iloc[::-1].head(params["n"]).copy()
+        )
     return _usar
 
 

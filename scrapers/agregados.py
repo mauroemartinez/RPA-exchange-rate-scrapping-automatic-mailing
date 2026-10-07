@@ -20,8 +20,6 @@ import httpx
 from scrapers.bcra import API_BASE, TIMEOUT
 from scrapers.utils import ScraperError, retry_http, run_async
 
-FUENTE = "BCRA"
-
 # La API devuelve hasta 1000 puntos si no se le pide otra cosa; con limit se
 # pueden pedir más por página (3000 probado) y paginar con offset.
 PAGINA = 3000
@@ -35,6 +33,7 @@ class Serie:
     frecuencia: str  # "D" diaria o "M" mensual, como la informa la API
     unidad: str  # tal cual la publica el BCRA
     positiva: bool = True  # un stock no puede ser <= 0; una variación de precios sí
+    fuente: str = "BCRA"
 
 
 SERIES = (
@@ -44,8 +43,9 @@ SERIES = (
     Serie("m2", 109, "M2", "D", "millones de ARS"),
     Serie("m2_transaccional_privado", 197, "M2 transaccional del sector privado", "D", "millones de ARS"),
     Serie("m3", 1624, "M3 en moneda local", "M", "miles de ARS"),
-    # La inflación ya se descarga todos los días para el reporte; guardarla deja
-    # al reenvío manual y a los gráficos sin depender de la API (docs/evaluacion-cache.md)
+    # La inflación ya se descarga todos los días para el reporte. Guardarla permitirá
+    # que el reenvío manual y los gráficos no dependan de la API, cuando lean
+    # Fact_Series_Macro (docs/evaluacion-cache.md)
     Serie("inflacion_mensual", 27, "Inflación mensual", "M", "porcentaje", positiva=False),
     Serie("inflacion_interanual", 28, "Inflación interanual", "M", "porcentaje", positiva=False),
 )

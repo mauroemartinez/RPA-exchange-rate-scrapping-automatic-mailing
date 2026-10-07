@@ -5,13 +5,12 @@ los dos caminos. Antes el script tenía su propia copia de estos cálculos y se 
 desincronizado: mostraba la tabla de inflación invertida y la interanual de hace
 doce meses.
 
-A diferencia de la celda 47, un envío fallido levanta una excepción en vez de
-imprimir el error y seguir: un 535 de Gmail tiene que poner la corrida en rojo.
+A diferencia de la celda 47, un envío fallido no se imprime y se olvida: enviar()
+levanta, y enviar_reporte_diario() devuelve el error de cada variante para que el
+pipeline ponga la corrida en rojo. Un 535 de Gmail no puede pasar como éxito.
 """
 
 import logging
-import smtplib
-import ssl
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from email.mime.image import MIMEImage
@@ -23,17 +22,16 @@ import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 from tabulate import tabulate
 
+import mailer
 from charts import COTIZACIONES_A_MOSTRAR, ORDEN_EN_MAIL
 from config import settings
-from data_access import COLUMNAS_FILA
+from models import COLUMNAS_FILA
 from scrapers import ambito, bcra, bna, dolarhoy, fed, riesgo_pais
 from transformations import etiqueta_mes
 
 log = logging.getLogger(__name__)
 
 RAIZ = Path(__file__).resolve().parent
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587
 
 # Cupo de dólares del resumen ejecutivo (costo blue contra oficial)
 CANTIDAD_USD = 100
@@ -105,10 +103,10 @@ def tabla_inflacion(inflacion_12: pd.DataFrame) -> tuple[str, str]:
     a proporción (celda 45).
     """
     inflacion = inflacion_12.copy()
-    interanual = "{0:,.2f}%".format(inflacion["Inflación Anual"].iloc[-1])
+    interanual = f"{inflacion['Inflación Anual'].iloc[-1]:,.2f}%"
 
     inflacion["Fecha"] = [etiqueta_mes(f) for f in inflacion["Fecha"]]
-    cols_pct = ["Inflación Mensual", "Inflación Bimestral", "Inflación Trimestral", "Inflación Anual", "bcra_tea"]
+    cols_pct = ["Inflación Mensual", "Inflación Bimestral", "Inflación Trimestral", "Inflación Anual"]
     inflacion[cols_pct] = inflacion[cols_pct] / 100
 
     tabla = tabulate(
@@ -217,22 +215,6 @@ def asunto(fecha: date) -> str:
     return f"📈 Reporte Macroeconómico - {fecha:%d-%m-%Y}"
 
 
-def leer_imagenes(carpeta: Path) -> dict[str, bytes]:
-    """Los gráficos de `carpeta` que existan, leídos una sola vez.
-
-    Se leen antes de lanzar los envíos en paralelo: en OneDrive, dos hilos abriendo
-    el mismo archivo mientras se sincroniza pueden dar un PermissionError.
-    """
-    imagenes = {}
-    for nombre in ORDEN_EN_MAIL:
-        ruta = Path(carpeta) / nombre
-        if ruta.exists():
-            imagenes[nombre] = ruta.read_bytes()
-        else:
-            log.warning("No se encontró el gráfico %s", ruta)
-    return imagenes
-
-
 def armar_mensaje(
     html: str,
     imagenes: dict[str, bytes],
@@ -268,16 +250,7 @@ def armar_mensaje(
 
 def enviar(mensaje: MIMEMultipart, destinatarios: list[str]) -> None:
     """Un sendmail por Gmail. Levanta ante cualquier fallo, incluidos los rechazos parciales."""
-    context = ssl.create_default_context()
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=60) as smtp:
-        smtp.ehlo()
-        smtp.starttls(context=context)
-        smtp.ehlo()
-        smtp.login(settings.email_sender, settings.email_password.get_secret_value())
-        rechazados = smtp.sendmail(settings.email_sender, destinatarios, mensaje.as_string())
-
-    if rechazados:
-        raise smtplib.SMTPRecipientsRefused(rechazados)
+    mailer.enviar_smtp(mensaje, destinatarios)
 
 
 def csv_historico(df: pd.DataFrame) -> str:

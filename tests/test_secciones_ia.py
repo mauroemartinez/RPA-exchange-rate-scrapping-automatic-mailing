@@ -132,7 +132,7 @@ def test_comentarios_por_grafico():
 
 def test_los_comentarios_van_debajo_de_su_grafico_y_escapados(df, resultados):
     df = t.agregar_brechas_y_variaciones(df)
-    inflacion_12 = t.ultimos_meses(t.serie_inflacion(resultados.bcra["inflacion_mensual"], 23.66))
+    inflacion_12 = t.ultimos_meses(t.serie_inflacion(resultados.bcra["inflacion_mensual"]))
     comentarios = ia_generator.comentarios_por_grafico({**SECCIONES, "btc": "BTC <b>sube</b>"})
 
     html = email_report.renderizar(df, inflacion_12, 1.0, 1.0, "x", 1.0, comentarios=comentarios)
@@ -145,7 +145,7 @@ def test_los_comentarios_van_debajo_de_su_grafico_y_escapados(df, resultados):
 
 def test_sin_comentarios_el_html_no_cambia(df, resultados):
     df = t.agregar_brechas_y_variaciones(df)
-    inflacion_12 = t.ultimos_meses(t.serie_inflacion(resultados.bcra["inflacion_mensual"], 23.66))
+    inflacion_12 = t.ultimos_meses(t.serie_inflacion(resultados.bcra["inflacion_mensual"]))
     sin = email_report.renderizar(df, inflacion_12, 1.0, 1.0, "x", 1.0)
     vacio = email_report.renderizar(df, inflacion_12, 1.0, 1.0, "x", 1.0, comentarios={})
     assert sin == vacio and "comentario-ia" not in sin

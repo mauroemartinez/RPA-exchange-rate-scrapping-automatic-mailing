@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 pytest.importorskip("streamlit", reason="el dashboard tiene sus propias dependencias: dashboard/requirements.txt")
-from streamlit.testing.v1 import AppTest  # noqa: E402
+from streamlit.testing.v1 import AppTest
 
 APP = Path(__file__).resolve().parent.parent / "dashboard" / "app.py"
 

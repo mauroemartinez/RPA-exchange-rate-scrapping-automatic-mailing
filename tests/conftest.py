@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from data_access import COLUMNAS_TABLA
+from models import COLUMNAS_TABLA
 from transformations import ResultadosScraping
 
 HOY = date(2026, 10, 6)

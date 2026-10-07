@@ -7,7 +7,9 @@ cambiaba el idioma de las fechas de todo el proceso. En una corrida por proceso
 no se notaba; en la API o en los tests, que corren varias veces seguidas, sí.
 
 Los meses salen en español sin usar el locale del sistema (ver fechas.MESES_ABREV).
-Los gráficos quedan idénticos, byte a byte, a los que generaba el notebook.
+Los gráficos quedan idénticos, byte a byte, a los que generaba el notebook, salvo
+dos cambios a propósito: la inflación acumulada de Variaciones.jpg y el decimal
+del eje derecho de Gráficos Inflación.jpg.
 """
 
 import logging
@@ -309,7 +311,10 @@ def grafico_variaciones(variacion_acumulada: pd.DataFrame, carpeta: Path) -> Pat
 
             # Etiquetas de datos: cada 25 filas para las cotizaciones, todas para la inflación
             bbox = dict(facecolor=palette[i], edgecolor=palette[i], boxstyle="square,pad=0.2")
+            bbox_max = dict(facecolor=palette[i], edgecolor="black", boxstyle="square,pad=0.2")
             label_frequency = 25 if column != "Inflación Mensual Acumulada" else 1
+            maximo = va[column].max()
+            idx_maximo = va[column].idxmax() if va[column].notna().any() else None
             for idx, row in va.iterrows():
                 if not pd.isna(row[column]):
                     if idx % label_frequency == 0:
@@ -319,8 +324,7 @@ def grafico_variaciones(variacion_acumulada: pd.DataFrame, carpeta: Path) -> Pat
                         )
 
                     # El valor máximo de cada línea, resaltado
-                    bbox_max = dict(facecolor=palette[i], edgecolor="black", boxstyle="square,pad=0.2")
-                    if row[column] == va[column].max() and idx == va[column].idxmax():
+                    if row[column] == maximo and idx == idx_maximo:
                         ax.text(
                             row["Fecha"], row[column] * 1.05, f"{row[column]:,.2f}",
                             fontsize=10, color="darkred", fontweight="bold", ha="center", va="center", bbox=bbox_max,

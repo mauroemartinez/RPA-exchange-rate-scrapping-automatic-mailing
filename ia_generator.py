@@ -83,16 +83,19 @@ def generar_con_failover(prompt, config=None):
 
 
 def leer_historial(engine) -> pd.DataFrame:
-    """Las columnas que usa el prompt, de más viejo a más nuevo."""
+    """Las últimas FILAS_MINIMAS filas con las columnas que usa el prompt, de más vieja a más nueva.
+
+    El prompt solo mira la última, la anterior y la de 25 ruedas atrás: no hace
+    falta traer las siete mil filas de la tabla.
+    """
     df = pd.read_sql(
-        f"""
-        SELECT "Fecha", "TCV_MEP", "TCV_Blue", "TCV_Billete",
-               "riesgo_pais", "bcra_tea", "fed_tea"
-        FROM "{TABLA}"
-        ORDER BY "Fecha" ASC
-        """,
+        text(
+            'SELECT "Fecha", "TCV_MEP", "TCV_Blue", "TCV_Billete", "riesgo_pais", "bcra_tea", "fed_tea" '
+            f'FROM "{TABLA}" ORDER BY "Fecha" DESC LIMIT :n'
+        ),
         con=engine,
-    )
+        params={"n": FILAS_MINIMAS},
+    ).iloc[::-1].reset_index(drop=True)
     df.columns = df.columns.str.strip()
     df["Fecha"] = pd.to_datetime(df["Fecha"])
     if len(df) < FILAS_MINIMAS:
@@ -387,10 +390,17 @@ def limpiar_secciones(engine, fecha: date) -> int:
 
 
 def comentarios_por_grafico(secciones: dict | SeccionesIA | None) -> dict[str, list[tuple[str, str]]]:
-    """{cid: [(título, texto), ...]} para el template, desde las secciones guardadas o recién generadas."""
-    if secciones is None:
+    """{cid: [(título, texto), ...]} para el template, desde las secciones guardadas o recién generadas.
+
+    Acepta lo que venga de la fila (None, NaN de pandas, la columna ausente): todo
+    lo que no sea un SeccionesIA o un dict da {}.
+    """
+    if isinstance(secciones, SeccionesIA):
+        datos = secciones.model_dump()
+    elif isinstance(secciones, dict):
+        datos = secciones
+    else:
         return {}
-    datos = secciones.model_dump() if isinstance(secciones, SeccionesIA) else dict(secciones)
     comentarios = {}
     for cid, items in SECCIONES_POR_GRAFICO.items():
         presentes = [(titulo, datos[clave]) for titulo, clave in items if datos.get(clave)]

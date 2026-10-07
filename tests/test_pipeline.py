@@ -226,12 +226,13 @@ def test_dry_run_no_manda_alertas(entorno):
     assert hechos["alertas"] == []
 
 
-def test_resultado_serializable_sin_detalle(entorno):
+def test_resultado_serializable(entorno):
+    import json
+
     deps, _, salida = entorno
-    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
-    datos = r.como_dict(con_detalle=False)
-    assert datos["fecha"] == "2026-10-06" and datos["exitosa"] is True
-    assert all("detalle" not in e for e in datos["etapas"])
+    datos = json.loads(json.dumps(pipeline.correr(pipeline.Opciones(salida=salida), deps).como_dict()))
+    assert datos["fecha"] == "2026-10-06" and datos["exitosa"] is True and datos["estado"] == "ok"
+    assert {"nombre", "estado", "segundos", "detalle"} <= set(datos["etapas"][0])
 
 
 def test_cli_valida_las_direcciones_de_enviar_a():
