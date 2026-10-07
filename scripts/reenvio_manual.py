@@ -52,9 +52,6 @@ from config import settings
 from scrapers import bcra
 from scrapers.utils import run_async
 
-# Tolerancia para avisar que los gráficos quedaron de una corrida vieja.
-HORAS_IMAGEN_VIEJA = 24
-
 
 def armar_inflacion() -> pd.DataFrame:
     """Los últimos 12 meses de inflación, como en el mail diario."""
@@ -63,22 +60,25 @@ def armar_inflacion() -> pd.DataFrame:
     return transformations.ultimos_meses(inflacion)
 
 
-def leer_imagenes() -> dict[str, bytes]:
-    """Los gráficos de Previews/, con aviso si quedaron de una corrida vieja."""
-    imagenes = {}
-    ahora = dt.datetime.now()
+def leer_imagenes(fecha_reporte: dt.date) -> dict[str, bytes]:
+    """Los gráficos de Previews/ generados el día del reporte o después.
 
+    Si ese día un gráfico no se pudo generar (Yahoo caído, por ejemplo), en
+    Previews/ quedó el de una corrida anterior: el mail diario no lo llevó, así
+    que el reenvío tampoco. El template omite el que falte.
+    """
+    imagenes = {}
     for archivo in charts.ORDEN_EN_MAIL:
         ruta = RAIZ / "Previews" / archivo
         if not ruta.exists():
-            raise SystemExit(f"❌ Falta {ruta}. Corré el pipeline para regenerar los gráficos.")
-
-        imagenes[archivo] = ruta.read_bytes()
+            print(f"  ⚠️ Falta {archivo}: el mail sale sin ese gráfico")
+            continue
         modificado = dt.datetime.fromtimestamp(ruta.stat().st_mtime)
-        horas = (ahora - modificado).total_seconds() / 3600
-        aviso = f"  ⚠️ {horas:.0f}h de antigüedad" if horas > HORAS_IMAGEN_VIEJA else ""
-        print(f"  {archivo}: {len(imagenes[archivo]):,} bytes, {modificado:%d/%m/%Y %H:%M}{aviso}")
-
+        if modificado.date() < fecha_reporte:
+            print(f"  ⚠️ {archivo} es del {modificado:%d/%m/%Y}, anterior al reporte: no se adjunta")
+            continue
+        imagenes[archivo] = ruta.read_bytes()
+        print(f"  {archivo}: {len(imagenes[archivo]):,} bytes, {modificado:%d/%m/%Y %H:%M}")
     return imagenes
 
 
@@ -114,7 +114,7 @@ def main() -> None:
     csv = email_report.csv_historico(df) if args.csv else None
     df = transformations.agregar_brechas_y_variaciones(df)
     inflacion_12 = armar_inflacion()
-    imagenes = leer_imagenes()
+    imagenes = leer_imagenes(dt.date.fromisoformat(ultima))
 
     # Los comentarios por gráfico de la fase 4, si la fila los tiene
     secciones = df["ai_secciones"].iloc[0] if "ai_secciones" in df.columns else None
