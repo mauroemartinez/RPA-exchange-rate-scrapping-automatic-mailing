@@ -2,9 +2,9 @@
 
 Roadmap, fase 5: *evaluar la generación automática de un PowerPoint ejecutivo* y *evaluar un dashboard en Streamlit conectado al histórico completo*, sin que ninguno se convierta en otra implementación del pipeline diario.
 
-Para evaluar con algo concreto hice un prototipo de cada uno. **Ninguno está conectado a la corrida diaria**: se corren a mano y solo leen.
+Para evaluar con algo concreto hice un prototipo de cada uno. **El PowerPoint ya es parte de la corrida diaria** (la decisión está abajo); el dashboard sigue siendo un prototipo que se corre a mano y solo lee.
 
-## PowerPoint: `scripts/presentacion_ejecutiva.py`
+## PowerPoint: `presentacion.py`
 
 ```bash
 python scripts/presentacion_ejecutiva.py                # .pptx en una carpeta temporal
@@ -22,7 +22,9 @@ Lo que salió de la prueba, con los datos del 6 de octubre:
 - **Costo:** una dependencia (`python-pptx`, que trae `lxml`) y unas 200 líneas. El armado es posicional: si cambia el tamaño de un gráfico, hay que retocar la ubicación.
 - **No exporta a PDF.** `python-pptx` solo escribe .pptx; para PDF hace falta PowerPoint o LibreOffice en la máquina que corre.
 
-Recomendación: **sí, pero semanal y fuera de git.** El README proponía versionar cada presentación en GitHub junto a `Previews/`; a 460 KB por día son unos 115 MB por año en el historial del repo, que no se pueden borrar sin reescribirlo. Mejor generarla los viernes y adjuntarla al mail con CSV (hoy llega a tres personas), o subirla a un Drive. Si te sirve, el paso siguiente es sumarla al pipeline como etapa opcional, por ejemplo con `--presentacion`.
+Mi recomendación era semanal y fuera de git, por el peso. **La decisión (7 de octubre de 2026) fue diaria y en git**, para que GitHub tenga siempre la última: la corrida la arma en la etapa `presentacion` y la commitea con los gráficos como `Previews/Reporte Ejecutivo.pptx`, con el mismo nombre todos los días. En la corrida usa los datos y los textos de IA que ya tiene en memoria, así que no suma consultas; `scripts/presentacion_ejecutiva.py` sigue sirviendo para armarla a mano desde Supabase.
+
+El costo, para tenerlo a la vista: el repo pesa hoy unos 49 MB, casi todo de los gráficos diarios (unos 550 KB por día hábil). La presentación agrega unos 460 KB por día, así que el repo pasa a crecer unos 250 MB por año en vez de 140. GitHub recomienda que un repo no pase de 1 GB, así que hay margen para varios años. Si algún día molesta, la presentación se puede mover a una rama aparte que guarde solo la última.
 
 ## Streamlit: `dashboard/app.py`
 
