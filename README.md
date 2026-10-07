@@ -107,7 +107,8 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 ├── scrapers/           Ingestion layer: Playwright scrapers + async REST clients
 ├── templates/          Jinja2 email template
 ├── notebooks/          The original orchestration notebook, kept as a reference
-├── scripts/            Operational tooling; scripts/sql/ holds the SQL applied by hand in Supabase
+├── scripts/            Operational tooling (backfills, manual resends, daily control, prototypes)
+├── sql/                SQL applied by hand in Supabase: schema, migrations, cleaning
 ├── tests/              Offline test suite; tests/datos/ pins the mail HTML
 ├── docs/               Roadmap evaluations and runbooks (Spanish)
 ├── dashboard/          Streamlit prototype, read-only, with its own requirements
@@ -148,7 +149,7 @@ A dry run leaves the six charts, the executive deck, a browser preview and an `.
 
 **Executive deck.** The latest deck is always at [`Reporte Ejecutivo.pptx`](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/raw/reporte-ejecutivo/Reporte%20Ejecutivo.pptx), on the `reporte-ejecutivo` branch. That branch is rebuilt as a single commit every day, so it never accumulates versions. `python scripts/presentacion_ejecutiva.py` builds the same deck by hand from the warehouse.
 
-**Supabase migrations.** `scripts/sql/` holds the SQL applied by hand in the Supabase SQL Editor. Two are new, and each opens with a plain-Spanish header: what it does, how to apply it, and how to verify and undo it.
+**Supabase migrations.** `sql/` holds the SQL applied by hand in the Supabase SQL Editor. Two are new, and each opens with a plain-Spanish header: what it does, how to apply it, and how to verify and undo it.
 
 * `06_series_macro.sql` creates `Fact_Series_Macro`, a long-format table for the monetary aggregates, inflation and debt series, each in its source unit. After applying it, `python scripts/agregados_monetarios.py --guardar` loads their full history, and the daily run keeps them up to date.
 * `07_ai_secciones.sql` adds the `ai_secciones` column next to `ai_paragraph`. It stores, as JSON, the AI comments shown under the FX and country risk chart and under the Bitcoin chart; with it in place the daily run switches from the single paragraph to that commentary.
@@ -189,9 +190,9 @@ The following modules are mapped in the architecture blueprint and are undergoin
 * **Project Modularization:** *Done.* The pipeline runs as plain Python modules through `pipeline.py`; the notebook remains only as a reference during the transition.
 * **Idempotent Warehouse Writes:** *Done.* Today's row goes in with a single atomic `INSERT ... ON CONFLICT ("Fecha")`, which keeps existing history untouched on a normal run and overwrites it only on an explicit `--forzar` rerun.
 * **Native Logging:** *Done for the pipeline.* Every module logs through `logging`, with an optional file handler (`--log-archivo`) so unattended runs leave an auditable trace. The legacy notebook still prints.
-* **Per-chart AI Commentary:** *Built, pending activation.* One structured Gemini call returns a summary plus comments for the FX, country risk and Bitcoin charts, validated with Pydantic before it reaches the mail and stored as JSON with the model that wrote it. It switches on once `scripts/sql/07_ai_secciones.sql` adds the column; until then the single paragraph keeps working as before.
+* **Per-chart AI Commentary:** *Built, pending activation.* One structured Gemini call returns a summary plus comments for the FX, country risk and Bitcoin charts, validated with Pydantic before it reaches the mail and stored as JSON with the model that wrote it. It switches on once `sql/07_ai_secciones.sql` adds the column; until then the single paragraph keeps working as before.
 * **Monetary Aggregates & Public Debt:** *Done.* Two charts in the daily mail with plain-language explanations; debt always in US dollars.
-* **API Data Persistence in Supabase:** *Built, pending activation.* The aggregates, inflation and debt series get their own long-format table, `Fact_Series_Macro`, with source dates, frequencies and units, kept up to date by the daily run once `scripts/sql/06_series_macro.sql` is applied. The mail charts do not depend on it: each run downloads what they need.
+* **API Data Persistence in Supabase:** *Built, pending activation.* The aggregates, inflation and debt series get their own long-format table, `Fact_Series_Macro`, with source dates, frequencies and units, kept up to date by the daily run once `sql/06_series_macro.sql` is applied. The mail charts do not depend on it: each run downloads what they need.
 * **Automated Executive PowerPoint Reporting:** *Done.* Every run builds an eight-slide executive deck and publishes it on the `reporte-ejecutivo` branch, replaced daily without accumulating versions.
 * **Workflow Orchestration & Automation:** *Ready to switch on.* The daily run and a daily control are scheduled on GitHub Actions' free plan and switch on with the `CORRIDA_AUTOMATICA` repository variable. Holidays and weekends are skipped, and a database lock prevents duplicate runs. CI already runs lint and the offline tests on every push.
 * **Streamlit Dashboard:** *Prototype, to be reviewed later.* `dashboard/app.py` explores the full history read-only, with its own dependencies. Publishing it first needs a read-only database role (the SQL is in `docs/evaluacion-powerpoint-y-streamlit.md`).
