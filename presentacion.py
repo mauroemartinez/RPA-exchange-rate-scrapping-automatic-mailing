@@ -9,17 +9,20 @@ Usa los colores del mail.
 
 La arma todos los días la etapa `presentacion` de pipeline.py, con los datos y
 los textos de esa misma corrida, y queda en Previews/ con un nombre fijo
-(ARCHIVO): se pisa cada día y se commitea y pushea junto con los gráficos, así
-la versión de GitHub es siempre la del último reporte. Para rearmarla a mano
-desde Supabase está scripts/presentacion_ejecutiva.py.
+(ARCHIVO), que git ignora: la etapa previews la publica sola en la rama
+reporte-ejecutivo, que se reemplaza entera cada día, así GitHub tiene siempre la
+del último reporte sin acumular versiones. Para rearmarla a mano desde Supabase
+está scripts/presentacion_ejecutiva.py.
 """
 
+import os
 from datetime import UTC, date, datetime
 from pathlib import Path
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
+from pptx.opc.constants import RELATIONSHIP_TYPE
 from pptx.util import Inches, Pt
 
 import charts
@@ -109,6 +112,26 @@ def _metadatos(prs, fecha: date) -> None:
     ahora = datetime.now(UTC).replace(tzinfo=None, microsecond=0)
     propiedades.created = ahora
     propiedades.modified = ahora
+
+
+def _propiedades_de_aplicacion(prs) -> None:
+    """docProps/app.xml con los datos de este archivo.
+
+    La plantilla de python-pptx trae los de la PowerPoint en que se armó (Microsoft
+    Macintosh PowerPoint 14, presentación 4:3, cero diapositivas). python-pptx no
+    tiene API para esta parte, así que se reescribe entera; es un XML de propiedades
+    opcionales y PowerPoint lo acepta así de corto.
+    """
+    parte = prs.part.package.part_related_by(RELATIONSHIP_TYPE.EXTENDED_PROPERTIES)
+    parte._blob = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" '
+        'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'
+        f"<Application>{AUTOR}</Application>"
+        "<PresentationFormat>16:9</PresentationFormat>"
+        f"<Slides>{len(prs.slides)}</Slides>"
+        "</Properties>"
+    ).encode()
 
 
 def armar(
@@ -227,6 +250,15 @@ def armar(
 
     salida = Path(salida)
     salida.mkdir(parents=True, exist_ok=True)
+    _propiedades_de_aplicacion(prs)
     ruta = salida / ARCHIVO
-    prs.save(ruta)
+    # Primero a un temporal y después se reemplaza: si el guardado falla a mitad de
+    # camino, queda entera la versión anterior y no un archivo roto. El temporal
+    # termina en .pptx, así que git lo ignora igual que al definitivo.
+    temporal = ruta.with_name(f"~tmp {ARCHIVO}")
+    try:
+        prs.save(temporal)
+        os.replace(temporal, ruta)
+    finally:
+        temporal.unlink(missing_ok=True)
     return ruta

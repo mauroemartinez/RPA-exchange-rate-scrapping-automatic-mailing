@@ -2,10 +2,9 @@
 
 import zipfile
 from datetime import date
+from pathlib import Path
 
 import pytest
-
-pytest.importorskip("pptx")
 from pptx import Presentation
 
 import charts
@@ -138,3 +137,27 @@ def test_agregados_y_deuda_llevan_su_explicacion(historico, imagenes, tmp_path, 
     prs = Presentation(presentacion.armar(historico, imagenes, tmp_path, explicaciones=explicaciones))
     assert explicaciones[indicadores.CID_DEUDA]["dato"] in _textos(prs.slides[7])
     assert explicaciones[indicadores.CID_AGREGADOS]["dato"] in _textos(prs.slides[6])
+
+
+def test_los_metadatos_de_aplicacion_son_los_de_este_archivo(historico, imagenes, tmp_path):
+    ruta = presentacion.armar(historico, imagenes, tmp_path)
+    with zipfile.ZipFile(ruta) as pptx:
+        app = pptx.read("docProps/app.xml").decode("utf-8")
+    assert "Macintosh" not in app and "4:3" not in app
+    assert f"<Slides>{len(Presentation(ruta).slides)}</Slides>" in app
+
+
+def test_si_el_guardado_falla_queda_la_version_anterior(historico, imagenes, tmp_path, monkeypatch):
+    ruta = presentacion.armar(historico, imagenes, tmp_path)
+    anterior = ruta.read_bytes()
+
+    def falla(self, destino):
+        Path(destino).write_bytes(b"a medio escribir")
+        raise OSError("disco lleno")
+
+    monkeypatch.setattr(presentacion.Presentation().__class__, "save", falla)
+    with pytest.raises(OSError):
+        presentacion.armar(historico, imagenes, tmp_path)
+
+    assert ruta.read_bytes() == anterior
+    assert [p.name for p in tmp_path.glob("*.pptx")] == [presentacion.ARCHIVO]  # sin el temporal

@@ -748,7 +748,7 @@ def _etapa_series(
         try:
             if not deps.tabla_series(engine):
                 e.estado = OMITIDA
-                e.detalle = f"falta la tabla {data_access.TABLA_SERIES} (sql/06_series_macro.sql)"
+                e.detalle = f"falta la tabla {data_access.TABLA_SERIES} (scripts/sql/06_series_macro.sql)"
                 return
         except Exception as exc:
             log.exception("No se pudo consultar la tabla de series")
