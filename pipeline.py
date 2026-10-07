@@ -2,6 +2,8 @@
 
 Etapas, en el mismo orden que el notebook:
 
+  control       fin de semana o feriado: no se corre (salvo --forzar); otra corrida en curso o
+                la fila de hoy ya guardada: tampoco
   historico     lee Fact_Mercado_Macro (o el CSV de contingencia si Supabase no responde)
   scraping      las seis fuentes en paralelo; si una cae, alerta y corta
   validacion    arma la fila del día y la pasa por models.FilaMacro; si no cumple, alerta y corta
@@ -22,7 +24,7 @@ Uso:
     python pipeline.py --dry-run --enviar-a yo@mail.com
                                            # igual, pero el mail te llega solo a vos
     python pipeline.py --sin-mail          # escribe en Supabase y genera todo, sin enviar
-    python pipeline.py --forzar            # repite el día aunque la fila ya exista
+    python pipeline.py --forzar            # repite el día aunque la fila ya exista, o corre en un feriado
     python pipeline.py --dry-run --con-ia  # prueba los comentarios por gráfico de Gemini, sin guardarlos
 """
 
@@ -37,6 +39,7 @@ from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 from pydantic import EmailStr, TypeAdapter, ValidationError
 
@@ -50,7 +53,7 @@ import preview_git
 import scrapers
 import transformations
 from config import settings
-from scrapers import agregados, btc
+from scrapers import agregados, btc, feriados
 from scrapers.utils import ScraperError
 
 log = logging.getLogger("pipeline")
@@ -159,6 +162,7 @@ class Dependencias:
     alertar: Callable = mailer.enviar_alerta
     alertar_scraper: Callable = mailer.alertar_scraper_caido
     alertar_validacion: Callable = mailer.alertar_validacion
+    feriado: Callable = feriados.nombre_feriado
     hoy: Callable = fechas.hoy
     ahora: Callable = fechas.ahora
 
@@ -253,6 +257,28 @@ def correr(opciones: Opciones | None = None, deps: Dependencias | None = None) -
 def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine, comienzo: float) -> None:
     resultado = registro.resultado
     fecha = resultado.fecha
+
+    # ── Calendario ───────────────────────────────────────────────────────────
+    # Un programador automático de lunes a viernes dispararía la corrida también
+    # los feriados, con las fuentes repitiendo el último dato. Si el calendario no
+    # responde, se sigue: es preferible un mail de más que un día sin reporte.
+    if fecha.weekday() >= 5:
+        motivo = "fin de semana"
+    else:
+        try:
+            nombre = deps.feriado(fecha)
+        except Exception as exc:
+            log.warning("No se pudo consultar el calendario de feriados (%s); se sigue como día hábil", exc)
+            nombre = None
+        motivo = f"feriado ({nombre})" if nombre else None
+
+    if motivo and not opciones.forzar:
+        if opciones.dry_run:
+            log.warning("El %s es %s: una corrida real no se haría (dry-run sigue igual)", fecha, motivo)
+        else:
+            registro.omitir("control", f"el {fecha} es {motivo}; para correr igual: --forzar")
+            resultado.estado = OMITIDA
+            return
 
     # ── Histórico ────────────────────────────────────────────────────────────
     with registro.etapa("historico") as e:
@@ -521,8 +547,57 @@ def _guardar_vista_previa(carpeta: Path, html: str, imagenes: dict[str, bytes], 
     log.info("Vista previa del mail en %s", carpeta)
 
 
+def _reemplazos_sensibles() -> list[tuple[str, str]]:
+    """(texto, reemplazo) para cada secreto del .env y cada dirección de destinatario.
+
+    Los más largos primero: una URL de conexión se tapa entera antes de que su
+    contraseña se reemplace sola.
+    """
+    secretos = [
+        settings.email_password, settings.gemini_api_key_1, settings.gemini_api_key_2,
+        settings.fed_api_key, settings.supabase_db_url, settings.api_key_easy_panel,
+    ]
+    pares = [(s.get_secret_value(), "***") for s in secretos if s is not None]
+    clave_base = urlparse(settings.supabase_db_url.get_secret_value()).password
+    if clave_base:
+        pares.append((clave_base, "***"))
+    destinatarios = {str(m) for m in [*settings.email_receiver, *settings.email_receiver_csv]}
+    pares += [(m, "[destinatario]") for m in destinatarios]
+    return sorted((p for p in pares if p[0]), key=lambda p: len(p[0]), reverse=True)
+
+
+def redactar(texto: str) -> str:
+    """El texto sin secretos ni direcciones de destinatarios."""
+    for secreto, reemplazo in _reemplazos_sensibles():
+        texto = texto.replace(secreto, reemplazo)
+    return texto
+
+
+class _FormatoSinSecretos(logging.Formatter):
+    """Tapa secretos y destinatarios en cada línea del log, traceback incluido.
+
+    Corriendo en GitHub Actions sobre un repo público, el log de la corrida es
+    público. GitHub enmascara cada secreto completo, pero no una dirección suelta
+    de la lista de destinatarios, que aparece en un SMTPRecipientsRefused.
+    """
+
+    def __init__(self, fmt: str):
+        super().__init__(fmt)
+        self._reemplazos = _reemplazos_sensibles()
+
+    def format(self, record: logging.LogRecord) -> str:
+        texto = super().format(record)
+        for secreto, reemplazo in self._reemplazos:
+            texto = texto.replace(secreto, reemplazo)
+        return texto
+
+
 def configurar_logging(archivo: Path | None = None, nivel: int = logging.INFO) -> None:
-    """Log a la consola (y opcionalmente a un archivo) para la corrida por línea de comandos."""
+    """Log a la consola (y opcionalmente a un archivo) para la corrida por línea de comandos.
+
+    Cada línea pasa por _FormatoSinSecretos, así ni la consola ni el archivo
+    llevan claves ni direcciones de suscriptores.
+    """
     # En Windows, con la salida redirigida (Programador de tareas, subprocess), la
     # consola cae en cp1252 y un emoji en un log tira UnicodeEncodeError.
     for stream in (sys.stdout, sys.stderr):
@@ -535,9 +610,10 @@ def configurar_logging(archivo: Path | None = None, nivel: int = logging.INFO) -
     if archivo:
         archivo.parent.mkdir(parents=True, exist_ok=True)
         handlers.append(logging.FileHandler(archivo, encoding="utf-8"))
-    logging.basicConfig(
-        level=nivel, format="%(asctime)s %(levelname)-8s %(name)s: %(message)s", handlers=handlers, force=True
-    )
+    formato = _FormatoSinSecretos("%(asctime)s %(levelname)-8s %(name)s: %(message)s")
+    for handler in handlers:
+        handler.setFormatter(formato)
+    logging.basicConfig(level=nivel, handlers=handlers, force=True)
     # httpx loguea cada request con la URL completa en INFO, y la de FRED lleva la
     # API key en la query string. El resto, solo para no tapar el log del pipeline.
     for ruidoso in ("httpx", "httpcore", "matplotlib", "PIL", "yfinance", "google_genai", "urllib3"):
@@ -582,7 +658,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     if args.json:
-        args.json.write_text(json.dumps(resultado.como_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+        args.json.write_text(redactar(json.dumps(resultado.como_dict(), ensure_ascii=False, indent=2)), encoding="utf-8")
     return 0 if resultado.exitosa else 1
 
 
