@@ -98,3 +98,54 @@ def test_sin_git_instalado_se_omite(monkeypatch, tmp_path):
 
     monkeypatch.setattr(preview_git.subprocess, "run", run)
     assert preview_git.actualizar_previews(tmp_path) == (False, "git no está instalado: se omite")
+
+
+def test_publicar_presentacion_deja_un_solo_commit_con_el_ultimo(repo):
+    local, remoto = repo
+    deck = local / "Previews" / "Reporte Ejecutivo.pptx"
+    rama = preview_git.RAMA_PRESENTACION
+
+    deck.write_bytes(b"deck del lunes")
+    assert preview_git.publicar_presentacion(local, deck, mensaje="Reporte ejecutivo del 05/10/2026")[0] is True
+    deck.write_bytes(b"deck del martes")
+    hecho, detalle = preview_git.publicar_presentacion(local, deck, mensaje="Reporte ejecutivo del 06/10/2026")
+
+    assert hecho is True and rama in detalle
+    # Un solo commit, sin historia: el de ayer no quedó acumulado
+    assert _git(remoto, "rev-list", "--count", rama).strip() == "1"
+    assert _git(remoto, "ls-tree", "--name-only", rama).splitlines() == ["Reporte Ejecutivo.pptx"]
+    assert _git(remoto, "show", f"{rama}:Reporte Ejecutivo.pptx") == "deck del martes"
+    assert _git(remoto, "log", "-1", "--format=%s|%an", rama).strip() == "Reporte ejecutivo del 06/10/2026|Test"
+    # main, la carpeta de trabajo y el stage no se tocaron
+    assert _git(remoto, "log", "-1", "--format=%s", "main").strip() == "inicial"
+    # (git entrecomilla las rutas con espacios)
+    assert _git(local, "status", "--porcelain", "--", "Previews").strip() == '?? "Previews/Reporte Ejecutivo.pptx"'
+
+
+def test_publicar_presentacion_fuera_de_main_no_publica(repo):
+    local, remoto = repo
+    _git(local, "checkout", "-b", "roadmap")
+    deck = local / "Previews" / "Reporte Ejecutivo.pptx"
+    deck.write_bytes(b"deck")
+    hecho, detalle = preview_git.publicar_presentacion(local, deck)
+    assert hecho is False and "roadmap" in detalle
+    assert preview_git.RAMA_PRESENTACION not in _git(remoto, "branch", "--list")
+
+
+def test_publicar_presentacion_con_push_fallido_levanta(repo, tmp_path):
+    local, _ = repo
+    _git(local, "remote", "set-url", "origin", str(tmp_path / "no-existe.git"))
+    deck = local / "Previews" / "Reporte Ejecutivo.pptx"
+    deck.write_bytes(b"deck")
+    with pytest.raises(preview_git.GitError):
+        preview_git.publicar_presentacion(local, deck)
+
+
+def test_un_grafico_que_no_existe_no_rompe_el_commit(repo):
+    local, remoto = repo
+    (local / "Previews" / "grafico.jpg").write_bytes(b"v2")
+
+    hecho, _ = preview_git.actualizar_previews(local, archivos=["grafico.jpg", "nuevo_que_fallo.jpg"])
+
+    assert hecho is True
+    assert _git(remoto, "show", "--name-only", "--format=", "HEAD").split() == ["Previews/grafico.jpg"]

@@ -31,7 +31,8 @@ def entorno(historico, resultados, btc_crudo, tmp_path, monkeypatch):
     ahí y no en el Previews/ del repo, que se commitea y se pushea solo.
     """
     monkeypatch.setattr(pipeline, "PREVIEWS", tmp_path / "Previews")
-    hechos = {"filas": [], "parrafos": [], "mails": [], "alertas": [], "previews": [], "limpiezas": []}
+    hechos = {"filas": [], "parrafos": [], "mails": [], "alertas": [], "previews": [], "limpiezas": [],
+              "presentaciones": []}
 
     def guardar_fila(engine, fila, sobrescribir=False):
         hechos["filas"].append((fila, sobrescribir))
@@ -52,6 +53,8 @@ def entorno(historico, resultados, btc_crudo, tmp_path, monkeypatch):
         generar_parrafo=generar_parrafo,
         enviar_mail=lambda mensaje, destinatarios: hechos["mails"].append((mensaje, destinatarios)),
         actualizar_previews=lambda repo, archivos=None: hechos["previews"].append(repo) or (True, "ok"),
+        publicar_presentacion=lambda repo, archivo, mensaje=None: hechos["presentaciones"].append((archivo, mensaje))
+        or (True, "publicada"),
         alertar=lambda asunto, cuerpo: hechos["alertas"].append(asunto) or True,
         alertar_scraper=lambda exc: hechos["alertas"].append("scraper") or True,
         alertar_validacion=lambda exc: hechos["alertas"].append("validacion") or True,
@@ -518,15 +521,17 @@ def test_una_corrida_real_actualiza_previews(entorno):
     r = pipeline.correr(pipeline.Opciones(), deps)
 
     assert _estados(r)["previews"] == "ok"
-    # Los cuatro gráficos y el .pptx del día, juntos en el mismo commit
-    assert llamadas == [(pipeline.RAIZ, [*charts.ORDEN_EN_MAIL, presentacion.ARCHIVO])]
+    # A main van solo los gráficos; el PowerPoint del día va a su propia rama
+    assert llamadas == [(pipeline.RAIZ, list(charts.ORDEN_EN_MAIL))]
     assert {p.name for p in pipeline.PREVIEWS.glob("*.jpg")} == set(charts.ORDEN_EN_MAIL)
-    assert (pipeline.PREVIEWS / presentacion.ARCHIVO).exists()
+    assert hechos["presentaciones"] == [(pipeline.PREVIEWS / presentacion.ARCHIVO, "Reporte ejecutivo del 06/10/2026")]
 
 
 def test_previews_sin_cambios_queda_omitida(entorno):
     deps, _, _ = entorno
-    r = pipeline.correr(pipeline.Opciones(), replace(deps, actualizar_previews=lambda repo, archivos=None: (False, "sin cambios")))
+    deps = replace(deps, actualizar_previews=lambda repo, archivos=None: (False, "sin cambios"),
+                   publicar_presentacion=lambda repo, archivo, mensaje=None: (False, "git no está instalado: se omite"))
+    r = pipeline.correr(pipeline.Opciones(), deps)
     assert _estados(r)["previews"] == "omitida" and r.estado == "ok"
 
 
@@ -734,8 +739,8 @@ def test_si_la_presentacion_falla_es_advertencia_y_el_mail_sale(entorno, monkeyp
     assert etapa.estado == "advertencia" and "plantilla rota" in etapa.detalle
     assert r.estado == "advertencia" and r.exitosa
     assert len(hechos["mails"]) == 2 and hechos["alertas"] == []
-    # Sin el .pptx en la carpeta, no se le pide a git una ruta que no existe
-    assert llamadas == [list(charts.ORDEN_EN_MAIL)]
+    # Los gráficos se publican igual, y no se sube ningún PowerPoint
+    assert llamadas == [list(charts.ORDEN_EN_MAIL)] and hechos["presentaciones"] == []
 
 
 def test_la_presentacion_avisa_el_grafico_que_falto(entorno, monkeypatch):
@@ -750,3 +755,55 @@ def test_la_presentacion_avisa_el_grafico_que_falto(entorno, monkeypatch):
     etapa = next(e for e in r.etapas if e.nombre == "presentacion")
     assert etapa.estado == "ok" and charts.INFLACION in etapa.detalle
     assert (salida / presentacion.ARCHIVO).exists()
+
+
+def test_si_hoy_no_se_armo_la_presentacion_no_se_sube_la_de_ayer(entorno, monkeypatch):
+    deps, hechos, _ = entorno
+    pipeline.PREVIEWS.mkdir(parents=True, exist_ok=True)
+    (pipeline.PREVIEWS / presentacion.ARCHIVO).write_bytes(b"la de ayer")
+
+    def falla(*args, **kwargs):
+        raise ValueError("plantilla rota")
+
+    monkeypatch.setattr(pipeline.presentacion, "armar", falla)
+    pipeline.correr(pipeline.Opciones(), deps)
+    assert hechos["presentaciones"] == []
+
+
+def test_si_falla_la_publicacion_de_la_presentacion_es_advertencia(entorno):
+    deps, hechos, _ = entorno
+
+    def publicar(repo, archivo, mensaje=None):
+        raise RuntimeError("push rechazado")
+
+    r = pipeline.correr(pipeline.Opciones(), replace(deps, publicar_presentacion=publicar))
+
+    etapa = next(e for e in r.etapas if e.nombre == "previews")
+    assert etapa.estado == "advertencia" and "push rechazado" in etapa.detalle
+    assert r.estado == "advertencia" and r.exitosa
+    assert len(hechos["previews"]) == 1 and len(hechos["mails"]) == 2 and hechos["alertas"] == []
+
+
+def test_sin_cambios_en_graficos_pero_con_presentacion_publicada_queda_ok(entorno):
+    deps, hechos, _ = entorno
+    r = pipeline.correr(pipeline.Opciones(), replace(deps, actualizar_previews=lambda repo, archivos=None: (False, "sin cambios")))
+    etapa = next(e for e in r.etapas if e.nombre == "previews")
+    assert etapa.estado == "ok" and "publicada" in etapa.detalle
+
+
+def test_sin_python_pptx_la_corrida_sigue_y_avisa(entorno, monkeypatch):
+    deps, hechos, salida = entorno
+    monkeypatch.setattr(pipeline, "presentacion", None)
+    monkeypatch.setattr(pipeline, "FALTA_PRESENTACION", "ModuleNotFoundError: No module named 'pptx'", raising=False)
+
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+
+    etapa = next(e for e in r.etapas if e.nombre == "presentacion")
+    assert etapa.estado == "advertencia" and "requirements.txt" in etapa.detalle
+    assert r.exitosa and len(hechos["mails"]) == 2
+
+
+def test_dry_run_con_salida_dentro_de_previews_usa_un_temporal(monkeypatch, tmp_path):
+    monkeypatch.setattr(pipeline, "PREVIEWS", tmp_path / "Previews")
+    carpeta = pipeline._carpeta_de_salida(pipeline.Opciones(dry_run=True, salida=tmp_path / "Previews" / "prueba"))
+    assert not carpeta.resolve().is_relative_to(tmp_path / "Previews")
