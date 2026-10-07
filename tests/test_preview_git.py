@@ -70,3 +70,15 @@ def test_un_push_que_falla_levanta(repo, tmp_path):
     (local / "Previews" / "grafico.jpg").write_bytes(b"v3")
     with pytest.raises(preview_git.GitError):
         preview_git.actualizar_previews(local)
+
+
+def test_con_archivos_solo_commitea_esos(repo):
+    local, remoto = repo
+    (local / "Previews" / "grafico.jpg").write_bytes(b"v2")
+    (local / "Previews" / "mail.eml").write_text("vista previa del mail")
+
+    hecho, _ = preview_git.actualizar_previews(local, archivos=["grafico.jpg"])
+
+    assert hecho is True
+    assert _git(remoto, "show", "--name-only", "--format=", "HEAD").split() == ["Previews/grafico.jpg"]
+    assert "mail.eml" in _git(local, "status", "--porcelain")  # quedó afuera del commit

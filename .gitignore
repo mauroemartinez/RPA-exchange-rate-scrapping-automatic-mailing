@@ -24,6 +24,9 @@ Thumbs.db
 # Logs
 *.log
 
+# Secretos de Streamlit (dashboard/): llevarían la URL de la base al repo público
+.streamlit/
+
 # Claude / Anthropic local files
 .claude/
 claude/

@@ -32,6 +32,8 @@ README.md
 AGENTS.md
 docs/
 logs/
+*.log
+.streamlit/
 # El notebook ya no se ejecuta en el contenedor: /run corre pipeline.py
 notebooks/
 tests/

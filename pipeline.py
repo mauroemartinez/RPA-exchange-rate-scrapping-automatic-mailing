@@ -39,7 +39,6 @@ from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
-from urllib.parse import urlparse
 
 from pydantic import EmailStr, TypeAdapter, ValidationError
 
@@ -52,7 +51,7 @@ import mailer
 import preview_git
 import scrapers
 import transformations
-from config import settings
+from config import redactar, reemplazos_sensibles, settings
 from scrapers import agregados, btc, feriados
 from scrapers.utils import ScraperError
 
@@ -420,6 +419,10 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
     inflacion_12 = transformations.ultimos_meses(inflacion)
 
     carpeta = opciones.salida or (Path(tempfile.mkdtemp(prefix="macro_dryrun_")) if opciones.dry_run else PREVIEWS)
+    if opciones.dry_run and carpeta.resolve() == PREVIEWS:
+        # La vista previa (mail.eml, con el remitente) terminaría commiteada en el repo público
+        log.warning("Un dry-run no escribe en Previews/: se usa una carpeta temporal")
+        carpeta = Path(tempfile.mkdtemp(prefix="macro_dryrun_"))
     carpeta.mkdir(parents=True, exist_ok=True)
     if opciones.dry_run or carpeta != PREVIEWS:
         resultado.salida = carpeta
@@ -503,7 +506,7 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
         registro.omitir("previews", f"RUTA_REPO ({settings.ruta_repo}) no es la carpeta de este código ({RAIZ})")
     else:
         with registro.etapa("previews", critica=False) as e:
-            hecho, e.detalle = deps.actualizar_previews(RAIZ)
+            hecho, e.detalle = deps.actualizar_previews(RAIZ, archivos=list(charts.ORDEN_EN_MAIL))
             if not hecho:
                 e.estado = OMITIDA
 
@@ -547,32 +550,6 @@ def _guardar_vista_previa(carpeta: Path, html: str, imagenes: dict[str, bytes], 
     log.info("Vista previa del mail en %s", carpeta)
 
 
-def _reemplazos_sensibles() -> list[tuple[str, str]]:
-    """(texto, reemplazo) para cada secreto del .env y cada dirección de destinatario.
-
-    Los más largos primero: una URL de conexión se tapa entera antes de que su
-    contraseña se reemplace sola.
-    """
-    secretos = [
-        settings.email_password, settings.gemini_api_key_1, settings.gemini_api_key_2,
-        settings.fed_api_key, settings.supabase_db_url, settings.api_key_easy_panel,
-    ]
-    pares = [(s.get_secret_value(), "***") for s in secretos if s is not None]
-    clave_base = urlparse(settings.supabase_db_url.get_secret_value()).password
-    if clave_base:
-        pares.append((clave_base, "***"))
-    destinatarios = {str(m) for m in [*settings.email_receiver, *settings.email_receiver_csv]}
-    pares += [(m, "[destinatario]") for m in destinatarios]
-    return sorted((p for p in pares if p[0]), key=lambda p: len(p[0]), reverse=True)
-
-
-def redactar(texto: str) -> str:
-    """El texto sin secretos ni direcciones de destinatarios."""
-    for secreto, reemplazo in _reemplazos_sensibles():
-        texto = texto.replace(secreto, reemplazo)
-    return texto
-
-
 class _FormatoSinSecretos(logging.Formatter):
     """Tapa secretos y destinatarios en cada línea del log, traceback incluido.
 
@@ -583,7 +560,7 @@ class _FormatoSinSecretos(logging.Formatter):
 
     def __init__(self, fmt: str):
         super().__init__(fmt)
-        self._reemplazos = _reemplazos_sensibles()
+        self._reemplazos = reemplazos_sensibles()
 
     def format(self, record: logging.LogRecord) -> str:
         texto = super().format(record)
@@ -637,6 +614,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", type=Path, help="Escribe el resultado de la corrida como JSON en este archivo")
     parser.add_argument("--origen", default="cli", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+
+    if args.dry_run and args.salida and args.salida.resolve() == PREVIEWS:
+        parser.error("--salida no puede ser Previews/ en un dry-run: esa carpeta se commitea y se pushea sola")
 
     if args.enviar_a:
         try:

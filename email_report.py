@@ -293,7 +293,15 @@ def csv_historico(df: pd.DataFrame) -> str:
     columnas = [*COLUMNAS_FILA, "ai_paragraph"]
     salida = df.reindex(columns=columnas).copy()
     salida["Fecha"] = pd.to_datetime(salida["Fecha"]).dt.strftime("%Y-%m-%d")
+    salida["ai_paragraph"] = salida["ai_paragraph"].map(_sin_formula)
     return salida.to_csv(index=False, lineterminator="\n")
+
+
+def _sin_formula(valor):
+    """Un texto que empieza con =, +, - o @ se antepone con ' para que Excel no lo ejecute."""
+    if isinstance(valor, str) and valor[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + valor
+    return valor
 
 
 def enviar_reporte_diario(

@@ -30,8 +30,14 @@ def _git(repo: Path, *args: str) -> str:
     return proc.stdout
 
 
-def actualizar_previews(repo: Path, carpeta: str = CARPETA, rama: str = RAMA) -> tuple[bool, str]:
-    """Commitea y pushea los cambios de `carpeta`. Devuelve (hizo_algo, detalle).
+def actualizar_previews(
+    repo: Path, archivos: list[str] | None = None, carpeta: str = CARPETA, rama: str = RAMA
+) -> tuple[bool, str]:
+    """Commitea y pushea los cambios de `archivos` dentro de `carpeta`. Devuelve (hizo_algo, detalle).
+
+    Con `archivos`, solo esos: el repo es público y un archivo que cayó en la
+    carpeta por error (una vista previa del mail, por ejemplo) no tiene que
+    publicarse. Sin `archivos`, toda la carpeta, como la celda 49.
 
     Levanta GitError si falla un comando cuando sí correspondía correrlo. Los casos
     en que no corresponde (sin git, sin repo, otra rama, sin cambios) no son error.
@@ -47,13 +53,14 @@ def actualizar_previews(repo: Path, carpeta: str = CARPETA, rama: str = RAMA) ->
     if actual != rama:
         return False, f"la rama actual es '{actual}' y no '{rama}': no se commitea"
 
-    if not _git(repo, "status", "--porcelain", "--", carpeta).strip():
+    rutas = [f"{carpeta}/{a}" for a in archivos] if archivos else [carpeta]
+    if not _git(repo, "status", "--porcelain", "--", *rutas).strip():
         return False, f"sin cambios en {carpeta}"
 
-    _git(repo, "add", "--", carpeta)
-    # Con la ruta al final, el commit lleva solo Previews/ aunque haya otras cosas
-    # en el stage. La celda hacía un `git commit` a secas.
-    _git(repo, "commit", "-m", MENSAJE, "--", carpeta)
+    _git(repo, "add", "--", *rutas)
+    # Con las rutas al final, el commit lleva solo esos archivos aunque haya otras
+    # cosas en el stage. La celda hacía un `git commit` a secas.
+    _git(repo, "commit", "-m", MENSAJE, "--", *rutas)
     _git(repo, "push")
     log.info("Previews actualizado en GitHub")
     return True, "Previews actualizado en GitHub"

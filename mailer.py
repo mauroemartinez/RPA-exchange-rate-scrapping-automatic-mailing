@@ -1,7 +1,8 @@
 """Envío de mails de alerta cuando algo del pipeline falla.
 
 Separado del reporte para que cualquier módulo pueda avisar sin depender del resto.
-Las alertas van en texto plano a EMAIL_RECEIVER_CSV.
+Las alertas van en texto plano a EMAIL_ALERTAS, o a EMAIL_RECEIVER_CSV si no está
+configurada, y pasan por config.redactar: un traceback puede arrastrar una clave.
 """
 
 import logging
@@ -11,7 +12,7 @@ import traceback
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from config import settings
+from config import redactar, settings
 
 log = logging.getLogger(__name__)
 
@@ -20,12 +21,13 @@ SMTP_PORT = 587
 
 
 def enviar_alerta(asunto: str, cuerpo: str) -> bool:
-    """Mail de texto plano a EMAIL_RECEIVER_CSV. Devuelve si pudo enviarlo.
+    """Mail de texto plano a la lista de alertas. Devuelve si pudo enviarlo.
 
     Nunca propaga: si el SMTP también está caído, se avisa en el log y se sigue.
     Una alerta que rompe el proceso que intentaba reportar no sirve de nada.
     """
-    destinatarios = list(settings.email_receiver_csv)
+    destinatarios = settings.destinatarios_alertas
+    asunto, cuerpo = redactar(asunto), redactar(cuerpo)
     em = MIMEMultipart()
     em["From"] = settings.email_sender
     em["To"] = ", ".join(destinatarios)
