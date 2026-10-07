@@ -7,6 +7,7 @@ histórico completo y guardar la fila del día sin duplicar la fecha.
 import logging
 from contextlib import contextmanager
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import (
@@ -70,7 +71,8 @@ def leer_historico(engine: Engine, respaldo_csv: bool = True) -> tuple[pd.DataFr
         return _normalizar_fecha(df).dropna(subset=["Fecha"]), "supabase"
 
     except Exception:
-        if not respaldo_csv:
+        # Sin respaldo (en GitHub Actions el CSV no existe), el error que importa es el de la base
+        if not respaldo_csv or not Path(settings.ruta_bbdd).exists():
             raise
         log.exception("No se pudo leer Supabase; se usa el CSV de contingencia %s", settings.ruta_bbdd)
         # UTF-8 y no latin1: leerlo como latin1 era lo que rompía las tildes de los párrafos

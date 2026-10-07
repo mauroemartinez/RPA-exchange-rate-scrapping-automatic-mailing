@@ -206,3 +206,26 @@ def test_grafico_de_agregados_con_las_series_del_pipeline(series_indicadores, tm
     series, _ = series_indicadores
     ruta = charts.grafico_agregados(*charts.preparar_agregados(series, HOY), tmp_path)
     assert ruta.name == charts.AGREGADOS and ruta.stat().st_size > 10_000
+
+
+def test_una_variable_rota_no_se_lleva_a_las_demas():
+    llamadas = []
+    sana = _api_falsa({15: _diaria(10)}, llamadas)
+
+    def responder(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/1624"):
+            return httpx.Response(404)
+        return sana.handle_request(request)
+
+    cliente = httpx.AsyncClient(transport=httpx.MockTransport(responder))
+    series = run_async(agregados.fetch_todas(cliente, claves=["base_monetaria", "m3"]))
+    assert list(series) == ["base_monetaria"] and len(series["base_monetaria"]) == 10
+
+
+def test_un_429_se_reintenta():
+    from scrapers.utils import _es_error_http_transitorio
+
+    pedido = httpx.Request("GET", "https://api.bcra.gob.ar/x")
+    error = lambda codigo: httpx.HTTPStatusError("x", request=pedido, response=httpx.Response(codigo, request=pedido))  # noqa: E731
+    assert _es_error_http_transitorio(error(429)) and _es_error_http_transitorio(error(503))
+    assert not _es_error_http_transitorio(error(404))

@@ -22,9 +22,9 @@ on:
   workflow_dispatch:
     inputs:
       modo:
-        description: "dry-run no escribe ni manda nada; real hace la corrida completa"
+        description: "dry-run no escribe ni manda nada; real hace la corrida completa; sin-mail hace todo menos el mail (para cargar la fila de un día cuyo mail ya salió)"
         type: choice
-        options: [dry-run, real]
+        options: [dry-run, real, sin-mail]
         default: dry-run
   schedule:
     - cron: "13 20 * * 1-5"   # 17:13 en Argentina (UTC-3), de lunes a viernes
@@ -39,8 +39,9 @@ concurrency:
 jobs:
   corrida:
     # El horario solo corre con el interruptor prendido; a mano, siempre
-    if: github.event_name != 'schedule' || vars.CORRIDA_AUTOMATICA == 'si'
-    runs-on: ubuntu-latest
+    # GitHub compara sin distinguir mayúsculas: vale si, Si o SI, y también sí con tilde
+    if: github.event_name != 'schedule' || vars.CORRIDA_AUTOMATICA == 'si' || vars.CORRIDA_AUTOMATICA == 'sí'
+    runs-on: ubuntu-24.04  # fija: un cambio de versión de Ubuntu puede romper las dependencias de Chromium
     timeout-minutes: 30
     env:
       TZ: America/Argentina/Buenos_Aires
@@ -58,6 +59,11 @@ jobs:
       RUTA_BBDD: data/no-existe.csv
       RUTA_REPO: .
     steps:
+      - name: Tapar en el log cada dirección de mail
+        # GitHub tapa los secretos enteros, pero una dirección suelta de una lista no
+        run: |
+          for m in $(printf '%s' "$EMAIL_RECEIVER,$EMAIL_RECEIVER_CSV,$EMAIL_ALERTAS" | tr ',' ' '); do echo "::add-mask::$m"; done
+
       - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v7
@@ -69,7 +75,13 @@ jobs:
       - name: Dependencias
         run: |
           pip install -r requirements.txt
-          python -m playwright install --with-deps chromium
+          # Solo el Chromium sin interfaz, que es el que usan los scrapers (unos 170 MB menos
+          # por corrida). Con reintentos: apt a veces falla un rato, y esa falla no tiene alerta
+          for intento in 1 2 3; do
+            python -m playwright install --with-deps --only-shell chromium && break
+            [ "$intento" = 3 ] && exit 1
+            sleep 20
+          done
 
       - name: Identidad de git para los commits
         # Los commits salen a nombre del dueño del repo, con su dirección noreply de
@@ -83,8 +95,8 @@ jobs:
 
       - name: Corrida
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.modo }}" = "real" ]; then
-            python pipeline.py --origen github-actions
-          else
-            python pipeline.py --dry-run --origen github-actions
-          fi
+          case "${{ github.event_name }}:${{ inputs.modo }}" in
+            schedule:*|*:real) python pipeline.py --origen github-actions ;;
+            *:sin-mail) python pipeline.py --sin-mail --origen github-actions ;;
+            *) python pipeline.py --dry-run --origen github-actions ;;
+          esac

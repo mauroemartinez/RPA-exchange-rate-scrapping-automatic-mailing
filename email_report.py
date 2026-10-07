@@ -22,6 +22,7 @@ import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 from tabulate import tabulate
 
+import indicadores
 import mailer
 from charts import COTIZACIONES_A_MOSTRAR, ORDEN_EN_MAIL
 from config import settings
@@ -211,8 +212,9 @@ def contexto_template(
         web_euro=ambito.WEB_EURO,
         fed_api_url=fed.API_URL,
         bcra_api_url=bcra.API_BASE,
-        # Las fuentes de agregados y deuda van al pie solo si alguno de esos gráficos viaja
-        fuente_deuda=finanzas.PAGINA if any(cid in graficos for cid in explicaciones or {}) else None,
+        # La Secretaría de Finanzas va al pie solo si el gráfico de deuda viaja y llegó a usar su dato
+        fuente_deuda=finanzas.PAGINA if indicadores.CID_DEUDA in graficos
+        and (explicaciones or {}).get(indicadores.CID_DEUDA, {}).get("con_deuda_bruta") else None,
         performance_segundos=performance_segundos,
         graficos=graficos,
         comentarios=comentarios or {},

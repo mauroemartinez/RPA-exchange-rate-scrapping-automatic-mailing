@@ -149,3 +149,22 @@ def test_un_grafico_que_no_existe_no_rompe_el_commit(repo):
 
     assert hecho is True
     assert _git(remoto, "show", "--name-only", "--format=", "HEAD").split() == ["Previews/grafico.jpg"]
+
+
+def test_si_main_avanzo_durante_la_corrida_se_trae_y_se_reintenta(repo, tmp_path):
+    local, remoto = repo
+    # Otro clon pushea a main mientras corre el reporte (un merge, por ejemplo)
+    otro = tmp_path / "otro"
+    subprocess.run(["git", "clone", str(remoto), str(otro)], check=True, capture_output=True)
+    _git(otro, "config", "user.name", "Otro")
+    _git(otro, "config", "user.email", "otro@example.com")
+    (otro / "otro.txt").write_text("cambio de otro lado")
+    _git(otro, "commit", "-am", "cambio de otro lado")
+    _git(otro, "push")
+
+    (local / "Previews" / "grafico.jpg").write_bytes(b"v2")
+    hecho, _ = preview_git.actualizar_previews(local)
+
+    assert hecho is True
+    asuntos = _git(remoto, "log", "--format=%s", "-3").splitlines()
+    assert asuntos[:2] == [preview_git.MENSAJE, "cambio de otro lado"]

@@ -52,6 +52,21 @@ def _motivo_para_no_tocar_git(repo: Path, rama: str) -> str | None:
     return None
 
 
+def _push_con_reintento(repo: Path) -> None:
+    """git push; si main avanzó durante la corrida (un merge, otro push), trae lo nuevo y reintenta una vez."""
+    try:
+        _git(repo, "push")
+    except GitError:
+        log.warning("El push fue rechazado: se trae lo nuevo de origin y se reintenta")
+        try:
+            _git(repo, "pull", "--rebase", "--autostash")
+        except GitError:
+            # Un conflicto deja el rebase a medias: se deshace para no dejar el repo trabado
+            subprocess.run(["git", "-C", str(repo), "rebase", "--abort"], capture_output=True, timeout=120)
+            raise
+        _git(repo, "push")
+
+
 def actualizar_previews(
     repo: Path, archivos: list[str] | None = None, carpeta: str = CARPETA, rama: str = RAMA
 ) -> tuple[bool, str]:
@@ -80,7 +95,7 @@ def actualizar_previews(
     # Con las rutas al final, el commit lleva solo esos archivos aunque haya otras
     # cosas en el stage. La celda hacía un `git commit` a secas.
     _git(repo, "commit", "-m", MENSAJE, "--", *rutas)
-    _git(repo, "push")
+    _push_con_reintento(repo)
     log.info("Previews actualizado en GitHub")
     return True, "Previews actualizado en GitHub"
 

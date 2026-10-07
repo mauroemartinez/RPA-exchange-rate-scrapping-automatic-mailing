@@ -130,3 +130,17 @@ def test_la_direccion_de_alertas_tambien_se_tapa(monkeypatch):
 
     monkeypatch.setattr(config.settings, "email_alertas", ["dev@example.com"])
     assert config.redactar("535 rechazado: dev@example.com") == "535 rechazado: [destinatario]"
+
+
+def test_una_segunda_key_de_gemini_vacia_no_entra_a_la_rotacion():
+    assert config.Settings(gemini_api_key_2="").gemini_keys == ["gemini-falsa-1"]
+
+
+def test_se_tapan_el_usuario_y_el_host_de_la_base(monkeypatch):
+    from pydantic import SecretStr
+
+    url = "postgresql://postgres.abcdefproyecto:clave-db@aws-0-sa-east-1.pooler.supabase.com:5432/postgres"
+    monkeypatch.setattr(config.settings, "supabase_db_url", SecretStr(url))
+    texto = config.redactar("no conecta postgres.abcdefproyecto en aws-0-sa-east-1.pooler.supabase.com")
+    assert "abcdefproyecto" not in texto and "pooler.supabase.com" not in texto
+    assert config.redactar("PostgreSQL y postgres siguen legibles") == "PostgreSQL y postgres siguen legibles"

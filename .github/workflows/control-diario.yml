@@ -24,8 +24,9 @@ permissions:
 
 jobs:
   control:
-    if: github.event_name != 'schedule' || vars.CORRIDA_AUTOMATICA == 'si'
-    runs-on: ubuntu-latest
+    # GitHub compara sin distinguir mayúsculas: vale si, Si o SI, y también sí con tilde
+    if: github.event_name != 'schedule' || vars.CORRIDA_AUTOMATICA == 'si' || vars.CORRIDA_AUTOMATICA == 'sí'
+    runs-on: ubuntu-24.04  # fija: un cambio de versión de Ubuntu puede romper las dependencias de Chromium
     timeout-minutes: 10
     env:
       EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
@@ -40,6 +41,11 @@ jobs:
       RUTA_BBDD: data/no-existe.csv
       RUTA_REPO: .
     steps:
+      - name: Tapar en el log cada dirección de mail
+        # GitHub tapa los secretos enteros, pero una dirección suelta de una lista no
+        run: |
+          for m in $(printf '%s' "$EMAIL_RECEIVER,$EMAIL_RECEIVER_CSV,$EMAIL_ALERTAS" | tr ',' ' '); do echo "::add-mask::$m"; done
+
       - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v7

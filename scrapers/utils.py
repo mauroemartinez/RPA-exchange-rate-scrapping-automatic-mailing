@@ -53,7 +53,8 @@ def _es_error_http_transitorio(exc: BaseException) -> bool:
     if isinstance(exc, httpx.TransportError):
         return True
     if isinstance(exc, httpx.HTTPStatusError):
-        return exc.response.status_code >= 500
+        # 429: la API pide que se espere un poco, no que se deje de intentar
+        return exc.response.status_code >= 500 or exc.response.status_code == 429
     return False
 
 

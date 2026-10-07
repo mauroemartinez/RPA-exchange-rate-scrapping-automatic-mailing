@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   verificar:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     # Valores falsos, solo para que config.py se pueda importar
     env:

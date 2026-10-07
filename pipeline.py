@@ -36,6 +36,7 @@ Uso:
 import argparse
 import json
 import logging
+import os
 import sys
 import tempfile
 import time
@@ -378,9 +379,13 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
         registro, carpeta, df, inflacion, inflacion_12, btc_df, falla_btc, series, provisorios, fecha,
     )
     # Solo de los gráficos que se generaron: una explicación sin su gráfico no tiene sentido
-    explicaciones = indicadores.explicaciones(
-        series, provisorios, cids=email_report.cids_disponibles({nombre: b"" for nombre in generados}),
-    )
+    cids = email_report.cids_disponibles({nombre: b"" for nombre in generados})
+    try:
+        explicaciones = indicadores.explicaciones(series, provisorios, cids=cids)
+    except Exception:
+        # Las frases con los últimos datos son un agregado: si algo falla, van los textos fijos
+        log.exception("No se pudieron armar las frases de agregados y deuda; van solo los textos fijos")
+        explicaciones = indicadores.textos_fijos(cids)
 
     _etapa_mail(
         opciones, deps, registro, fecha, comienzo, df, df_base, inflacion_12, fwd_oficial, fwd_blue,
@@ -534,6 +539,10 @@ def _etapa_indicadores(deps: Dependencias, registro: _Registro, fecha: date) -> 
         except Exception as exc:
             log.warning("Sin series del BCRA: %s", exc)
             avisos.append(f"BCRA: {type(exc).__name__}: {exc}")
+        else:
+            faltan = [clave for clave in agregados.POR_CLAVE if clave not in series]
+            if faltan:
+                avisos.append(f"BCRA: sin {', '.join(faltan)}")
         try:
             series[agregados.DEUDA_BRUTA.clave], provisorios = deps.descargar_deuda()
         except Exception as exc:
@@ -713,8 +722,15 @@ def _etapa_previews(
         registro.omitir("previews", f"RUTA_REPO ({settings.ruta_repo}) no es la carpeta de este código ({RAIZ})")
     else:
         with registro.etapa("previews", critica=False) as e:
-            hecho, detalle = deps.actualizar_previews(RAIZ, archivos=list(charts.ORDEN_EN_MAIL))
-            partes = [detalle]
+            partes, hecho = [], False
+            try:
+                hecho, detalle = deps.actualizar_previews(RAIZ, archivos=list(charts.ORDEN_EN_MAIL))
+                partes.append(detalle)
+            except Exception as exc:
+                # Queda en error, pero se sigue: el PowerPoint va a otra rama y no depende de este push
+                log.exception("No se pudieron publicar los gráficos")
+                partes.append(f"gráficos sin publicar: {type(exc).__name__}: {exc}")
+                e.estado = ERROR
             if deck is not None:
                 try:
                     publicado, detalle_deck = deps.publicar_presentacion(
@@ -725,9 +741,10 @@ def _etapa_previews(
                 except Exception as exc:
                     log.exception("No se pudo publicar la presentación")
                     partes.append(f"presentación sin publicar: {type(exc).__name__}: {exc}")
-                    e.estado = ADVERTENCIA
+                    if e.estado != ERROR:
+                        e.estado = ADVERTENCIA
             e.detalle = "; ".join(partes)
-            if not hecho and e.estado != ADVERTENCIA:
+            if not hecho and e.estado == OK:
                 e.estado = OMITIDA
 
 
@@ -886,7 +903,30 @@ def main(argv: list[str] | None = None) -> int:
     )
     if args.json:
         args.json.write_text(redactar(json.dumps(resultado.como_dict(), ensure_ascii=False, indent=2)), encoding="utf-8")
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        _avisar_en_github(resultado)
     return 0 if resultado.exitosa else 1
+
+
+def _escapar_anotacion(texto: str) -> str:
+    return texto.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def _avisar_en_github(resultado: ResultadoCorrida) -> None:
+    """Una anotación por etapa en advertencia o error, y el resumen de la corrida en la página del run.
+
+    Una corrida en verde puede tener etapas en advertencia (por ejemplo, el mail salió
+    sin un gráfico porque una fuente no respondió desde los servidores de GitHub).
+    Sin esto, solo se vería abriendo el log. Todo pasa por redactar(): el log es público.
+    """
+    for etapa in resultado.etapas:
+        if etapa.estado in (ADVERTENCIA, ERROR):
+            nivel = "error" if etapa.estado == ERROR else "warning"
+            print(f"::{nivel} title={etapa.nombre}::{_escapar_anotacion(redactar(etapa.detalle or etapa.estado))}")
+    resumen = os.environ.get("GITHUB_STEP_SUMMARY")
+    if resumen:
+        with open(resumen, "a", encoding="utf-8") as fh:
+            fh.write("```\n" + redactar(resultado.resumen()) + "\n```\n")
 
 
 if __name__ == "__main__":

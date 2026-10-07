@@ -28,7 +28,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # --with-deps instala también las librerías de sistema que Chromium necesita.
 # Va en su propia capa porque pesa ~400MB y cambia mucho menos que el código.
-RUN playwright install --with-deps chromium
+# Solo el Chromium sin interfaz, el que usan los scrapers: unos 400 MB menos de imagen
+RUN playwright install --with-deps --only-shell chromium
 
 # ── usuario sin privilegios ───────────────────────────────────────────────────
 # Por defecto un contenedor corre como root. Si alguien logra ejecutar código

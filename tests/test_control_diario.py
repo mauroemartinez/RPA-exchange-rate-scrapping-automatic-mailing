@@ -77,3 +77,11 @@ def test_sin_alerta_no_manda_el_mail(entorno):
     usar(None)
     assert control_diario.main(["--sin-alerta"]) == 1
     assert alertas == []
+
+
+def test_la_alerta_no_induce_a_mandar_el_mail_dos_veces(entorno, capsys):
+    usar, _ = entorno
+    usar(None)
+    control_diario.main(["--sin-alerta"])
+    salida = capsys.readouterr().out
+    assert "--sin-mail" in salida and "YA SALIÓ" in salida
