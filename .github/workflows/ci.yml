@@ -1,0 +1,61 @@
+# Verificaciones sin efectos externos: lint, imports y tests.
+#
+# No necesita ningún secreto: los tests cargan credenciales falsas, fallan si
+# intentan salir a la red o abrir una conexión SMTP, y no levantan navegadores.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    # Los commits automáticos de Previews/ no tocan código
+    paths-ignore: ["Previews/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Valores falsos, solo para que config.py se pueda importar
+    env:
+      EMAIL_SENDER: remitente@example.com
+      EMAIL_PASSWORD: no-es-una-clave
+      EMAIL_RECEIVER: uno@example.com
+      EMAIL_RECEIVER_CSV: csv@example.com
+      GEMINI_API_KEY_1: no-es-una-clave
+      FED_API_KEY: no-es-una-clave
+      SUPABASE_DB_URL: postgresql://usuario:clave@127.0.0.1:1/inexistente
+      RUTA_BBDD: data/no-existe.csv
+      RUTA_REPO: .
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            dashboard/requirements.txt
+
+      - name: Dependencias
+        run: pip install -r requirements-dev.txt -r dashboard/requirements.txt
+
+      - name: Lint (ruff, incluye el orden de los imports)
+        run: ruff check .
+
+      - name: Imports
+        run: >
+          python -c "import pipeline, app, data_access, transformations, charts, email_report,
+          preview_git, ia_generator, mailer, models, fechas, scrapers.agregados, scrapers.btc,
+          scrapers.feriados"
+
+      - name: Tests
+        run: pytest -q

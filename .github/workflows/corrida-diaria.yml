@@ -1,0 +1,102 @@
+# La corrida diaria del reporte en GitHub Actions (fase 6 del roadmap).
+#
+# CÓMO SE PRENDE: el horario de abajo solo corre si existe la variable del repo
+# CORRIDA_AUTOMATICA con el valor si (Settings > Secrets and variables > Actions >
+# Variables). Sin ella, el trabajo figura cada día como salteado y no hace nada.
+# Para apagarlo, cambiá la variable a no o borrala. A mano (Actions > Corrida
+# diaria > Run workflow) siempre se puede correr, en dry-run por defecto.
+# Con la variable en si, dejá de correr el notebook: no respeta el candado que
+# evita dos corridas el mismo día. Pasos completos: docs/programacion-y-monitoreo.md.
+#
+# El horario está en UTC, no en hora argentina: 20:13 UTC son las 17:13 en
+# Argentina. Va a los 13 minutos y no en punto porque GitHub recomienda evitar el
+# comienzo de cada hora, cuando más se atrasan las corridas programadas.
+#
+# El repo es público, así que el log de cada corrida también lo es. GitHub tapa
+# los secretos completos y pipeline.py tapa además cada clave y cada dirección
+# de destinatario en sus líneas de log. Aun así, no subas artefactos con la
+# vista previa del mail ni el detalle de errores.
+name: Corrida diaria
+
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: "dry-run no escribe ni manda nada; real hace la corrida completa; sin-mail hace todo menos el mail (para cargar la fila de un día cuyo mail ya salió)"
+        type: choice
+        options: [dry-run, real, sin-mail]
+        default: dry-run
+  schedule:
+    - cron: "13 20 * * 1-5"   # 17:13 en Argentina (UTC-3), de lunes a viernes
+
+permissions:
+  contents: write  # para el commit de Previews/ y la rama del PowerPoint
+
+concurrency:
+  group: corrida-diaria
+  cancel-in-progress: false
+
+jobs:
+  corrida:
+    # El horario solo corre con el interruptor prendido; a mano, siempre
+    # GitHub compara sin distinguir mayúsculas: vale si, Si o SI, y también sí con tilde
+    if: github.event_name != 'schedule' || vars.CORRIDA_AUTOMATICA == 'si' || vars.CORRIDA_AUTOMATICA == 'sí'
+    runs-on: ubuntu-24.04  # fija: un cambio de versión de Ubuntu puede romper las dependencias de Chromium
+    timeout-minutes: 30
+    env:
+      TZ: America/Argentina/Buenos_Aires
+      EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+      EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+      EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
+      EMAIL_RECEIVER_CSV: ${{ secrets.EMAIL_RECEIVER_CSV }}
+      # Opcional: sin el secreto llega vacía y las alertas van a EMAIL_RECEIVER_CSV
+      EMAIL_ALERTAS: ${{ secrets.EMAIL_ALERTAS }}
+      GEMINI_API_KEY_1: ${{ secrets.GEMINI_API_KEY_1 }}
+      GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+      FED_API_KEY: ${{ secrets.FED_API_KEY }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      # El CSV de respaldo no existe en el runner: solo se lee si Supabase no responde
+      RUTA_BBDD: data/no-existe.csv
+      RUTA_REPO: .
+    steps:
+      - name: Tapar en el log cada dirección de mail
+        # GitHub tapa los secretos enteros, pero una dirección suelta de una lista no
+        run: |
+          for m in $(printf '%s' "$EMAIL_RECEIVER,$EMAIL_RECEIVER_CSV,$EMAIL_ALERTAS" | tr ',' ' '); do echo "::add-mask::$m"; done
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Dependencias
+        run: |
+          pip install -r requirements.txt
+          # Solo el Chromium sin interfaz, que es el que usan los scrapers (unos 170 MB menos
+          # por corrida). Con reintentos: apt a veces falla un rato, y esa falla no tiene alerta
+          for intento in 1 2 3; do
+            python -m playwright install --with-deps --only-shell chromium && break
+            [ "$intento" = 3 ] && exit 1
+            sleep 20
+          done
+
+      - name: Identidad de git para los commits
+        # Los commits salen a nombre del dueño del repo, con su dirección noreply de
+        # GitHub (la que GitHub asocia a la cuenta), no a nombre de un bot. Si en el
+        # primer commit automático no aparece tu foto (pasa con algunas cuentas
+        # creadas antes de 2017), creá la variable del repo EMAIL_COMMITS con el mail
+        # de tus commits y se usa esa.
+        run: |
+          git config user.name "${{ github.repository_owner }}"
+          git config user.email "${{ vars.EMAIL_COMMITS || format('{0}+{1}@users.noreply.github.com', github.repository_owner_id, github.repository_owner) }}"
+
+      - name: Corrida
+        run: |
+          case "${{ github.event_name }}:${{ inputs.modo }}" in
+            schedule:*|*:real) python pipeline.py --origen github-actions ;;
+            *:sin-mail) python pipeline.py --sin-mail --origen github-actions ;;
+            *) python pipeline.py --dry-run --origen github-actions ;;
+          esac

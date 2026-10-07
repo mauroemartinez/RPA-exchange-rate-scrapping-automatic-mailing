@@ -130,15 +130,29 @@
             <!-- PÁRRAFO IA -->
             <div class="ai-box" style="background:linear-gradient(135deg,#1a252f 0%,#2c3e50 100%); border-left:4px solid #f39c12; border-radius:6px; padding:16px 18px; margin:20px 0;">
               <div class="ai-label" style="font-size:10px; color:#f39c12; text-transform:uppercase; letter-spacing:1px; font-weight:bold; margin-bottom:8px;">🤖 Análisis IA · Gemini</div>
-              <p style="color:#ecf0f1 !important; font-size:13px !important; line-height:1.7; margin:0;">{{ parrafo_ia }}</p>
+              <p style="color:#ecf0f1 !important; font-size:13px !important; line-height:1.7; margin:0;">{{ parrafo_ia | e }}</p>
             </div>
 
             <!-- GRÁFICOS -->
+            {#- Solo van los cid que vinieron adjuntos: si un gráfico no se pudo
+                generar, no queda una imagen rota. Sin la variable (el notebook no
+                la pasa) van los cuatro, como siempre. Es un comentario de Jinja y
+                no de HTML para que no viaje en el mail. #}
             <div style="text-align:center; width:100%; margin:20px 0;">
-              <img src='cid:image1' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
-              <img src='cid:image2' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
-              <img src='cid:image3' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
-              <img src='cid:image4' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+              {%- for cid in graficos | default(['image1', 'image2', 'image3', 'image4']) %}
+              <img src='cid:{{ cid }}' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+              {#- Comentarios de Gemini sobre este gráfico (fase 4). Sin comentarios no
+                  se agrega nada, ni siquiera un salto de línea. #}
+              {%- for titulo, texto in (comentarios or {}).get(cid, []) %}
+              <div class="comentario-ia" style="margin:0 0 18px 0; padding:10px 14px; background-color:#f4f6f8; border-left:3px solid #f39c12; border-radius:4px; text-align:left;"><b style="font-size:11px; color:#2c3e50; text-transform:uppercase; letter-spacing:0.5px;">🤖 {{ titulo | e }}</b><br><span style="color:#1a252f;">{{ texto | e }}</span></div>
+              {%- endfor %}
+              {#- Explicación para no especialistas de los gráficos de agregados y deuda:
+                  un texto fijo y una frase con los últimos datos, calculada en Python. #}
+              {%- set explicacion = (explicaciones or {}).get(cid) %}
+              {%- if explicacion %}
+              <div class="explicacion" style="margin:0 0 18px 0; padding:10px 14px; background-color:#eef5fb; border-left:3px solid #2980b9; border-radius:4px; text-align:left;"><b style="font-size:11px; color:#2c3e50; text-transform:uppercase; letter-spacing:0.5px;">💡 {{ explicacion.titulo | e }}</b><br><span style="color:#1a252f;">{{ explicacion.texto | e }}</span>{% if explicacion.dato %}<br><br><b style="color:#1a252f;">{{ explicacion.dato | e }}</b>{% endif %}</div>
+              {%- endif %}
+              {%- endfor %}
             </div>
 
             <!-- TABLA COTIZACIONES -->
@@ -167,6 +181,10 @@
               <b>Cotización Euro Blue: </b>{{ web_euro }}<br>
               <b>Tasa Efectiva Anual EEUU: </b>{{ fed_api_url }}<br>
               <b>Tasa Efectiva Anual e Inflación Mensual argentina: </b>{{ bcra_api_url }}<br>
+              {%- if fuente_deuda %}
+              <b>Agregados monetarios, deuda del BCRA y dólar mayorista: </b>{{ bcra_api_url }}<br>
+              <b>Deuda bruta del Tesoro: </b>{{ fuente_deuda }}<br>
+              {%- endif %}
               <b>Bitcoin: </b>finance.yahoo.com</p>
             </div>
 

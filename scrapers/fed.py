@@ -52,5 +52,11 @@ async def run(client: httpx.AsyncClient | None = None, api_key: str | None = Non
                 }
         raise ValueError("las últimas 10 observaciones vinieron todas vacías")
 
+    except httpx.HTTPStatusError as exc:
+        # El mensaje de httpx incluye la URL completa, y la de FRED lleva la API key
+        # en la query string: llegaba tal cual al mail de alerta y al log. Se
+        # relanza solo con el código, y sin encadenar la excepción original.
+        causa = RuntimeError(f"FRED respondió HTTP {exc.response.status_code}")
+        raise ScraperError("FED", "leer EFFR", causa) from None
     except Exception as exc:
         raise ScraperError("FED", "leer EFFR", exc) from exc

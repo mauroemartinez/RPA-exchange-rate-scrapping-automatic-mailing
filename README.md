@@ -27,6 +27,15 @@ Below is the end-to-end blueprint of the production data life cycle.
   <img src="https://raw.githubusercontent.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/main/Assets/Architecture.png" width="900" alt="Project Architecture">
 </p>
 
+### 🗓️ A Business Day, Step by Step
+GitHub Actions runs `pipeline.py` every business day: twelve stages, from the run lock to the warehouse, each one reporting its state and duration.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/main/Assets/Architecture_opcion2.png" width="900" alt="Daily run on GitHub Actions">
+</p>
+
+Both diagrams are generated from `Assets/arquitectura/construir.py`, so they can be updated without redrawing them.
+
 ---
 
 ## 📋 Project Overview
@@ -35,14 +44,17 @@ This repository features a robust, portfolio-grade Robotic Process Automation (R
 
 The system automates the ingestion of highly volatile financial variables, ensures data integrity within a centralized data warehouse, runs mathematical macro-projections, and distributes dynamic, highly-styled financial reports to a private subscriber list.
 
+Every business day the report brings official and parallel FX rates with their spreads, country risk, inflation, Irving Fisher forward rates, Bitcoin, the monetary aggregates and Argentina's public and private debt in US dollars, with an AI-written narrative and plain-language explanations for non-specialists. The same data feeds an executive PowerPoint deck. The whole run is built to work unattended on GitHub Actions' free plan, once its schedule is switched on.
+
 ### 🛠️ Core Tech Stack & Frameworks
-* **Data Ingestion (ETL):** httpx (REST APIs), Playwright (async Web Scraping).
+* **Data Ingestion (ETL):** httpx (REST APIs), Playwright (async Web Scraping), openpyxl (the Treasury's monthly debt workbook).
 * **Processing & Relational Mapping:** Pandas (Data Manipulation), SQLAlchemy (ORM).
 * **Data Validation:** Pydantic for strict schema validation before data is persisted.
 * **Configuration Management:** Pydantic-Settings for typed, fail-fast environment configuration.
 * **Data Warehouse:** **Supabase PostgreSQL** for cloud-hosted analytics and persistency. Before Supabase, I used Microsoft SQL Server 2022, Microsoft SQL Server 2019.
-* **Generative AI:** Google Gemini 2.5 Flash API (Contextual Macro Narrative Generation).
-* **Data Visualization & Delivery:** Matplotlib, Seaborn, Jinja2 HTML/CSS templates, Tabula PDF Parsing, SMTP Service.
+* **Generative AI:** Google Gemini Flash models with structured JSON output, validated with Pydantic, with multi-key and model failover (Contextual Macro Narrative Generation).
+* **Data Visualization & Delivery:** Matplotlib, Seaborn, Jinja2 HTML/CSS templates, tabulate, python-pptx (executive deck), SMTP Service.
+* **Orchestration & CI:** GitHub Actions on the free plan: the daily run, a daily control and the test suite on every push.
 
 ---
 
@@ -72,6 +84,10 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 * **Data Integrity Audit & Historical Backfill (2026):** A systematic comparison of the warehouse against its upstream APIs surfaced two silent capture defects. **Country risk** was shifted one business day: the scraper read Ámbito's last *published* close and stored it against the current date, 160 of 171 divergent rows matched the previous business day exactly. **BCRA effective annual rate** was reading `.iloc[-1]` on a descending-ordered API response, persisting the oldest record of a 1000-point window, a June 2022 rate stored as current, propagating into the AI narrative and the Irving Fisher forward-rate projections. 936 rows were corrected against source; both series now reconcile at 100%. Both modules now sort explicitly and expose the value's true publication date, with staleness warnings surfaced at runtime.
 * **Scraper Failure Alerting (2026):** Introduced a standalone `mailer.py` module that converts a `ScraperError` into a plain-text alert email carrying source, failed step, root cause, and traceback. Wired around the ingestion call so a broken selector or a downed API notifies the maintainer before the run aborts, closing the gap where failures died silently in an unattended process. The alert path never raises: an unreachable SMTP server degrades to a console warning rather than masking the original failure.
 * **TLS Verification Restored (2026):** The BCRA API integration carried `verify=False`, disabling certificate validation to work around a broken chain on the bank's side. Verified as fixed upstream and removed, restoring standard TLS validation on that request path.
+* **Notebook-free Pipeline (2026):** Ported the orchestration notebook into plain Python modules (`data_access`, `transformations`, `charts`, `email_report`, `preview_git`) driven by a `pipeline.py` entry point that both the CLI and the FastAPI service execute. The port was verified against the original notebook run dry on frozen inputs: the four charts, the rendered HTML and both MIME messages come out byte-identical. Three later, intentional fixes (the accumulated-inflation line of the variations chart, one decimal on the inflation axis, and a CSV attachment built from the warehouse instead of a stale local file) are the only differences from the notebook's output, and a golden-file test now pins the HTML byte for byte. Each stage now reports its state and duration, a failed email send turns the run red instead of printing a line, a `--dry-run` mode exercises live scraping without writing or sending anything, and the row date is computed in Argentina time, so a containerized run in UTC can no longer stamp tomorrow's date.
+* **Monetary Aggregates & Public Debt in Dollars (2026):** Added two charts to the daily report. The monetary aggregates (monetary base, M2, M3) show how much money circulates and how it grows against inflation. The debt chart tracks, always in US dollars, the Treasury's gross debt, private-sector bank loans, the Central Bank's letters and its transitory advances to the Treasury: BCRA series published in pesos are converted with the official wholesale rate of each day, and the Treasury's monthly workbook is read by its labels, with provisional months flagged. Each chart carries a plain-language explanation plus one sentence computed in Python from the latest figures, so the AI never writes the numbers.
+* **Executive PowerPoint, Replaced Daily (2026):** Every run builds an eight-slide executive deck with the indicators, the AI summary and the charts, and publishes it as the single commit of a dedicated branch. GitHub always holds the latest deck while old versions never pile up in the history.
+* **Cloud Scheduling on GitHub Actions (2026):** The daily run and a daily control run on GitHub Actions' free plan, switched on and off with a repository variable. A Postgres advisory lock prevents duplicate runs, the national holiday calendar skips non-business days, an unfinished day is detected and flagged, every log line is scrubbed of secrets and recipient addresses before it reaches the public log, and automated commits carry the owner's identity.
 * **Deployment Hardening (2026):** Reworked the container and service layer. Added a `.dockerignore`, the image previously built with `COPY . .` and no exclusions, baking the `.env` file into a layer where credentials remain readable via `docker history` regardless of later deletion. Unified the runtime on **Python 3.14-slim** to match the development environment, moved `fastapi`/`uvicorn`/`nbconvert` out of an unpinned inline `pip install` into pinned `requirements.txt` entries, and introduced a `requirements.in` manifest separating direct dependencies from the resolved lock. The container now runs as a non-root user with a shared Playwright browser path and reports liveness through a `HEALTHCHECK`. `app.py` was hardened in turn: authentication now fails **closed** (the previous `if API_KEY and ...` guard left `/run` publicly callable whenever the variable was unset), concurrent invocations are rejected with HTTP 409 via a non-blocking lock instead of running the pipeline twice in parallel, subprocess output no longer leaks into HTTP responses, and the hardcoded `/app` working directory is derived from the module path so the service is runnable locally.
 
 ---
@@ -79,24 +95,70 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 ## 📁 Repository Layout
 
 ```
-├── notebooks/          Orchestration notebook (relocates to project root on startup)
+├── pipeline.py         Daily run and its CLI: stages, per-stage results, alerts
+├── data_access.py      Supabase reads, idempotent insert, run lock
+├── transformations.py  Today's row, validation, spreads, Fisher forwards, inflation
+├── charts.py           The six report charts
+├── indicadores.py      Plain-language explanations of the aggregates and debt charts
+├── email_report.py     HTML rendering, MIME assembly and sending
+├── presentacion.py     The daily executive PowerPoint deck
+├── preview_git.py      Commit of Previews/ and publication of the deck branch
+├── fechas.py           Argentina-time dates and Spanish month names
 ├── scrapers/           Ingestion layer: Playwright scrapers + async REST clients
 ├── templates/          Jinja2 email template
-├── scripts/            Operational tooling (historical backfills, manual resends)
-├── sql/                Schema, bulk load and exploratory queries
+├── notebooks/          The original orchestration notebook, kept as a reference
+├── scripts/            Operational tooling (backfills, manual resends, daily control, prototypes)
+├── sql/                SQL applied by hand in Supabase: schema, migrations, cleaning
+├── tests/              Offline test suite; tests/datos/ pins the mail HTML
+├── docs/               Roadmap evaluations and runbooks (Spanish)
+├── dashboard/          Streamlit prototype, read-only, with its own requirements
+├── .github/workflows/  CI, plus the daily run and daily control (switched on by a variable)
 ├── data/               Local CSV history (gitignored)
-├── Previews/           Generated chart assets, auto-committed by the pipeline
-├── Assets/             Architecture diagram
+├── Previews/           Daily charts, auto-committed by the pipeline
+├── Assets/             Architecture diagrams and their generator
 ├── config.py           Typed environment configuration (Pydantic-Settings)
 ├── models.py           Row-level validation schema (Pydantic)
 ├── mailer.py           Failure alerting over SMTP
 ├── ia_generator.py     Gemini narrative layer
-└── app.py              FastAPI entrypoint
+├── app.py              FastAPI entrypoint
+├── pyproject.toml      pytest and ruff configuration
+└── requirements*.in    Direct dependencies, locked into the matching .txt
 ```
 
 ---
 
 ## 🛟 Operational Tooling
+
+**Daily run.** `pipeline.py` is the whole report end to end, the same code the `/run` endpoint executes:
+
+```bash
+python pipeline.py --dry-run                          # live scraping, nothing written or sent
+python pipeline.py --dry-run --enviar-a me@mail.com   # same, but the report reaches only me
+python pipeline.py                                    # the real run
+```
+
+A dry run leaves the six charts, the executive deck, a browser preview and an `.eml` of the report in a temp folder. The exit code is 1 when any stage fails, so schedulers can alert on it.
+
+**Running it in the cloud (GitHub Actions, free plan).** The full guide, in Spanish, is `docs/programacion-y-monitoreo.md`. In short:
+
+1. Merge into `main` and push. GitHub only schedules workflows that live on the default branch.
+2. Load the `.env` values as repository secrets: Settings > Secrets and variables > Actions.
+3. Run *Corrida diaria* by hand in `dry-run` mode, to check that the Argentine sites answer from GitHub's servers.
+4. Run it once in `real` mode.
+5. Create the repository variable `CORRIDA_AUTOMATICA` with the value `si`. From then on it runs Monday to Friday at 17:13 Argentina time, and the daily control at 19:43. Set it to `no` to pause.
+
+**Executive deck.** The latest deck is always at [`Reporte Ejecutivo.pptx`](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/raw/reporte-ejecutivo/Reporte%20Ejecutivo.pptx), on the `reporte-ejecutivo` branch. That branch is rebuilt as a single commit every day, so it never accumulates versions. `python scripts/presentacion_ejecutiva.py` builds the same deck by hand from the warehouse.
+
+**Supabase migrations.** `sql/` holds the SQL applied by hand in the Supabase SQL Editor. Two are new, and each opens with a plain-Spanish header: what it does, how to apply it, and how to verify and undo it.
+
+* `06_series_macro.sql` creates `Fact_Series_Macro`, a long-format table for the monetary aggregates, inflation and debt series, each in its source unit. After applying it, `python scripts/agregados_monetarios.py --guardar` loads their full history, and the daily run keeps them up to date.
+* `07_ai_secciones.sql` adds the `ai_secciones` column next to `ai_paragraph`. It stores, as JSON, the AI comments shown under the FX and country risk chart and under the Bitcoin chart; with it in place the daily run switches from the single paragraph to that commentary.
+
+Neither touches existing data, and both are safe while the legacy notebook is still in use.
+
+**Daily control.** `python scripts/control_diario.py` fails and sends an alert when a business day ends without its row in the warehouse, which catches the run that never started. `--sin-alerta` only reports.
+
+**Tests.** `pytest` runs an offline suite that never touches the network, the warehouse or SMTP: fake credentials override any real `.env`, and a test that tries to send mail, make an HTTP request, download market data or launch a browser fails on the spot. A golden-file test pins the report's HTML byte for byte. `ruff check .` lints the codebase.
 
 Scripts under `scripts/` run independently of the daily pipeline, for the situations the scheduler does not cover.
 
@@ -109,7 +171,7 @@ python scripts/reenvio_manual.py someone@mail.com --csv       # attaches the tra
 python scripts/reenvio_manual.py someone@mail.com --dry-run   # builds it, sends nothing
 ```
 
-It replays the daily run rather than repeating it: no scraping, no row validation, no warehouse writes, no Gemini call, no git push. The report is rebuilt from the newest `Fact_Mercado_Macro` row, the AI paragraph already stored on it, and the chart assets in `Previews/`, which makes the output byte-identical to the daily mail. Recipients are placed in Bcc. The script aborts if the latest row carries no AI paragraph, since that indicates an unfinished pipeline run.
+It replays the daily run rather than repeating it: no scraping, no row validation, no warehouse writes, no Gemini call, no git push. The report is rebuilt from the newest `Fact_Mercado_Macro` row, the AI texts already stored on it, and the chart assets in `Previews/`, through the same rendering module as the daily run, so its HTML matches the daily mail apart from the performance timing line. The sentences under the aggregates and debt charts are recomputed from the latest published data. A single recipient goes in To; several go in Bcc. The script aborts if the latest row carries no AI paragraph, which means the pipeline did not finish or Gemini returned nothing that day. With the daily run on GitHub Actions, run `git pull` before a resend: it reads the charts from the local `Previews/` and leaves out any older than the report.
 
 **Historical backfill.** Repairs the `riesgo_pais` and `bcra_tea` series against their source APIs after a capture bug. Dry-run by default; writes only with `--apply`:
 
@@ -125,13 +187,15 @@ python scripts/backfill.py --apply            # applies the updates
 
 The following modules are mapped in the architecture blueprint and are undergoing staging checks prior to production deployment:
 
-* **Project Modularization:** Reorganize the architecture to move beyond the notebook and convert the codebase into reusable, scalable modules that are deployment-ready. *In progress:* the ingestion layer (`scrapers/`), configuration (`config.py`), validation (`models.py`), alerting (`mailer.py`), and the AI layer (`ia_generator.py`) are already extracted; `database.py`, `charts.py`, and a `main.py` orchestrator remain.
-* **Idempotent Warehouse Writes:** Replace the current read-all-dates-then-filter insert with a native Postgres `INSERT ... ON CONFLICT ("Fecha") DO UPDATE` guarded by `COALESCE`, so a run that brings a value overwrites, while a run whose source was down preserves existing history. Atomic, single round-trip, and correctable without external backfill scripts.
-* **Native Logging:** Replace remaining `print()` calls with the `logging` module and a file handler, so unattended runs leave an auditable trace.
-* **API Data Persistence in Supabase:** Store API data in Supabase instead of re-consuming the full dataset on every execution.
-* **Automated Executive PowerPoint Reporting:** Developing a fully automated `.pptx` executive summary generation layer containing macroeconomic charts, spreads, and key indicators. The generated presentations will be versioned and automatically pushed to GitHub alongside analytical preview assets through integrated Git automation workflows.
-* **Workflow Orchestration & Automation:** Migrating from local execution to serverless execution via **GitHub Actions**.
-* **Streamlit Dashboard:** Build a Streamlit dashboard so users can consume the full Supabase dataset interactively.
+* **Project Modularization:** *Done.* The pipeline runs as plain Python modules through `pipeline.py`; the notebook remains only as a reference during the transition.
+* **Idempotent Warehouse Writes:** *Done.* Today's row goes in with a single atomic `INSERT ... ON CONFLICT ("Fecha")`, which keeps existing history untouched on a normal run and overwrites it only on an explicit `--forzar` rerun.
+* **Native Logging:** *Done for the pipeline.* Every module logs through `logging`, with an optional file handler (`--log-archivo`) so unattended runs leave an auditable trace. The legacy notebook still prints.
+* **Per-chart AI Commentary:** *Built, pending activation.* One structured Gemini call returns a summary plus comments for the FX, country risk and Bitcoin charts, validated with Pydantic before it reaches the mail and stored as JSON with the model that wrote it. It switches on once `sql/07_ai_secciones.sql` adds the column; until then the single paragraph keeps working as before.
+* **Monetary Aggregates & Public Debt:** *Done.* Two charts in the daily mail with plain-language explanations; debt always in US dollars.
+* **API Data Persistence in Supabase:** *Built, pending activation.* The aggregates, inflation and debt series get their own long-format table, `Fact_Series_Macro`, with source dates, frequencies and units, kept up to date by the daily run once `sql/06_series_macro.sql` is applied. The mail charts do not depend on it: each run downloads what they need.
+* **Automated Executive PowerPoint Reporting:** *Done.* Every run builds an eight-slide executive deck and publishes it on the `reporte-ejecutivo` branch, replaced daily without accumulating versions.
+* **Workflow Orchestration & Automation:** *Ready to switch on.* The daily run and a daily control are scheduled on GitHub Actions' free plan and switch on with the `CORRIDA_AUTOMATICA` repository variable. Holidays and weekends are skipped, and a database lock prevents duplicate runs. CI already runs lint and the offline tests on every push.
+* **Streamlit Dashboard:** *Prototype, to be reviewed later.* `dashboard/app.py` explores the full history read-only, with its own dependencies. Publishing it first needs a read-only database role (the SQL is in `docs/evaluacion-powerpoint-y-streamlit.md`).
 
 ---
 
@@ -139,6 +203,8 @@ The following modules are mapped in the architecture blueprint and are undergoin
 
 * **Credential Management:** All API keys, connection strings, and sensitive tokens are fully decoupled via environment variables using `.env` files (explicitly excluded via `.gitignore`). Secrets are typed as `SecretStr` in `config.py`, so they render masked in logs and tracebacks and require an explicit `.get_secret_value()` call to read.
 * **Resilience:** Built with basic exception-handling blocks to prevent operational failure during scraping anomalies without exposing server secrets in standard logs. Ingestion failures raise a structured `ScraperError` carrying source and step, which triggers an alert email before the run aborts.
+* **Public Logs:** GitHub Actions logs are public in a public repository, so every log line, tracebacks included, is scrubbed of each secret and recipient address before it is written.
+* **Unattended Runs:** A database lock prevents duplicate runs, an unfinished day is reported instead of skipped, and a daily control alerts when a business day ends without its data. A failed run sends one summary alert.
 * **AI Failover:** The Gemini integration implements multi-key rotation on quota exhaustion, ensuring uninterrupted report generation even under API rate limits. Also, if the model rejects the bot because of the high traffic, it moves on to the next model.
 
 ---
