@@ -12,7 +12,9 @@ Etapas, en el mismo orden que el notebook:
                 además un comentario por gráfico, en la misma llamada (fase 4)
   graficos      los cuatro .jpg; si Yahoo no responde, el mail sale sin el de BTC
   mail          las dos variantes del reporte (con y sin CSV)
-  previews      commit y push de Previews/
+  presentacion  el PowerPoint del día (presentacion.ARCHIVO), en la carpeta de los gráficos;
+                si falla, es una advertencia: el mail ya salió
+  previews      commit y push de Previews/: los cuatro .jpg y el .pptx
   series        agregados monetarios e inflación a Fact_Series_Macro (fase 3, todavía fuera del mail)
 
 Cada etapa queda registrada con estado y duración. Una etapa en "error" pone la
@@ -48,6 +50,7 @@ import email_report
 import fechas
 import ia_generator
 import mailer
+import presentacion
 import preview_git
 import scrapers
 import transformations
@@ -361,6 +364,7 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
         opciones, deps, registro, fecha, comienzo, df, df_base, inflacion_12, fwd_oficial, fwd_blue,
         parrafo, texto_ia, comentarios, generados,
     )
+    _etapa_presentacion(registro, carpeta, df_base, parrafo, comentarios, generados)
     _etapa_previews(opciones, deps, registro, carpeta)
     _etapa_series(opciones, deps, registro, engine, fecha)
 
@@ -565,6 +569,29 @@ def _etapa_mail(
                 e.detalle = "enviado" + (f" solo a {', '.join(opciones.enviar_a)}" if opciones.enviar_a else "")
 
 
+def _etapa_presentacion(
+    registro: _Registro, carpeta: Path, df_base, parrafo: str, comentarios: dict, generados: dict[str, Path],
+) -> None:
+    """El PowerPoint del día, con los datos, los textos de IA y los gráficos de esta corrida.
+
+    Queda en la misma carpeta que los gráficos: en una corrida real, Previews/, y
+    se commitea con ellos. Va después del mail, así que si falla el reporte ya
+    salió: es una advertencia y no pone la corrida en rojo.
+    """
+    with registro.etapa("presentacion", critica=False) as e:
+        try:
+            ruta = presentacion.armar(df_base, generados, carpeta, parrafo=parrafo, comentarios=comentarios)
+        except Exception as exc:
+            log.exception("No se pudo armar la presentación")
+            e.estado = ADVERTENCIA
+            e.detalle = f"{type(exc).__name__}: {exc}"
+            return
+        e.detalle = f"{ruta.name}, {ruta.stat().st_size / 1024:,.0f} KB"
+        faltan = [nombre for nombre in charts.ORDEN_EN_MAIL if nombre not in generados]
+        if faltan:
+            e.detalle += f"; sin {', '.join(faltan)}"
+
+
 def _etapa_previews(opciones: Opciones, deps: Dependencias, registro: _Registro, carpeta: Path) -> None:
     if opciones.dry_run or not opciones.push_previews:
         registro.omitir("previews", "dry-run" if opciones.dry_run else "--sin-push")
@@ -573,8 +600,13 @@ def _etapa_previews(opciones: Opciones, deps: Dependencias, registro: _Registro,
     elif Path(settings.ruta_repo).resolve() != RAIZ:
         registro.omitir("previews", f"RUTA_REPO ({settings.ruta_repo}) no es la carpeta de este código ({RAIZ})")
     else:
+        archivos = list(charts.ORDEN_EN_MAIL)
+        # El .pptx solo si existe: si nunca se pudo armar, `git add` de una ruta
+        # inexistente fallaría y pondría la corrida en rojo por un archivo secundario
+        if (carpeta / presentacion.ARCHIVO).exists():
+            archivos.append(presentacion.ARCHIVO)
         with registro.etapa("previews", critica=False) as e:
-            hecho, e.detalle = deps.actualizar_previews(RAIZ, archivos=list(charts.ORDEN_EN_MAIL))
+            hecho, e.detalle = deps.actualizar_previews(RAIZ, archivos=archivos)
             if not hecho:
                 e.estado = OMITIDA
 
