@@ -12,6 +12,7 @@ import pytest
 import charts
 import ia_generator
 import pipeline
+import presentacion
 from conftest import HOY
 from scrapers import agregados
 from scrapers.utils import ScraperError
@@ -75,13 +76,14 @@ def test_corrida_completa(entorno):
     assert r.estado == "ok" and r.exitosa
     assert _estados(r) == {
         "historico": "ok", "scraping": "ok", "validacion": "ok", "persistencia": "ok",
-        "ia": "ok", "graficos": "ok", "mail": "ok", "previews": "omitida", "series": "omitida",
+        "ia": "ok", "graficos": "ok", "mail": "ok", "presentacion": "ok", "previews": "omitida", "series": "omitida",
     }
     fila, sobrescribir = hechos["filas"][0]
     assert fila["Fecha"].iloc[0] == HOY and sobrescribir is False
     assert hechos["parrafos"] == [HOY]
     assert len(hechos["mails"]) == 2
     assert {p.name for p in salida.glob("*.jpg")} == set(charts.ORDEN_EN_MAIL)
+    assert (salida / presentacion.ARCHIVO).exists()
     assert hechos["alertas"] == []
     html = hechos["mails"][0][0].get_payload()[0].get_payload(decode=True).decode()
     assert "Párrafo de Gemini" in html
@@ -516,8 +518,10 @@ def test_una_corrida_real_actualiza_previews(entorno):
     r = pipeline.correr(pipeline.Opciones(), deps)
 
     assert _estados(r)["previews"] == "ok"
-    assert llamadas == [(pipeline.RAIZ, list(charts.ORDEN_EN_MAIL))]
+    # Los cuatro gráficos y el .pptx del día, juntos en el mismo commit
+    assert llamadas == [(pipeline.RAIZ, [*charts.ORDEN_EN_MAIL, presentacion.ARCHIVO])]
     assert {p.name for p in pipeline.PREVIEWS.glob("*.jpg")} == set(charts.ORDEN_EN_MAIL)
+    assert (pipeline.PREVIEWS / presentacion.ARCHIVO).exists()
 
 
 def test_previews_sin_cambios_queda_omitida(entorno):
@@ -675,3 +679,74 @@ def test_la_guarda_de_conftest_corta_las_fuentes_reales():
     with pytest.raises(ScraperError, match="un test intentó bajar datos de Yahoo") as error:
         pipeline.Dependencias().descargar_btc(HOY - timedelta(days=30), HOY)
     assert isinstance(error.value.__cause__, AssertionError)
+
+
+# ── Etapa presentacion ───────────────────────────────────────────────────────
+
+def _diapositivas(ruta):
+    from pptx import Presentation
+
+    return [" ".join(s.text_frame.text for s in d.shapes if s.has_text_frame) for d in Presentation(ruta).slides]
+
+
+def test_dry_run_arma_la_presentacion_en_la_salida_y_no_en_previews(entorno):
+    deps, _, salida = entorno
+    r = pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida), deps)
+
+    assert _estados(r)["presentacion"] == "ok"
+    assert len(_diapositivas(salida / presentacion.ARCHIVO)) == 6
+    assert not (pipeline.PREVIEWS / presentacion.ARCHIVO).exists()
+
+
+def test_sin_push_igual_arma_la_presentacion(entorno):
+    deps, hechos, _ = entorno
+    r = pipeline.correr(pipeline.Opciones(push_previews=False), deps)
+    assert _estados(r)["presentacion"] == "ok" and _estados(r)["previews"] == "omitida"
+    assert (pipeline.PREVIEWS / presentacion.ARCHIVO).exists() and hechos["previews"] == []
+
+
+def test_la_presentacion_lleva_los_textos_de_esta_corrida(entorno):
+    """El párrafo y los comentarios salen de la IA de hoy, en memoria: la fila no los tiene."""
+    deps, _, salida = entorno
+    deps = replace(deps, columna_secciones=lambda engine: True,
+                   generar_secciones=lambda prompt: (_secciones(), "gemini-x"),
+                   guardar_secciones=lambda engine, fecha, secciones, modelo: 1)
+
+    pipeline.correr(pipeline.Opciones(salida=salida), deps)
+
+    textos = _diapositivas(salida / presentacion.ARCHIVO)
+    assert _secciones().resumen in textos[2]
+    assert _secciones().paralelas in textos[3] and _secciones().btc in textos[5]
+
+
+def test_si_la_presentacion_falla_es_advertencia_y_el_mail_sale(entorno, monkeypatch):
+    deps, hechos, _ = entorno
+    llamadas = []
+    deps = replace(deps, actualizar_previews=lambda repo, archivos=None: llamadas.append(archivos) or (True, "ok"))
+
+    def falla(*args, **kwargs):
+        raise ValueError("plantilla rota")
+
+    monkeypatch.setattr(pipeline.presentacion, "armar", falla)
+    r = pipeline.correr(pipeline.Opciones(), deps)
+
+    etapa = next(e for e in r.etapas if e.nombre == "presentacion")
+    assert etapa.estado == "advertencia" and "plantilla rota" in etapa.detalle
+    assert r.estado == "advertencia" and r.exitosa
+    assert len(hechos["mails"]) == 2 and hechos["alertas"] == []
+    # Sin el .pptx en la carpeta, no se le pide a git una ruta que no existe
+    assert llamadas == [list(charts.ORDEN_EN_MAIL)]
+
+
+def test_la_presentacion_avisa_el_grafico_que_falto(entorno, monkeypatch):
+    deps, _, salida = entorno
+
+    def falla(*a, **k):
+        raise ValueError("datos raros")
+
+    monkeypatch.setattr(pipeline.charts, "grafico_inflacion", falla)
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+
+    etapa = next(e for e in r.etapas if e.nombre == "presentacion")
+    assert etapa.estado == "ok" and charts.INFLACION in etapa.detalle
+    assert (salida / presentacion.ARCHIVO).exists()

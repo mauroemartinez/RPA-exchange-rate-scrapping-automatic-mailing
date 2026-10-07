@@ -47,6 +47,7 @@ google-genai
 Jinja2           # plantilla del mail
 matplotlib
 seaborn
+python-pptx      # presentación ejecutiva diaria (presentacion.py)
 
 # ── Servicio HTTP (app.py) ──
 fastapi
