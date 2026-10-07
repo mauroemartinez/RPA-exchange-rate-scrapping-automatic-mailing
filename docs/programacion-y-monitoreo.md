@@ -1,6 +1,6 @@
 # Fase 6: ejecución programada y monitoreo
 
-Estado al 7 de octubre de 2026: **todo lo de esta fase está listo menos la elección del programador, que es tuya.** Nada queda programado por el solo hecho de mergear: los workflows de GitHub se disparan a mano hasta que descomentes su `schedule`.
+Estado al 7 de octubre de 2026: **el programador elegido es GitHub Actions, en el plan gratis, y todo está listo.** Faltan los pasos de abajo, que son tuyos porque usan tus credenciales. Nada queda programado por el solo hecho de mergear: el horario se prende con una variable del repo (paso 5).
 
 Hoy la corrida se lanza a mano desde el notebook. En los últimos 90 días quedaron tres días hábiles sin fila que no eran feriados: el 19/08, el 24/09 y el 02/10.
 
@@ -34,20 +34,29 @@ Hay dos opciones reales. No hace falta ningún servidor (ni EasyPanel ni otro): 
 
 Mi recomendación es **GitHub Actions**, con una condición: que las webs argentinas respondan desde los servidores de GitHub. Es lo único que no se puede saber sin probar, y se prueba en dos minutos con el paso 3 de abajo. Si BNA, DolarHoy o Ámbito bloquean esas IPs, la alternativa más simple es el Programador de tareas de Windows.
 
-### GitHub Actions, paso a paso
+### GitHub Actions, paso a paso (plan gratis)
 
-1. Mergear `roadmap/implementacion` a `main` y pushear: GitHub solo muestra y programa los workflows que están en `main`.
-2. En el repo: Settings > Secrets and variables > Actions > New repository secret. Cargar `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECEIVER`, `EMAIL_RECEIVER_CSV`, `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`, `FED_API_KEY` y `SUPABASE_DB_URL`, con los mismos valores del `.env`. Opcional: `EMAIL_ALERTAS`.
-3. Actions > Corrida diaria > Run workflow, con modo `dry-run`. Scrapea y arma todo sin escribir ni mandar nada. Si la etapa `scraping` termina en `ok`, las webs responden desde GitHub.
-4. Un día que no hayas corrido el notebook: Run workflow con modo `real`. Es la corrida completa: escribe en Supabase, manda el mail y pushea `Previews/` (los cuatro gráficos y el PowerPoint). Los commits salen a tu nombre: el workflow toma tu usuario de GitHub, no el de un bot.
-5. En `.github/workflows/corrida-diaria.yml`, descomentar el bloque `schedule` (17:00 de Argentina, de lunes a viernes) y hacer lo mismo en `control-diario.yml` (19:30). "Descomentar" es borrar el `#` del principio de esas líneas. Commitear en `main`.
-6. Dejar de correr el notebook.
+En un repo público, GitHub Actions no cobra los minutos de sus máquinas estándar, que son las que usan estos workflows. Cada corrida tarda unos pocos minutos.
+
+1. **Mergear y subir.** Mergear `roadmap/implementacion` a `main` y pushear. GitHub solo muestra y programa los workflows que están en `main`.
+2. **Cargar los secretos.** En el repo: Settings > Secrets and variables > Actions, pestaña *Secrets* > New repository secret. Uno por uno, con los mismos valores del `.env`: `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECEIVER`, `EMAIL_RECEIVER_CSV`, `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`, `FED_API_KEY` y `SUPABASE_DB_URL`. Opcional: `EMAIL_ALERTAS`, para que las alertas te lleguen solo a vos.
+3. **Probar sin efectos.** Actions > Corrida diaria > Run workflow, con modo `dry-run`. Scrapea y arma todo sin escribir ni mandar nada. Si la etapa `scraping` termina en `ok`, las webs argentinas responden desde los servidores de GitHub.
+4. **Una corrida real, a mano.** Un día que no hayas corrido el notebook: Run workflow con modo `real`. Escribe en Supabase, manda el mail, commitea los gráficos en `Previews/` y publica el PowerPoint en la rama `reporte-ejecutivo`. Fijate en GitHub que el commit de `Previews/` salga con tu foto. Si no (pasa con algunas cuentas creadas antes de 2017), creá en la pestaña *Variables* la variable `EMAIL_COMMITS` con el mail de tus commits.
+5. **Prender el horario.** En Settings > Secrets and variables > Actions, pestaña *Variables* > New repository variable: nombre `CORRIDA_AUTOMATICA`, valor `si`. Desde ahí corre solo de lunes a viernes a las 17:13 de Argentina, y el control a las 19:43. Para apagarlo, cambiá el valor a `no`.
+6. **Dejar de correr el notebook.** Si corren los dos el mismo día, sale un mail duplicado.
+
+Dos cosas de GitHub para tener en cuenta:
+
+- **Las corridas programadas pueden atrasarse** unos minutos cuando GitHub está cargado. Por eso el horario está a los 13 minutos y no en punto, que es cuando más se atrasan.
+- **En un repo público, GitHub apaga los horarios después de 60 días sin actividad.** Los commits diarios de `Previews/` cuentan como actividad, así que con la corrida andando no pasa. Si alguna vez pasa, GitHub te avisa por mail y se vuelve a prender desde la pestaña Actions.
 
 ### Logs públicos
 
 En un repo público, cualquiera puede leer el log de un workflow. GitHub tapa los secretos completos, pero `EMAIL_RECEIVER` se carga entero como un solo secreto y una dirección suelta (por ejemplo, la de un destinatario rechazado en un error de SMTP) no coincidiría. Por eso `pipeline.py` reemplaza en cada línea de log, traceback incluido, cada secreto del `.env` por `***` y cada dirección de destinatario por `[destinatario]`; el JSON de `--json` pasa por el mismo filtro. Los workflows tampoco suben artefactos: la vista previa del mail y el detalle de los errores no quedan publicados.
 
 ### Programador de tareas de Windows, en resumen
+
+Después de mergear, actualizar el venv una vez: `venv\Scripts\pip install -r requirements.txt` (entraron `python-pptx` y sus dependencias). Sin eso la corrida sigue, pero sin el PowerPoint.
 
 Una tarea de lunes a viernes a las 17:00 que ejecute, con la carpeta del proyecto como directorio de inicio:
 
