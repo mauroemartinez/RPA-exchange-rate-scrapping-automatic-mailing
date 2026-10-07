@@ -172,3 +172,30 @@ def test_limpiar_secciones():
 
     assert ia_generator.limpiar_secciones(Engine(), date(2026, 10, 6)) == 1
     assert '"ai_secciones" = NULL' in ejecutado[0][0] and ejecutado[0][1] == {"f": date(2026, 10, 6)}
+
+
+def test_con_todas_las_keys_agotadas_no_hay_parrafo(cliente_falso):
+    agotada = Exception("429 RESOURCE_EXHAUSTED")
+    cliente_falso.guion = {("gemini-falsa-1", "gemini-3.5-flash"): agotada, ("gemini-falsa-2", "gemini-3.5-flash"): agotada}
+
+    assert ia_generator.generar_con_failover("prompt") == (None, None, 2)
+
+    cliente_falso.llamadas.clear()
+    assert ia_generator.generar_parrafo("prompt") == (None, None)
+    # Dos vueltas de dos intentos: la segunda arranca con 2 consumidos, que es menos de MAX_INTENTOS
+    assert len(cliente_falso.llamadas) == 4
+
+
+def test_el_peor_caso_son_cinco_llamadas(cliente_falso):
+    cliente_falso.guion = {
+        ("gemini-falsa-1", "gemini-3.5-flash"): Exception("429 RESOURCE_EXHAUSTED"),
+        ("gemini-falsa-2", "gemini-3.5-flash"): Exception("503 UNAVAILABLE"),
+        ("gemini-falsa-2", "gemini-2.5-flash"): Exception("429 RESOURCE_EXHAUSTED"),
+    }
+    assert ia_generator.generar_con_failover("prompt") == (None, None, 3)
+
+    cliente_falso.llamadas.clear()
+    cliente_falso.guion[("gemini-falsa-1", "gemini-3.5-flash")] = Exception("400 INVALID_ARGUMENT")
+    assert ia_generator.generar_parrafo("prompt") == (None, None)
+    # 1 (error técnico) + 1 + 1, y la tercera vuelta ya no entra: 3 llamadas
+    assert len(cliente_falso.llamadas) == 3

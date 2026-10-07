@@ -2,7 +2,10 @@
 
 Las credenciales falsas se cargan antes de importar config: las variables de
 entorno le ganan al .env, así que aunque haya uno con las claves verdaderas, los
-tests no las ven. Además cualquier intento de abrir una conexión SMTP falla.
+tests no las ven. Además falla cualquier intento de abrir una conexión SMTP, de
+hacer un request HTTP real (BCRA, FRED, Gemini, ArgentinaDatos), de bajar velas
+de Yahoo o de lanzar un navegador: un test que se olvide de reemplazar una
+fuente se entera en el acto en lugar de salir a internet.
 """
 
 import os
@@ -66,6 +69,19 @@ def sin_red_real(monkeypatch):
 
     monkeypatch.setattr(httpx.HTTPTransport, "handle_request", _prohibido)
     monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", _prohibido)
+
+
+@pytest.fixture(autouse=True)
+def sin_fuentes_fuera_de_httpx(monkeypatch):
+    """yfinance (curl_cffi) y Playwright no pasan por httpx: se cortan en su propia puerta."""
+    from scrapers import ambito, bna, btc, dolarhoy
+
+    def _prohibido(*args, **kwargs):
+        raise AssertionError("un test intentó bajar datos de Yahoo o lanzar un navegador real")
+
+    monkeypatch.setattr(btc.yf, "download", _prohibido)
+    for modulo in (ambito, bna, dolarhoy):
+        monkeypatch.setattr(modulo, "async_playwright", _prohibido)
 
 
 def _dias_habiles_hacia_atras(desde: date, cantidad: int) -> list[date]:

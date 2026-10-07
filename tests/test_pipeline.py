@@ -496,8 +496,12 @@ def test_una_serie_rota_no_frena_a_las_demas(entorno):
     assert "m2" not in guardadas and len(guardadas) == len(agregados.SERIES) - 1
 
 
-@pytest.mark.parametrize("argumentos", [["--enviar-a", "yo@example.com"], ["--con-ia"]])
-def test_opciones_que_solo_van_con_dry_run(argumentos):
+@pytest.mark.parametrize("argumentos", [
+    ["--enviar-a", "yo@example.com"],
+    ["--con-ia"],
+    ["--dry-run", "--sin-mail", "--enviar-a", "yo@example.com"],
+])
+def test_combinaciones_de_opciones_que_no_se_admiten(argumentos):
     with pytest.raises(SystemExit):
         pipeline.main(argumentos)
 
@@ -655,3 +659,19 @@ def test_el_json_de_la_corrida_tiene_lo_que_lee_app(entorno, tmp_path, monkeypat
     assert datos["estado"] == "ok"
     assert [e["nombre"] for e in datos["etapas"]] == [e.nombre for e in resultado.etapas]
     assert all(set(e) == {"nombre", "estado", "segundos"} for e in datos["etapas"])
+
+
+def test_historico_desde_el_csv_es_una_advertencia(entorno, historico):
+    deps, hechos, salida = entorno
+    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, leer_historico=lambda e: (historico.copy(), "csv")))
+    assert _estados(r)["historico"] == "advertencia" and r.estado == "advertencia"
+    assert len(hechos["mails"]) == 2
+
+
+def test_la_guarda_de_conftest_corta_las_fuentes_reales():
+    """Si alguien saca la guarda, este test lo nota: el default de Dependencias saldría a Yahoo."""
+    from scrapers.utils import ScraperError
+
+    with pytest.raises(ScraperError, match="un test intentó bajar datos de Yahoo") as error:
+        pipeline.Dependencias().descargar_btc(HOY - timedelta(days=30), HOY)
+    assert isinstance(error.value.__cause__, AssertionError)
