@@ -50,10 +50,12 @@ def test_varios_destinatarios_van_en_cco(monkeypatch, entorno):
     assert mensaje["Bcc"] == "a@example.com, b@example.com"
 
 
-def test_dry_run_no_envia(monkeypatch, entorno):
+def test_dry_run_no_envia(monkeypatch, entorno, tmp_path):
     _, enviados = entorno
+    monkeypatch.setattr(reenvio_manual.tempfile, "gettempdir", lambda: str(tmp_path))
     _correr(monkeypatch, "a@example.com", "--dry-run")
     assert enviados == []
+    assert (tmp_path / "reenvio_preview.html").exists()
 
 
 def test_sin_parrafo_no_reenvia(monkeypatch, entorno):
@@ -62,3 +64,30 @@ def test_sin_parrafo_no_reenvia(monkeypatch, entorno):
     with pytest.raises(SystemExit):
         _correr(monkeypatch, "a@example.com")
     assert enviados == []
+
+
+def test_con_csv_adjunta_el_historico(monkeypatch, entorno):
+    _, enviados = entorno
+    _correr(monkeypatch, "a@example.com", "--csv")
+    mensaje, _ = enviados[0]
+    adjunto = next(p for p in mensaje.walk() if p.get_content_type() == "text/csv")
+    assert adjunto.get_payload(decode=True).decode("utf-8").startswith("Fecha,TCC_Blue")
+
+
+def test_el_html_es_el_mismo_que_el_del_mail_diario(monkeypatch, entorno, historico, resultados):
+    """La afirmación central del reenvío: mismo HTML que el pipeline, salvo la línea de performance."""
+    import re
+
+    import transformations as t
+
+    con_hoy, enviados = entorno
+    _correr(monkeypatch, "a@example.com")
+    html_reenvio = enviados[0][0].get_payload()[0].get_payload(decode=True).decode()
+
+    df = t.agregar_brechas_y_variaciones(con_hoy)
+    fwd_oficial, fwd_blue = t.forwards_fisher(con_hoy)
+    inflacion_12 = t.ultimos_meses(t.serie_inflacion(resultados.bcra["inflacion_mensual"]))
+    html_diario = email_report.renderizar(df, inflacion_12, fwd_oficial, fwd_blue, con_hoy["ai_paragraph"].iloc[0], 1.0)
+
+    sin_tiempo = lambda h: re.sub(r"en [0-9.]+ segundos", "en X segundos", h)  # noqa: E731
+    assert sin_tiempo(html_reenvio) == sin_tiempo(html_diario)

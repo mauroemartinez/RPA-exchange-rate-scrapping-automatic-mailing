@@ -1,5 +1,6 @@
 """preview_git contra repos de git reales en carpetas temporales (con un remoto bare)."""
 
+import os
 import shutil
 import subprocess
 
@@ -12,6 +13,13 @@ pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git no est�
 
 def _git(repo, *args):
     return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=True).stdout
+
+
+@pytest.fixture(autouse=True)
+def git_aislado(monkeypatch):
+    """Sin la config global ni la del sistema: un commit.gpgsign o un hook del desarrollador no cuentan."""
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
 
 
 @pytest.fixture
@@ -82,3 +90,11 @@ def test_con_archivos_solo_commitea_esos(repo):
     assert hecho is True
     assert _git(remoto, "show", "--name-only", "--format=", "HEAD").split() == ["Previews/grafico.jpg"]
     assert "mail.eml" in _git(local, "status", "--porcelain")  # quedó afuera del commit
+
+
+def test_sin_git_instalado_se_omite(monkeypatch, tmp_path):
+    def run(*a, **k):
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(preview_git.subprocess, "run", run)
+    assert preview_git.actualizar_previews(tmp_path) == (False, "git no está instalado: se omite")

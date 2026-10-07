@@ -92,3 +92,9 @@ def test_la_inflacion_acumulada_arranca_con_el_periodo(df, resultados):
     assert primera_inflacion == pd.Timestamp("2026-08-31")
     assert va["Inflación Mensual Acumulada"].dropna().iloc[0] == pytest.approx(va["Inflación Mensual"].dropna().iloc[0])
     assert list(va.index[:3]) == [0, 1, 2]
+
+
+@pytest.mark.parametrize("maximo, pasos", [(250, (25, 12.5)), (300, (25, 12.5)), (650, (100, 50)),
+                                           (1500, (250, 100)), (2500, (500, 200))])
+def test_paso_de_ticks_del_riesgo_pais(maximo, pasos):
+    assert charts._step_riesgo_pais(maximo) == pasos

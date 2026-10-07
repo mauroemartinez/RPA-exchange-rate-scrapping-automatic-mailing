@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* RESET Y BASE */
+        body { background-color: #2c3e50; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+
+        /* CONTENEDOR PRINCIPAL - clave para mobile */
+        .container {
+            max-width: 800px;
+            width: 100% !important;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        /* TIPOGRAFÍA */
+        p, div, b, span { font-size: 13px !important; color: #1a252f; line-height: 1.6; text-align: left !important; }
+
+        /* TABLAS - scroll horizontal en mobile */
+        .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table { border-collapse: collapse; width: 100%; min-width: 400px; margin: 12px 0; border: 1px solid #dcdde1;
+                box-shadow: 0 2px 6px rgba(44,62,80,0.16); }
+        table td, table th { font-size: 8px !important; padding: 4px 2px; text-align: center; border: 1px solid #dcdde1; }
+        th { background-color: #2c3e50; color: #ffffff; text-transform: uppercase; }
+        tr:nth-child(even) { background-color: #f8f9fa; }
+
+        /* Inflación (4 columnas) y Variaciones (7) entran cómodas a 12px.
+           Cotizaciones tiene 14 columnas: a 12px se pasa del ancho del mail, así
+           que va a 10px, el máximo que entra sin desbordar. */
+        .tabla-inflacion table, .tabla-variaciones table { min-width: 0; }
+        .tabla-inflacion table td, .tabla-inflacion table th,
+        .tabla-variaciones table td, .tabla-variaciones table th { font-size: 12px !important; padding: 7px 6px; }
+        .tabla-cotizaciones table td, .tabla-cotizaciones table th { font-size: 10px !important; padding: 5px 3px; }
+
+        /* Sombra en los gráficos. Gmail y Outlook descartan box-shadow, así que
+           el borde es lo que garantiza el recorte; la sombra es un extra que se
+           ve en Apple Mail y clientes web modernos. */
+        .grafico { box-shadow: 0 2px 6px rgba(44,62,80,0.16); }
+
+        /* HEADER */
+        .header-box { background: #2c3e50; color: white; padding: 20px 15px; text-align: center; }
+        .header-box h2 { color: white; font-size: 18px; margin: 0; }
+
+        /* PÁRRAFO IA */
+        .ai-box {
+            background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%);
+            border-left: 4px solid #f39c12;
+            border-radius: 6px;
+            padding: 16px 18px;
+            margin: 20px 0;
+        }
+        .ai-box .ai-label {
+            font-size: 10px !important;
+            color: #f39c12;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-align: left !important;
+        }
+        .ai-box p {
+            color: #ecf0f1 !important;
+            font-size: 13px !important;
+            line-height: 1.7;
+            margin: 0;
+            text-align: left !important;
+        }
+
+        /* FOOTER */
+        .footer { font-size: 10px !important; color: #7f8c8d; border-top: 1px solid #dcdde1; margin-top: 30px; padding-top: 15px; }
+
+        /* MOBILE */
+        @media only screen and (max-width: 600px) {
+            .container { border-radius: 0 !important; }
+            .inner-pad { padding: 18px 16px 26px 16px !important; text-align: left !important; }
+            .header-box h2 { font-size: 15px !important; }
+            .ai-box p { font-size: 12px !important; }
+            p, div, b, span { font-size: 12px !important; text-align: left !important; }
+        }
+    </style>
+</head>
+<body style="margin:0; padding:0; background-color:#2c3e50; font-family:Arial,sans-serif;">
+<table width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#2c3e50">
+  <tr>
+    <td align="center" style="padding:20px 10px;">
+      <table class="container" width="800" border="0" cellspacing="0" cellpadding="0" bgcolor="#ffffff" style="max-width:800px; width:100%; border-radius:8px; overflow:hidden;">
+
+        <!-- HEADER -->
+        <tr>
+          <td class="header-box" style="background-color:#2c3e50; padding:20px; text-align:center;">
+            <h2 style="margin:0; color:white;">📊 Reporte Macroeconómico Diario</h2>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+        <!-- Esta celda es la que da el margen interno del informe. Sin ella el
+             contenido queda suelto dentro de <table> y los clientes de mail lo
+             sacan afuera, que era el motivo de que no hubiera margen lateral.
+             El padding va inline porque Gmail descarta buena parte del <style>. -->
+        <tr>
+          <td class="inner-pad" style="padding:26px 30px 36px 30px;">
+
+            <!-- RESUMEN EJECUTIVO -->
+            <p style="margin:0 0 15px 0; font-size:14px !important; color:#2c3e50;">📅 <b>RESUMEN EJECUTIVO DE MERCADO</b></p>
+
+            <div style="margin-bottom:15px;">
+              <span style="font-size:11px; color:#7f8c8d; text-transform:uppercase;">💰 Oportunidad de Arbitraje (Cupo USD 100)</span><br>
+              • Costo Blue: <span style="color:#c0392b; font-weight:bold;">$ 155,500.00</span><br>
+              • Costo Oficial (impuestos inc.): $ 198,900.00<br>
+              • <b>Sobrecosto estimado: <span style="color:#c0392b; font-size:14px;">$ -43,400.00</span></b>
+            </div>
+
+            <div style="margin-bottom:15px;">
+              <span style="font-size:11px; color:#7f8c8d; text-transform:uppercase;">📊 Variaciones y Brechas</span><br>
+              • Dólar Blue 💵: <b>-3.46%</b> (Brecha: -27.91%)<br>
+              • Dólar Divisas: -3.88%<br>
+              • Euro Blue 💶: -1.52% (Brecha c/ Dólar Blue: 13.36%)
+            </div>
+
+            <div style="margin-bottom:20px;">
+              <span style="font-size:11px; color:#7f8c8d; text-transform:uppercase;">🔮 Proyecciones y Riesgo</span><br>
+              • Fwd Oficial: <b>$ 1,821.33</b> | Fwd Blue 💸: <b>$ 1,851.09</b><br>
+              • Riesgo País ☣️: <b>590 pts</b> (Sobretasa: 5.90%)
+            </div>
+
+            <!-- PÁRRAFO IA -->
+            <div class="ai-box" style="background:linear-gradient(135deg,#1a252f 0%,#2c3e50 100%); border-left:4px solid #f39c12; border-radius:6px; padding:16px 18px; margin:20px 0;">
+              <div class="ai-label" style="font-size:10px; color:#f39c12; text-transform:uppercase; letter-spacing:1px; font-weight:bold; margin-bottom:8px;">🤖 Análisis IA · Gemini</div>
+              <p style="color:#ecf0f1 !important; font-size:13px !important; line-height:1.7; margin:0;">Párrafo de prueba con &lt;, &amp; y &#34;comillas&#34;.</p>
+            </div>
+
+            <!-- GRÁFICOS -->
+            <div style="text-align:center; width:100%; margin:20px 0;">
+              <img src='cid:image1' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+              <div class="comentario-ia" style="margin:0 0 18px 0; padding:10px 14px; background-color:#f4f6f8; border-left:3px solid #f39c12; border-radius:4px; text-align:left;"><b style="font-size:11px; color:#2c3e50; text-transform:uppercase; letter-spacing:0.5px;">🤖 Cotizaciones paralelas</b><br><span style="color:#1a252f;">Comentario de paralelas con &lt;etiquetas&gt; &amp; &#34;comillas&#34;.</span></div>
+              <div class="comentario-ia" style="margin:0 0 18px 0; padding:10px 14px; background-color:#f4f6f8; border-left:3px solid #f39c12; border-radius:4px; text-align:left;"><b style="font-size:11px; color:#2c3e50; text-transform:uppercase; letter-spacing:0.5px;">🤖 Cotizaciones oficiales</b><br><span style="color:#1a252f;">Comentario de oficiales.</span></div>
+              <div class="comentario-ia" style="margin:0 0 18px 0; padding:10px 14px; background-color:#f4f6f8; border-left:3px solid #f39c12; border-radius:4px; text-align:left;"><b style="font-size:11px; color:#2c3e50; text-transform:uppercase; letter-spacing:0.5px;">🤖 Riesgo país</b><br><span style="color:#1a252f;">Comentario de riesgo país.</span></div>
+              <img src='cid:image2' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+              <img src='cid:image3' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+              <img src='cid:image4' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+              <div class="comentario-ia" style="margin:0 0 18px 0; padding:10px 14px; background-color:#f4f6f8; border-left:3px solid #f39c12; border-radius:4px; text-align:left;"><b style="font-size:11px; color:#2c3e50; text-transform:uppercase; letter-spacing:0.5px;">🤖 Bitcoin</b><br><span style="color:#1a252f;">Comentario de BTC.</span></div>
+            </div>
+
+            <!-- TABLA COTIZACIONES -->
+            <p style="color:#2c3e50;">📊 <b><u>Monitoreo de Mercado:</u></b><br>
+            Las siguientes tablas muestran las últimas 25 cotizaciones de dólares, euro, riesgo país y las tasas de referencia (BCRA 🇦🇷 y FED 🇺🇸).<br>
+            Analizalas tranquilo mientras te cebás unos mates 🧉:</p>
+            <div class="table-wrapper tabla-cotizaciones" style="width:100%; overflow-x:auto;"><table>
+<thead>
+<tr><th>Fecha   </th><th style="text-align: center;"> tccblue </th><th style="text-align: center;"> tcvblue </th><th style="text-align: center;"> tccBillete </th><th style="text-align: center;"> tcvBillete </th><th style="text-align: center;"> tccDivisas </th><th style="text-align: center;"> tcvDivisas </th><th style="text-align: center;"> Solidario </th><th style="text-align: center;">  MEP  </th><th style="text-align: center;"> RiesgoPaís </th><th style="text-align: center;"> tccEuros </th><th style="text-align: center;"> tcvEuros </th><th>FEDtea  </th><th>BCRAtea  </th></tr>
+</thead>
+<tbody>
+<tr><td>06/10/26</td><td style="text-align: center;"> 1535.00 </td><td style="text-align: center;"> 1555.00 </td><td style="text-align: center;">  1480.00   </td><td style="text-align: center;">  1530.00   </td><td style="text-align: center;">  1498.50   </td><td style="text-align: center;">  1507.50   </td><td style="text-align: center;">  1989.00  </td><td style="text-align: center;">1534.10</td><td style="text-align: center;">   590.00   </td><td style="text-align: center;"> 1771.72  </td><td style="text-align: center;"> 1794.81  </td><td>3.88%   </td><td>23.66%   </td></tr>
+<tr><td>05/10/26</td><td style="text-align: center;"> 1589.50 </td><td style="text-align: center;"> 1610.68 </td><td style="text-align: center;">  1536.55   </td><td style="text-align: center;">  1589.50   </td><td style="text-align: center;">  1557.73   </td><td style="text-align: center;">  1568.32   </td><td style="text-align: center;">  2066.35  </td><td style="text-align: center;">1600.09</td><td style="text-align: center;">   636.40   </td><td style="text-align: center;"> 1801.30  </td><td style="text-align: center;"> 1822.48  </td><td>5.11%   </td><td>27.47%   </td></tr>
+<tr><td>02/10/26</td><td style="text-align: center;"> 1587.50 </td><td style="text-align: center;"> 1608.66 </td><td style="text-align: center;">  1534.60   </td><td style="text-align: center;">  1587.50   </td><td style="text-align: center;">  1555.76   </td><td style="text-align: center;">  1566.34   </td><td style="text-align: center;">  2063.75  </td><td style="text-align: center;">1598.08</td><td style="text-align: center;">   635.30   </td><td style="text-align: center;"> 1799.10  </td><td style="text-align: center;"> 1820.26  </td><td>4.61%   </td><td>26.95%   </td></tr>
+<tr><td>01/10/26</td><td style="text-align: center;"> 1585.50 </td><td style="text-align: center;"> 1606.64 </td><td style="text-align: center;">  1532.65   </td><td style="text-align: center;">  1585.50   </td><td style="text-align: center;">  1553.79   </td><td style="text-align: center;">  1564.36   </td><td style="text-align: center;">  2061.15  </td><td style="text-align: center;">1596.07</td><td style="text-align: center;">   634.20   </td><td style="text-align: center;"> 1796.90  </td><td style="text-align: center;"> 1818.04  </td><td>4.10%   </td><td>26.42%   </td></tr>
+<tr><td>30/09/26</td><td style="text-align: center;"> 1585.00 </td><td style="text-align: center;"> 1606.12 </td><td style="text-align: center;">  1532.20   </td><td style="text-align: center;">  1585.00   </td><td style="text-align: center;">  1553.32   </td><td style="text-align: center;">  1563.88   </td><td style="text-align: center;">  2060.50  </td><td style="text-align: center;">1595.56</td><td style="text-align: center;">   634.60   </td><td style="text-align: center;"> 1796.20  </td><td style="text-align: center;"> 1817.32  </td><td>5.10%   </td><td>27.40%   </td></tr>
+<tr><td>29/09/26</td><td style="text-align: center;"> 1583.00 </td><td style="text-align: center;"> 1604.10 </td><td style="text-align: center;">  1530.25   </td><td style="text-align: center;">  1583.00   </td><td style="text-align: center;">  1551.35   </td><td style="text-align: center;">  1561.90   </td><td style="text-align: center;">  2057.90  </td><td style="text-align: center;">1593.55</td><td style="text-align: center;">   633.50   </td><td style="text-align: center;"> 1794.00  </td><td style="text-align: center;"> 1815.10  </td><td>4.59%   </td><td>26.88%   </td></tr>
+<tr><td>28/09/26</td><td style="text-align: center;"> 1581.00 </td><td style="text-align: center;"> 1602.08 </td><td style="text-align: center;">  1528.30   </td><td style="text-align: center;">  1581.00   </td><td style="text-align: center;">  1549.38   </td><td style="text-align: center;">  1559.92   </td><td style="text-align: center;">  2055.30  </td><td style="text-align: center;">1591.54</td><td style="text-align: center;">   632.40   </td><td style="text-align: center;"> 1791.80  </td><td style="text-align: center;"> 1812.88  </td><td>4.09%   </td><td>26.35%   </td></tr>
+<tr><td>25/09/26</td><td style="text-align: center;"> 1580.50 </td><td style="text-align: center;"> 1601.56 </td><td style="text-align: center;">  1527.85   </td><td style="text-align: center;">  1580.50   </td><td style="text-align: center;">  1548.91   </td><td style="text-align: center;">  1559.44   </td><td style="text-align: center;">  2054.65  </td><td style="text-align: center;">1591.03</td><td style="text-align: center;">   632.80   </td><td style="text-align: center;"> 1791.10  </td><td style="text-align: center;"> 1812.16  </td><td>5.09%   </td><td>27.32%   </td></tr>
+<tr><td>24/09/26</td><td style="text-align: center;"> 1578.50 </td><td style="text-align: center;"> 1599.54 </td><td style="text-align: center;">  1525.90   </td><td style="text-align: center;">  1578.50   </td><td style="text-align: center;">  1546.94   </td><td style="text-align: center;">  1557.46   </td><td style="text-align: center;">  2052.05  </td><td style="text-align: center;">1589.02</td><td style="text-align: center;">   631.70   </td><td style="text-align: center;"> 1788.90  </td><td style="text-align: center;"> 1809.94  </td><td>4.58%   </td><td>26.80%   </td></tr>
+<tr><td>23/09/26</td><td style="text-align: center;"> 1576.50 </td><td style="text-align: center;"> 1597.52 </td><td style="text-align: center;">  1523.95   </td><td style="text-align: center;">  1576.50   </td><td style="text-align: center;">  1544.97   </td><td style="text-align: center;">  1555.48   </td><td style="text-align: center;">  2049.45  </td><td style="text-align: center;">1587.01</td><td style="text-align: center;">   630.60   </td><td style="text-align: center;"> 1786.70  </td><td style="text-align: center;"> 1807.72  </td><td>4.08%   </td><td>26.27%   </td></tr>
+<tr><td>22/09/26</td><td style="text-align: center;"> 1576.00 </td><td style="text-align: center;"> 1597.00 </td><td style="text-align: center;">  1523.50   </td><td style="text-align: center;">  1576.00   </td><td style="text-align: center;">  1544.50   </td><td style="text-align: center;">  1555.00   </td><td style="text-align: center;">  2048.80  </td><td style="text-align: center;">1586.50</td><td style="text-align: center;">   631.00   </td><td style="text-align: center;"> 1786.00  </td><td style="text-align: center;"> 1807.00  </td><td>5.07%   </td><td>27.25%   </td></tr>
+<tr><td>21/09/26</td><td style="text-align: center;"> 1574.00 </td><td style="text-align: center;"> 1594.98 </td><td style="text-align: center;">  1521.55   </td><td style="text-align: center;">  1574.00   </td><td style="text-align: center;">  1542.53   </td><td style="text-align: center;">  1553.02   </td><td style="text-align: center;">  2046.20  </td><td style="text-align: center;">1584.49</td><td style="text-align: center;">   629.90   </td><td style="text-align: center;"> 1783.80  </td><td style="text-align: center;"> 1804.78  </td><td>4.57%   </td><td>26.72%   </td></tr>
+<tr><td>18/09/26</td><td style="text-align: center;"> 1572.00 </td><td style="text-align: center;"> 1592.96 </td><td style="text-align: center;">  1519.60   </td><td style="text-align: center;">  1572.00   </td><td style="text-align: center;">  1540.56   </td><td style="text-align: center;">  1551.04   </td><td style="text-align: center;">  2043.60  </td><td style="text-align: center;">1582.48</td><td style="text-align: center;">   628.80   </td><td style="text-align: center;"> 1781.60  </td><td style="text-align: center;"> 1802.56  </td><td>4.07%   </td><td>26.20%   </td></tr>
+<tr><td>17/09/26</td><td style="text-align: center;"> 1571.50 </td><td style="text-align: center;"> 1592.44 </td><td style="text-align: center;">  1519.15   </td><td style="text-align: center;">  1571.50   </td><td style="text-align: center;">  1540.09   </td><td style="text-align: center;">  1550.56   </td><td style="text-align: center;">  2042.95  </td><td style="text-align: center;">1581.97</td><td style="text-align: center;">   629.20   </td><td style="text-align: center;"> 1780.90  </td><td style="text-align: center;"> 1801.84  </td><td>5.06%   </td><td>27.18%   </td></tr>
+<tr><td>16/09/26</td><td style="text-align: center;"> 1569.50 </td><td style="text-align: center;"> 1590.42 </td><td style="text-align: center;">  1517.20   </td><td style="text-align: center;">  1569.50   </td><td style="text-align: center;">  1538.12   </td><td style="text-align: center;">  1548.58   </td><td style="text-align: center;">  2040.35  </td><td style="text-align: center;">1579.96</td><td style="text-align: center;">   628.10   </td><td style="text-align: center;"> 1778.70  </td><td style="text-align: center;"> 1799.62  </td><td>4.56%   </td><td>26.65%   </td></tr>
+<tr><td>15/09/26</td><td style="text-align: center;"> 1567.50 </td><td style="text-align: center;"> 1588.40 </td><td style="text-align: center;">  1515.25   </td><td style="text-align: center;">  1567.50   </td><td style="text-align: center;">  1536.15   </td><td style="text-align: center;">  1546.60   </td><td style="text-align: center;">  2037.75  </td><td style="text-align: center;">1577.95</td><td style="text-align: center;">   627.00   </td><td style="text-align: center;"> 1776.50  </td><td style="text-align: center;"> 1797.40  </td><td>4.05%   </td><td>26.12%   </td></tr>
+<tr><td>14/09/26</td><td style="text-align: center;"> 1567.00 </td><td style="text-align: center;"> 1587.88 </td><td style="text-align: center;">  1514.80   </td><td style="text-align: center;">  1567.00   </td><td style="text-align: center;">  1535.68   </td><td style="text-align: center;">  1546.12   </td><td style="text-align: center;">  2037.10  </td><td style="text-align: center;">1577.44</td><td style="text-align: center;">   627.40   </td><td style="text-align: center;"> 1775.80  </td><td style="text-align: center;"> 1796.68  </td><td>5.05%   </td><td>27.10%   </td></tr>
+<tr><td>11/09/26</td><td style="text-align: center;"> 1565.00 </td><td style="text-align: center;"> 1585.86 </td><td style="text-align: center;">  1512.85   </td><td style="text-align: center;">  1565.00   </td><td style="text-align: center;">  1533.71   </td><td style="text-align: center;">  1544.14   </td><td style="text-align: center;">  2034.50  </td><td style="text-align: center;">1575.43</td><td style="text-align: center;">   626.30   </td><td style="text-align: center;"> 1773.60  </td><td style="text-align: center;"> 1794.46  </td><td>4.55%   </td><td>26.57%   </td></tr>
+<tr><td>10/09/26</td><td style="text-align: center;"> 1563.00 </td><td style="text-align: center;"> 1583.84 </td><td style="text-align: center;">  1510.90   </td><td style="text-align: center;">  1563.00   </td><td style="text-align: center;">  1531.74   </td><td style="text-align: center;">  1542.16   </td><td style="text-align: center;">  2031.90  </td><td style="text-align: center;">1573.42</td><td style="text-align: center;">   625.20   </td><td style="text-align: center;"> 1771.40  </td><td style="text-align: center;"> 1792.24  </td><td>4.04%   </td><td>26.05%   </td></tr>
+<tr><td>09/09/26</td><td style="text-align: center;"> 1562.50 </td><td style="text-align: center;"> 1583.32 </td><td style="text-align: center;">  1510.45   </td><td style="text-align: center;">  1562.50   </td><td style="text-align: center;">  1531.27   </td><td style="text-align: center;">  1541.68   </td><td style="text-align: center;">  2031.25  </td><td style="text-align: center;">1572.91</td><td style="text-align: center;">   625.60   </td><td style="text-align: center;"> 1770.70  </td><td style="text-align: center;"> 1791.52  </td><td>5.04%   </td><td>27.02%   </td></tr>
+<tr><td>08/09/26</td><td style="text-align: center;"> 1560.50 </td><td style="text-align: center;"> 1581.30 </td><td style="text-align: center;">  1508.50   </td><td style="text-align: center;">  1560.50   </td><td style="text-align: center;">  1529.30   </td><td style="text-align: center;">  1539.70   </td><td style="text-align: center;">  2028.65  </td><td style="text-align: center;">1570.90</td><td style="text-align: center;">   624.50   </td><td style="text-align: center;"> 1768.50  </td><td style="text-align: center;"> 1789.30  </td><td>4.54%   </td><td>26.50%   </td></tr>
+<tr><td>07/09/26</td><td style="text-align: center;"> 1558.50 </td><td style="text-align: center;"> 1579.28 </td><td style="text-align: center;">  1506.55   </td><td style="text-align: center;">  1558.50   </td><td style="text-align: center;">  1527.33   </td><td style="text-align: center;">  1537.72   </td><td style="text-align: center;">  2026.05  </td><td style="text-align: center;">1568.89</td><td style="text-align: center;">   623.40   </td><td style="text-align: center;"> 1766.30  </td><td style="text-align: center;"> 1787.08  </td><td>4.03%   </td><td>25.97%   </td></tr>
+<tr><td>04/09/26</td><td style="text-align: center;"> 1558.00 </td><td style="text-align: center;"> 1578.76 </td><td style="text-align: center;">  1506.10   </td><td style="text-align: center;">  1558.00   </td><td style="text-align: center;">  1526.86   </td><td style="text-align: center;">  1537.24   </td><td style="text-align: center;">  2025.40  </td><td style="text-align: center;">1568.38</td><td style="text-align: center;">   623.80   </td><td style="text-align: center;"> 1765.60  </td><td style="text-align: center;"> 1786.36  </td><td>5.03%   </td><td>26.95%   </td></tr>
+<tr><td>03/09/26</td><td style="text-align: center;"> 1556.00 </td><td style="text-align: center;"> 1576.74 </td><td style="text-align: center;">  1504.15   </td><td style="text-align: center;">  1556.00   </td><td style="text-align: center;">  1524.89   </td><td style="text-align: center;">  1535.26   </td><td style="text-align: center;">  2022.80  </td><td style="text-align: center;">1566.37</td><td style="text-align: center;">   622.70   </td><td style="text-align: center;"> 1763.40  </td><td style="text-align: center;"> 1784.14  </td><td>4.52%   </td><td>26.42%   </td></tr>
+<tr><td>02/09/26</td><td style="text-align: center;"> 1554.00 </td><td style="text-align: center;"> 1574.72 </td><td style="text-align: center;">  1502.20   </td><td style="text-align: center;">  1554.00   </td><td style="text-align: center;">  1522.92   </td><td style="text-align: center;">  1533.28   </td><td style="text-align: center;">  2020.20  </td><td style="text-align: center;">1564.36</td><td style="text-align: center;">   621.60   </td><td style="text-align: center;"> 1761.20  </td><td style="text-align: center;"> 1781.92  </td><td>4.02%   </td><td>25.90%   </td></tr>
+</tbody>
+</table></div>
+
+            <!-- TABLA VARIACIONES -->
+            <p style="color:#2c3e50; margin-top:20px;">🔄 <b><u>Brechas y Variaciones:</u></b><br>
+            Acá podés ver cómo se están moviendo los arbitrajes entre los distintos tipos de cambio y qué tanto terreno ganó o perdió cada uno en las últimas jornadas.</p>
+            <div class="table-wrapper tabla-variaciones" style="width:100%; overflow-x:auto;"><table>
+<thead>
+<tr><th>Fecha   </th><th style="text-align: center;"> Solidario / TCV Blue </th><th style="text-align: center;"> TCV MEP / TCV Blue </th><th style="text-align: center;"> TCV Euro / TCC Blue % </th><th>Variación Solidario                                           </th><th>Variación TCV Blue                                            </th><th>Variación TCV Euro                                            </th></tr>
+</thead>
+<tbody>
+<tr><td>06/10/26</td><td style="text-align: center;">        27.91%        </td><td style="text-align: center;">       -1.34%       </td><td style="text-align: center;">        15.42%         </td><td><span style="color: #c0392b; font-weight: bold;">-3.74%</span></td><td><span style="color: #c0392b; font-weight: bold;">-3.46%</span></td><td><span style="color: #c0392b; font-weight: bold;">-1.52%</span></td></tr>
+<tr><td>05/10/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>02/10/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>01/10/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.16%         </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.04%</span> </td></tr>
+<tr><td>30/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>29/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>28/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.16%         </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.04%</span> </td></tr>
+<tr><td>25/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>24/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>23/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.16%         </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.04%</span> </td></tr>
+<tr><td>22/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>21/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>18/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.16%         </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.04%</span> </td></tr>
+<tr><td>17/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>16/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>15/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.16%         </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.04%</span> </td></tr>
+<tr><td>14/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>11/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>10/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.16%         </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.04%</span> </td></tr>
+<tr><td>09/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>08/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>07/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.16%         </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.04%</span> </td></tr>
+<tr><td>04/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>03/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.15%         </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.13%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.12%</span> </td></tr>
+<tr><td>02/09/26</td><td style="text-align: center;">        28.29%        </td><td style="text-align: center;">       -0.66%       </td><td style="text-align: center;">        13.16%         </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.03%</span> </td><td><span style="color: #1e8449; font-weight: bold;">0.04%</span> </td></tr>
+</tbody>
+</table></div>
+
+            <!-- TABLA INFLACIÓN -->
+            <p style="color:#2c3e50; margin-top:20px;">📈 <b><u>Termómetro de Inflación:</u></b><br>
+            La siguiente tabla muestra las últimas 12 publicaciones del IPC. Tené en cuenta que la <b>inflación interanual es del 31.50%</b>:</p>
+            <div class="table-wrapper tabla-inflacion" style="width:100%; overflow-x:auto;"><table>
+<thead>
+<tr><th>Fecha   </th><th style="text-align: center;"> I. Mensual </th><th style="text-align: center;"> I. Bimestral </th><th style="text-align: center;"> I. Trimestral </th></tr>
+</thead>
+<tbody>
+<tr><td>oct/2025</td><td style="text-align: center;">   2.40%    </td><td style="text-align: center;">    4.76%     </td><td style="text-align: center;">     7.06%     </td></tr>
+<tr><td>nov/2025</td><td style="text-align: center;">   2.50%    </td><td style="text-align: center;">    4.96%     </td><td style="text-align: center;">     7.37%     </td></tr>
+<tr><td>dic/2025</td><td style="text-align: center;">   2.60%    </td><td style="text-align: center;">    5.16%     </td><td style="text-align: center;">     7.69%     </td></tr>
+<tr><td>ene/2026</td><td style="text-align: center;">   2.00%    </td><td style="text-align: center;">    4.65%     </td><td style="text-align: center;">     7.27%     </td></tr>
+<tr><td>feb/2026</td><td style="text-align: center;">   2.10%    </td><td style="text-align: center;">    4.14%     </td><td style="text-align: center;">     6.85%     </td></tr>
+<tr><td>mar/2026</td><td style="text-align: center;">   2.20%    </td><td style="text-align: center;">    4.35%     </td><td style="text-align: center;">     6.43%     </td></tr>
+<tr><td>abr/2026</td><td style="text-align: center;">   2.30%    </td><td style="text-align: center;">    4.55%     </td><td style="text-align: center;">     6.75%     </td></tr>
+<tr><td>may/2026</td><td style="text-align: center;">   2.40%    </td><td style="text-align: center;">    4.76%     </td><td style="text-align: center;">     7.06%     </td></tr>
+<tr><td>jun/2026</td><td style="text-align: center;">   2.50%    </td><td style="text-align: center;">    4.96%     </td><td style="text-align: center;">     7.37%     </td></tr>
+<tr><td>jul/2026</td><td style="text-align: center;">   2.60%    </td><td style="text-align: center;">    5.16%     </td><td style="text-align: center;">     7.69%     </td></tr>
+<tr><td>ago/2026</td><td style="text-align: center;">   2.00%    </td><td style="text-align: center;">    4.65%     </td><td style="text-align: center;">     7.27%     </td></tr>
+<tr><td>sep/2026</td><td style="text-align: center;">   2.10%    </td><td style="text-align: center;">    4.14%     </td><td style="text-align: center;">     6.85%     </td></tr>
+</tbody>
+</table></div>
+
+            <!-- FUENTES -->
+            <div style="margin-top:30px; font-size:12px; color:#7f8c8d; border-top:1px solid #eee; padding-top:15px;">
+              <p><b><u>📚 Las fuentes consultadas fueron:</u></b><br>
+              <b>Cotizaciones oficiales: </b>https://www.bna.com.ar/Personas<br>
+              <b>Cotizaciones paralelas: </b>https://dolarhoy.com/cotizaciondolarblue<br>
+              <b>Cotización Dólar MEP: </b>https://www.ambito.com/contenidos/dolar-mep.html<br>
+              <b>Riesgo País: </b>https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais<br>
+              <b>Cotización Euro Blue: </b>https://www.ambito.com/euro-informal<br>
+              <b>Tasa Efectiva Anual EEUU: </b>https://api.stlouisfed.org/fred/series/observations<br>
+              <b>Tasa Efectiva Anual e Inflación Mensual argentina: </b>https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias<br>
+              <b>Bitcoin: </b>finance.yahoo.com</p>
+            </div>
+
+            <!-- CIERRE -->
+            <div style="margin-top:30px; border-top:1px solid #dcdde1; padding-top:20px;">
+              <p style="font-size:14px !important; color:#2c3e50;">🤓 Muchas gracias por leer,<br>
+              🤑 Ojalá esta información te sea de gran utilidad para tus decisiones.</p>
+
+              <!-- Todo el cierre vive dentro de este recuadro.
+                   El gris pasa de #f8f9fa a #eef1f4: el anterior era 97% blanco y sobre
+                   el fondo del informe no se distinguía, así que la zona no se leía como
+                   zona. Con el borde sutil queda delimitada.
+                   Contraste medido sobre #eef1f4: #4d5a68 da 6.22:1 y #2c3e50 9.69:1,
+                   los dos por encima del 4.5:1 que pide WCAG AA para texto chico.
+                   El #bdc3c7 que estaba antes daba 1.69:1, ilegible. -->
+              <div style="background-color:#eef1f4; border:1px solid #dfe4ea; padding:18px 20px; border-radius:8px; margin:20px 0 0 0;">
+                <p style="margin:0 0 10px 0;">
+                  <a href="https://linkedin.com/in/mauroemartinez/" style="text-decoration:none; color:#0077b5;"><b>LinkedIn</b></a>
+                  | <a href="https://github.com/mauroemartinez/" style="text-decoration:none; color:#24292e;"><b>GitHub</b></a>
+                </p>
+                <p style="margin:0 0 3px 0; font-size:12px !important; color:#4d5a68;">
+                  ☕ Si este reporte te ahorró tiempo y/o dinero, podés apoyar el proyecto al alias: <b style="color:#2c3e50;">mauroemartinezmp</b>
+                </p>
+
+                <!-- Sin separador ni padding entre esta línea y la anterior: la
+                     línea divisoria mas el margen abrian un renglon en blanco.
+                     Mismo tamaño, mismo estilo y sin cursivas en las tres líneas.
+                     Solo el nombre y el mail van en negrita. -->
+                <div style="font-size:11px !important; color:#4d5a68; line-height:1.6;">
+                  🤖 Este es un proceso de RPA desarrollado íntegramente en Python por <b style="color:#2c3e50;">Mauro E. Martinez</b>.<br>
+                  ⏱️ Performance: el script procesó los datos y generó este envío en 1.00 segundos.<br>
+                  📧 Consultas, desuscripciones o propuestas: <a href="mailto:martinezmauroezequiel@gmail.com" style="color:#2c3e50; text-decoration:underline; font-weight:bold;">martinezmauroezequiel@gmail.com</a>
+                </div>
+              </div>
+            </div>
+
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>
