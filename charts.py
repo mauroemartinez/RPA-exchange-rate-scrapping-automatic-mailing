@@ -26,6 +26,7 @@ from matplotlib.artist import setp
 from matplotlib.figure import Figure
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 
+import transformations
 from fechas import mes_abreviado
 from transformations import etiqueta_mes
 
@@ -527,3 +528,86 @@ def grafico_btc(btc_df: pd.DataFrame, carpeta: Path) -> Path:
 
         fig.tight_layout()
         return _guardar(fig, carpeta, BTC, dpi=150, facecolor="#0a0a0a", edgecolor="none", bbox_inches="tight")
+
+
+# ── Agregados monetarios (fase 3, todavía fuera del mail) ────────────────────
+
+AGREGADOS = "Agregados Monetarios.jpg"
+
+# Series del panel de niveles y del de variación interanual, con su rótulo
+NIVELES = {"base_monetaria": "Base monetaria", "circulacion_monetaria": "Circulación monetaria", "m2": "M2"}
+INTERANUALES = {"base_monetaria": "Base monetaria", "m2": "M2", "m3": "M3 (mensual)"}
+
+
+def preparar_agregados(series: dict, hoy) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(niveles en billones de ARS, variación interanual), los dos del último año.
+
+    `series` es lo que devuelve scrapers.agregados.descargar(). Los niveles se
+    pasan de millones a billones solo para el gráfico: en la base quedan en la
+    unidad de la fuente.
+    """
+    # Un año en los dos paneles: con dos, la variación interanual de fines de 2024
+    # (más de 200%) aplastaba la escala justo donde está la comparación que importa
+    corte = pd.Timestamp(hoy) - pd.DateOffset(years=1)
+
+    niveles = []
+    for clave, rotulo in NIVELES.items():
+        df = transformations.serie_a_frame(series[clave])
+        df = df[df["Fecha"] >= corte].assign(serie=rotulo, billones=lambda d: d["valor"] / 1e6)
+        niveles.append(df)
+
+    interanuales = []
+    for clave, rotulo in {**INTERANUALES, "inflacion_interanual": "Inflación interanual"}.items():
+        if clave == "inflacion_interanual":
+            df = transformations.serie_a_frame(series[clave]).rename(columns={"valor": "interanual"})
+        else:
+            df = transformations.interanual_por_fecha(series[clave])
+        interanuales.append(df[df["Fecha"] >= corte].assign(serie=rotulo))
+
+    return pd.concat(niveles, ignore_index=True), pd.concat(interanuales, ignore_index=True)
+
+
+def grafico_agregados(niveles: pd.DataFrame, interanual: pd.DataFrame, carpeta: Path) -> Path:
+    """Niveles de base monetaria, circulación y M2, y su variación interanual contra la inflación."""
+    with _estilo_base():
+        fig = Figure(figsize=(10, 10))
+        ax = fig.subplots(2, 1)
+        fig.suptitle("Agregados monetarios", fontweight="bold", fontsize=18)
+
+        paleta = sns.color_palette("dark")
+        for i, (rotulo, datos) in enumerate(niveles.groupby("serie", sort=False)):
+            ax[0].plot(datos["Fecha"], datos["billones"], color=paleta[i], linewidth=2, label=rotulo)
+            ultimo = datos.iloc[-1]
+            ax[0].annotate(
+                f"{ultimo['billones']:,.1f}", xy=(ultimo["Fecha"], ultimo["billones"]), xytext=(4, 0),
+                textcoords="offset points", va="center", fontproperties=fm.FontProperties(weight="bold", size=9),
+                color=paleta[i],
+            )
+        ax[0].set_title("Niveles del último año", fontweight="bold", fontsize=12)
+        ax[0].set_ylabel("Billones de ARS", fontsize=12, fontweight="bold")
+        ax[0].yaxis.set_major_formatter(FuncFormatter("{:,.0f}".format))
+
+        colores = {"Base monetaria": paleta[0], "M2": paleta[2], "M3 (mensual)": paleta[4], "Inflación interanual": "darkred"}
+        for rotulo, datos in interanual.groupby("serie", sort=False):
+            if rotulo == "Inflación interanual":
+                ax[1].plot(datos["Fecha"], datos["interanual"], color=colores[rotulo], linewidth=2.5,
+                           drawstyle="steps-post", label=rotulo)
+            elif rotulo == "M3 (mensual)":
+                ax[1].plot(datos["Fecha"], datos["interanual"], color=colores[rotulo], linestyle="none",
+                           marker="D", markersize=6, label=rotulo)
+            else:
+                ax[1].plot(datos["Fecha"], datos["interanual"], color=colores[rotulo], linewidth=1.8, label=rotulo)
+        ax[1].axhline(0, color="black", linewidth=0.8)
+        ax[1].set_title("Variación interanual contra la inflación", fontweight="bold", fontsize=12)
+        ax[1].set_ylabel("Variación interanual", fontsize=12, fontweight="bold")
+        ax[1].yaxis.set_major_formatter(FuncFormatter("{:,.0f} %".format))
+
+        for axis, ubicacion in zip(ax, ["upper left", "upper right"]):
+            axis.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+            axis.xaxis.set_major_formatter(_formato_mes("%b/%y"))
+            axis.grid(color="silver", linestyle="--", linewidth=0.5)
+            axis.legend(prop={"size": 8}, loc=ubicacion, shadow=True)
+            setp(axis.xaxis.get_majorticklabels(), rotation=45)
+
+        fig.tight_layout(pad=1)
+        return _guardar(fig, carpeta, AGREGADOS)

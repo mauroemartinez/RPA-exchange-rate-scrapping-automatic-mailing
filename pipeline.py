@@ -10,6 +10,7 @@ Etapas, en el mismo orden que el notebook:
   graficos      los cuatro .jpg; si Yahoo no responde, el mail sale sin el de BTC
   mail          las dos variantes del reporte (con y sin CSV)
   previews      commit y push de Previews/
+  series        agregados monetarios e inflación a Fact_Series_Macro (fase 3, todavía fuera del mail)
 
 Cada etapa queda registrada con estado y duración. Una etapa en "error" pone la
 corrida en rojo (código de salida 1) y dispara un mail de alerta con el resumen.
@@ -32,7 +33,7 @@ import time
 from collections.abc import Callable
 from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from pydantic import EmailStr, TypeAdapter, ValidationError
@@ -47,7 +48,7 @@ import preview_git
 import scrapers
 import transformations
 from config import settings
-from scrapers import btc
+from scrapers import agregados, btc
 from scrapers.utils import ScraperError
 
 log = logging.getLogger("pipeline")
@@ -56,6 +57,10 @@ RAIZ = Path(__file__).resolve().parent
 PREVIEWS = RAIZ / "Previews"
 
 OK, ADVERTENCIA, ERROR, OMITIDA = "ok", "advertencia", "error", "omitida"
+
+# Ventana que la etapa de series vuelve a pedir cada día: alcanza para el último
+# M3 mensual (sale con unos dos meses de rezago) y para tomar las revisiones del BCRA
+DIAS_SERIES = 120
 
 
 @dataclass
@@ -141,6 +146,9 @@ class Dependencias:
     generar_parrafo: Callable = ia_generator.procesar_y_guardar_parrafo
     enviar_mail: Callable = email_report.enviar
     actualizar_previews: Callable = preview_git.actualizar_previews
+    tabla_series: Callable = data_access.tabla_existe
+    descargar_series: Callable = agregados.descargar
+    guardar_series: Callable = data_access.guardar_series
     alertar: Callable = mailer.enviar_alerta
     alertar_scraper: Callable = mailer.alertar_scraper_caido
     alertar_validacion: Callable = mailer.alertar_validacion
@@ -413,6 +421,32 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
             hecho, e.detalle = deps.actualizar_previews(RAIZ)
             if not hecho:
                 e.estado = OMITIDA
+
+    # ── Series monetarias (fase 3) ───────────────────────────────────────────
+    # Se guardan para ir armando la historia, pero todavía no van en el mail: por
+    # eso un problema acá queda como advertencia y no pone la corrida en rojo.
+    if opciones.dry_run:
+        registro.omitir("series", "dry-run")
+    else:
+        with registro.etapa("series", critica=False) as e:
+            try:
+                if not deps.tabla_series(engine):
+                    e.estado = OMITIDA
+                    e.detalle = f"falta la tabla {data_access.TABLA_SERIES} (sql/06_series_macro.sql)"
+                else:
+                    series = deps.descargar_series(fecha - timedelta(days=DIAS_SERIES))
+                    avisos, escritos = [], 0
+                    for clave, puntos in series.items():
+                        serie = agregados.POR_CLAVE[clave]
+                        avisos += transformations.validar_serie(serie, puntos, fecha)
+                        escritos += deps.guardar_series(engine, serie, puntos)
+                    e.detalle = f"{escritos} puntos nuevos o revisados" + "".join(f"; {a}" for a in avisos)
+                    if avisos:
+                        e.estado = ADVERTENCIA
+            except Exception as exc:
+                log.exception("No se pudieron guardar las series monetarias")
+                e.estado = ADVERTENCIA
+                e.detalle = f"{type(exc).__name__}: {exc}"
 
 
 def _guardar_vista_previa(carpeta: Path, html: str, imagenes: dict[str, bytes], fecha: date) -> None:

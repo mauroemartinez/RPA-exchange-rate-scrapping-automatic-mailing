@@ -9,7 +9,20 @@ from contextlib import contextmanager
 from datetime import date
 
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import (
+    Column,
+    Date,
+    DateTime,
+    MetaData,
+    Numeric,
+    String,
+    Table,
+    Text,
+    create_engine,
+    func,
+    text,
+)
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Engine
 
 from config import settings
@@ -126,3 +139,71 @@ def candado_corrida(engine: Engine):
         finally:
             if obtenido:
                 conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": CLAVE_CANDADO})
+
+
+# ── Series con su frecuencia original (fase 3) ──────────────────────────────
+
+TABLA_SERIES = "Fact_Series_Macro"
+
+# Formato largo: una fila por serie y fecha, con la unidad y la frecuencia de la
+# fuente. La crea sql/06_series_macro.sql; mientras no exista, el pipeline omite
+# la etapa en vez de fallar.
+_metadata = MetaData()
+series_macro = Table(
+    TABLA_SERIES,
+    _metadata,
+    Column("serie", Text, primary_key=True),
+    Column("Fecha", Date, primary_key=True),
+    Column("valor", Numeric, nullable=False),
+    Column("frecuencia", String(1), nullable=False),
+    Column("unidad", Text, nullable=False),
+    Column("fuente", Text, nullable=False),
+    Column("id_fuente", Text),
+    Column("actualizado_en", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)
+
+
+def tabla_existe(engine: Engine, tabla: str = TABLA_SERIES) -> bool:
+    with engine.connect() as conn:
+        return conn.execute(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": f'public."{tabla}"'}).scalar()
+
+
+def sentencia_series():
+    """El upsert de series: inserta lo nuevo y pisa solo los valores que cambiaron.
+
+    Los agregados del BCRA se revisan después de publicados; con el WHERE, una
+    fila idéntica no se reescribe y actualizado_en marca la última revisión real.
+    """
+    stmt = pg_insert(series_macro)
+    return stmt.on_conflict_do_update(
+        index_elements=["serie", "Fecha"],
+        set_={"valor": stmt.excluded.valor, "unidad": stmt.excluded.unidad, "actualizado_en": func.now()},
+        where=series_macro.c.valor != stmt.excluded.valor,
+    )
+
+
+def guardar_series(engine: Engine, serie, puntos: list[tuple[date, float]]) -> int:
+    """Upsert de los puntos de una scrapers.agregados.Serie. Devuelve cuántos escribió."""
+    if not puntos:
+        return 0
+    filas = [
+        {
+            "serie": serie.clave, "Fecha": fecha, "valor": valor, "frecuencia": serie.frecuencia,
+            "unidad": serie.unidad, "fuente": "BCRA", "id_fuente": str(serie.id_bcra),
+        }
+        for fecha, valor in puntos
+    ]
+    with engine.begin() as conn:
+        escritas = conn.execute(sentencia_series(), filas).rowcount
+    log.info("Supabase: %s, %d puntos nuevos o revisados de %d", serie.clave, max(escritas, 0), len(puntos))
+    return max(escritas, 0)
+
+
+def leer_series(engine: Engine, claves: list[str]) -> pd.DataFrame:
+    """Las series pedidas en formato largo, ordenadas por serie y fecha."""
+    with engine.connect() as conn:
+        return pd.read_sql_query(
+            text(f'SELECT * FROM "{TABLA_SERIES}" WHERE serie = ANY(:claves) ORDER BY serie, "Fecha"'),
+            conn,
+            params={"claves": list(claves)},
+        )

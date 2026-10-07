@@ -3,7 +3,7 @@
 import contextlib
 import smtplib
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -11,6 +11,7 @@ import charts
 import ia_generator
 import pipeline
 from conftest import HOY
+from scrapers import agregados
 from scrapers.utils import ScraperError
 
 
@@ -46,6 +47,7 @@ def entorno(historico, resultados, btc_crudo, tmp_path):
         alertar=lambda asunto, cuerpo: hechos["alertas"].append(asunto) or True,
         alertar_scraper=lambda exc: hechos["alertas"].append("scraper") or True,
         alertar_validacion=lambda exc: hechos["alertas"].append("validacion") or True,
+        tabla_series=lambda engine: False,
         hoy=lambda: HOY,
         ahora=lambda: datetime(2026, 10, 6, 16, 43),
     )
@@ -63,7 +65,7 @@ def test_corrida_completa(entorno):
     assert r.estado == "ok" and r.exitosa
     assert _estados(r) == {
         "historico": "ok", "scraping": "ok", "validacion": "ok", "persistencia": "ok",
-        "ia": "ok", "graficos": "ok", "mail": "ok", "previews": "omitida",
+        "ia": "ok", "graficos": "ok", "mail": "ok", "previews": "omitida", "series": "omitida",
     }
     fila, sobrescribir = hechos["filas"][0]
     assert fila["Fecha"].iloc[0] == HOY and sobrescribir is False
@@ -252,3 +254,38 @@ def test_el_csv_adjunto_sale_de_supabase_con_el_parrafo_de_hoy(entorno, historic
     assert lineas[1].startswith("2026-10-06,1535.0,1555.0") and lineas[1].endswith("Párrafo de Gemini")
     assert lineas[2].startswith(historico["Fecha"].iloc[0])
     assert len(lineas) == len(historico) + 2
+
+
+def _series_falsas(hoy=HOY):
+    return {
+        s.clave: [(hoy - timedelta(days=d), 100.0 + d) for d in (40, 20, 3)]
+        for s in agregados.SERIES
+    }
+
+
+def test_series_se_guardan_cuando_existe_la_tabla(entorno):
+    deps, hechos, salida = entorno
+    guardadas = []
+    deps = replace(
+        deps,
+        tabla_series=lambda engine: True,
+        descargar_series=lambda desde: _series_falsas(),
+        guardar_series=lambda engine, serie, puntos: guardadas.append(serie.clave) or len(puntos),
+    )
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+    assert _estados(r)["series"] == "ok"
+    assert sorted(guardadas) == sorted(s.clave for s in agregados.SERIES)
+    assert r.estado == "ok"
+
+
+def test_una_falla_en_las_series_no_pone_la_corrida_en_rojo(entorno):
+    deps, hechos, salida = entorno
+
+    def descargar(desde):
+        raise ScraperError("BCRA", "leer agregados monetarios", TimeoutError("timeout"))
+
+    deps = replace(deps, tabla_series=lambda engine: True, descargar_series=descargar)
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+    assert _estados(r)["series"] == "advertencia"
+    assert r.estado == "advertencia" and r.exitosa
+    assert len(hechos["mails"]) == 2
