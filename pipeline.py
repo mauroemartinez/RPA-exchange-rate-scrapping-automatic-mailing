@@ -6,7 +6,8 @@ Etapas, en el mismo orden que el notebook:
   scraping      las seis fuentes en paralelo; si una cae, alerta y corta
   validacion    arma la fila del día y la pasa por models.FilaMacro; si no cumple, alerta y corta
   persistencia  INSERT de la fila sin duplicar la fecha
-  ia            párrafo de Gemini, guardado en la misma fila
+  ia            párrafo de Gemini, guardado en la misma fila; con la columna ai_secciones,
+                además un comentario por gráfico, en la misma llamada (fase 4)
   graficos      los cuatro .jpg; si Yahoo no responde, el mail sale sin el de BTC
   mail          las dos variantes del reporte (con y sin CSV)
   previews      commit y push de Previews/
@@ -22,6 +23,7 @@ Uso:
                                            # igual, pero el mail te llega solo a vos
     python pipeline.py --sin-mail          # escribe en Supabase y genera todo, sin enviar
     python pipeline.py --forzar            # repite el día aunque la fila ya exista
+    python pipeline.py --dry-run --con-ia  # prueba los comentarios por gráfico de Gemini, sin guardarlos
 """
 
 import argparse
@@ -131,6 +133,8 @@ class Opciones:
     # carpeta temporal en dry-run (Previews/ se commitea sola, no es lugar de pruebas).
     salida: Path | None = None
     origen: str = "cli"
+    # En dry-run, pedirle a Gemini los comentarios por gráfico (una llamada, sin guardarlos)
+    probar_ia: bool = False
 
 
 @dataclass
@@ -144,6 +148,9 @@ class Dependencias:
     scrapear: Callable = scrapers.run_all_sync
     descargar_btc: Callable = btc.descargar
     generar_parrafo: Callable = ia_generator.procesar_y_guardar_parrafo
+    columna_secciones: Callable = lambda engine: data_access.columna_existe(engine, "ai_secciones")
+    generar_secciones: Callable = ia_generator.generar_secciones
+    guardar_secciones: Callable = ia_generator.guardar_secciones
     enviar_mail: Callable = email_report.enviar
     actualizar_previews: Callable = preview_git.actualizar_previews
     tabla_series: Callable = data_access.tabla_existe
@@ -257,10 +264,12 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
     hoy_iso = str(fecha)
     existente = historico[historico["Fecha"] == hoy_iso]
     ya_existe = not existente.empty
-    parrafo_existente = None
+    parrafo_existente = secciones_existentes = None
     if ya_existe:
         if "ai_paragraph" in existente.columns and isinstance(existente["ai_paragraph"].iloc[0], str):
             parrafo_existente = existente["ai_paragraph"].iloc[0]
+        if "ai_secciones" in existente.columns and isinstance(existente["ai_secciones"].iloc[0], dict):
+            secciones_existentes = existente["ai_secciones"].iloc[0]
         if not (opciones.forzar or opciones.dry_run):
             registro.omitir(
                 "control",
@@ -313,24 +322,72 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
                 e.estado = ADVERTENCIA
                 e.detalle = "la fila apareció mientras corría; se conservan los valores guardados"
 
+    # ── BTC ──────────────────────────────────────────────────────────────────
+    # Se descarga antes de la IA porque el comentario de BTC lo necesita. Si
+    # Yahoo no responde, el mail sale sin ese gráfico y sin ese comentario.
+    btc_df, falla_btc = None, None
+    try:
+        desde, hasta = charts.rango_btc(deps.ahora())
+        btc_df = charts.preparar_btc(deps.descargar_btc(desde, hasta), hasta)
+    except Exception as exc:
+        log.warning("Sin datos de BTC: %s", exc)
+        falla_btc = f"{type(exc).__name__}: {exc}"
+
     # ── Párrafo de IA ────────────────────────────────────────────────────────
-    # parrafo es lo que muestra el mail; texto_ia, lo que queda guardado en la fila
+    # parrafo es lo que muestra el mail; texto_ia, lo que queda guardado en la
+    # fila; comentarios, los textos por gráfico de la fase 4 ({cid: [(título, texto)]})
     parrafo = ia_generator.MENSAJE_FALLA
     texto_ia = None
+    comentarios: dict = {}
     if opciones.dry_run:
         texto_ia = parrafo_existente
         parrafo = parrafo_existente or "[dry-run] Acá va el párrafo de Gemini, que en una prueba no se pide."
-        registro.omitir("ia", "dry-run: no se llama a Gemini")
+        comentarios = ia_generator.comentarios_por_grafico(secciones_existentes)
+        if opciones.probar_ia:
+            with registro.etapa("ia", critica=False) as e:
+                prompt = ia_generator.armar_prompt_secciones(df_base, btc_df, fwd_oficial)
+                secciones, modelo = deps.generar_secciones(prompt)
+                if secciones is None:
+                    e.estado = ADVERTENCIA
+                    e.detalle = "Gemini no devolvió secciones válidas"
+                else:
+                    parrafo = secciones.resumen
+                    comentarios = ia_generator.comentarios_por_grafico(secciones)
+                    e.detalle = f"secciones de prueba con {modelo}, sin guardar"
+        else:
+            registro.omitir("ia", "dry-run: no se llama a Gemini (--con-ia para probar los comentarios)")
     elif not persistida:
         registro.omitir("ia", "la fila del día no quedó guardada")
     else:
         with registro.etapa("ia", critica=False) as e:
-            texto = deps.generar_parrafo(engine, fecha_esperada=fecha)
-            if texto and texto != ia_generator.MENSAJE_FALLA:
-                parrafo = texto_ia = texto
-            else:
-                e.estado = ADVERTENCIA
-                e.detalle = "Gemini no devolvió párrafo; el mail lleva el mensaje de reemplazo"
+            try:
+                con_secciones = bool(deps.columna_secciones(engine))
+            except Exception as exc:
+                log.warning("No se pudo consultar la columna ai_secciones (%s); se usa el párrafo único", exc)
+                con_secciones = False
+
+            secciones = None
+            if con_secciones:
+                prompt = ia_generator.armar_prompt_secciones(df_base, btc_df, fwd_oficial)
+                secciones, modelo = deps.generar_secciones(prompt)
+                if secciones is not None and deps.guardar_secciones(engine, fecha, secciones, modelo):
+                    parrafo = texto_ia = secciones.resumen
+                    comentarios = ia_generator.comentarios_por_grafico(secciones)
+                    e.detalle = f"resumen y comentarios por gráfico con {modelo}"
+                else:
+                    log.warning("Sin comentarios por gráfico; se vuelve al párrafo único")
+                    secciones = None
+
+            if secciones is None:
+                texto = deps.generar_parrafo(engine, fecha_esperada=fecha)
+                if texto and texto != ia_generator.MENSAJE_FALLA:
+                    parrafo = texto_ia = texto
+                    if con_secciones:
+                        e.estado = ADVERTENCIA
+                        e.detalle = "falló la respuesta estructurada; salió el párrafo único"
+                else:
+                    e.estado = ADVERTENCIA
+                    e.detalle = "Gemini no devolvió párrafo; el mail lleva el mensaje de reemplazo"
 
     # ── Gráficos ─────────────────────────────────────────────────────────────
     inflacion = transformations.serie_inflacion(res.bcra["inflacion_mensual"], res.bcra["bcra_tea"])
@@ -358,14 +415,15 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
                 log.exception("No se pudo generar %s", nombre)
                 fallas.append(f"{nombre}: {type(exc).__name__}: {exc}")
 
-        try:
-            desde, hasta = charts.rango_btc(deps.ahora())
-            crudo = deps.descargar_btc(desde, hasta)
-            generados[charts.BTC] = charts.grafico_btc(charts.preparar_btc(crudo, hasta), carpeta)
-        except Exception as exc:
-            log.warning("Sin gráfico de BTC: %s", exc)
+        if btc_df is None:
             e.estado = ADVERTENCIA
-            e.detalle = f"sin gráfico de BTC ({type(exc).__name__}: {exc})"
+            e.detalle = f"sin gráfico de BTC ({falla_btc})"
+        else:
+            try:
+                generados[charts.BTC] = charts.grafico_btc(btc_df, carpeta)
+            except Exception as exc:
+                log.exception("No se pudo generar %s", charts.BTC)
+                fallas.append(f"{charts.BTC}: {type(exc).__name__}: {exc}")
 
         if fallas:
             # A diferencia de BTC, estos no dependen de un tercero: si fallan, es un bug
@@ -381,6 +439,7 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
             df, inflacion_12, fwd_oficial, fwd_blue, parrafo,
             performance_segundos=time.perf_counter() - comienzo,
             graficos=email_report.cids_disponibles(imagenes),
+            comentarios=comentarios,
         )
         if resultado.salida:
             _guardar_vista_previa(resultado.salida, html, imagenes, fecha)
@@ -495,6 +554,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Repite el día aunque la fila ya exista (pisa sus valores y vuelve a mandar el mail)")
     parser.add_argument("--enviar-a", nargs="+", metavar="MAIL",
                         help="Manda el mail solo a estas direcciones, en lugar de a las listas del .env")
+    parser.add_argument("--con-ia", action="store_true",
+                        help="Con --dry-run: pide a Gemini los comentarios por gráfico (una llamada) sin guardarlos")
     parser.add_argument("--salida", type=Path, help="Carpeta para los gráficos y la vista previa")
     parser.add_argument("--log-archivo", type=Path, help="Además de la consola, escribe el log en este archivo")
     parser.add_argument("--json", type=Path, help="Escribe el resultado de la corrida como JSON en este archivo")
@@ -517,6 +578,7 @@ def main(argv: list[str] | None = None) -> int:
             enviar_a=args.enviar_a,
             salida=args.salida.resolve() if args.salida else None,
             origen=args.origen,
+            probar_ia=args.con_ia,
         )
     )
     if args.json:
