@@ -4,6 +4,7 @@ Son las celdas 21 a 34 del notebook, convertidas en funciones puras: reciben
 DataFrames y devuelven DataFrames nuevos, sin red, sin base y sin archivos.
 """
 
+import math
 from dataclasses import dataclass
 from datetime import date
 
@@ -129,3 +130,71 @@ def ultimos_meses(inflacion: pd.DataFrame, meses: int = 12) -> pd.DataFrame:
 def etiqueta_mes(fecha) -> str:
     """'sep/2025': el rótulo de mes del gráfico y de la tabla de inflación."""
     return f"{mes_abreviado(fecha).replace('.', '')}/{fecha.year}"
+
+
+# ── Series monetarias (fase 3) ───────────────────────────────────────────────
+
+# Días sin dato nuevo a partir de los cuales una serie se considera atrasada. El
+# BCRA publica las diarias con dos o tres días hábiles de rezago y el M3 mensual
+# con unos dos meses.
+MAX_REZAGO_DIAS = {"D": 10, "M": 75}
+
+
+def validar_serie(serie, puntos: list[tuple[date, float]], hoy: date) -> list[str]:
+    """Levanta ValueError si la serie viene rota; devuelve avisos si viene atrasada.
+
+    `serie` es un scrapers.agregados.Serie. Rota es: vacía, con fechas repetidas o
+    desordenadas, con valores no finitos, o un stock con valores <= 0.
+    """
+    if not puntos:
+        raise ValueError(f"{serie.clave}: la API no devolvió puntos")
+
+    fechas = [f for f, _ in puntos]
+    if any(b <= a for a, b in zip(fechas, fechas[1:])):
+        raise ValueError(f"{serie.clave}: fechas repetidas o desordenadas")
+
+    for fecha, valor in puntos:
+        if not math.isfinite(valor):
+            raise ValueError(f"{serie.clave}: valor no finito el {fecha}")
+        if serie.positiva and valor <= 0:
+            raise ValueError(f"{serie.clave}: valor no positivo ({valor}) el {fecha}")
+
+    rezago = (hoy - fechas[-1]).days
+    if rezago > MAX_REZAGO_DIAS[serie.frecuencia]:
+        return [f"{serie.nombre}: el último dato es del {fechas[-1]} ({rezago} días)"]
+    return []
+
+
+def variacion_interanual(puntos: list[tuple[date, float]]) -> float | None:
+    """Variación % del último valor contra el último publicado un año antes o más."""
+    if not puntos:
+        return None
+    fecha, valor = puntos[-1]
+    hace_un_anio = (pd.Timestamp(fecha) - pd.DateOffset(years=1)).date()
+    previos = [v for f, v in puntos if f <= hace_un_anio]
+    if not previos or previos[-1] == 0:
+        return None
+    return (valor / previos[-1] - 1) * 100
+
+
+def serie_a_frame(puntos: list[tuple[date, float]], nombre: str = "valor") -> pd.DataFrame:
+    """(fecha, valor) a DataFrame con Fecha datetime, ascendente."""
+    df = pd.DataFrame(puntos, columns=["Fecha", nombre])
+    df["Fecha"] = pd.to_datetime(df["Fecha"])
+    return df.sort_values("Fecha").reset_index(drop=True)
+
+
+def interanual_por_fecha(puntos: list[tuple[date, float]]) -> pd.DataFrame:
+    """Para cada fecha, la variación % contra el último dato de un año antes o más.
+
+    Sirve igual para series diarias y mensuales: merge_asof busca, para cada
+    fecha, la observación más reciente que no pase de la misma fecha del año
+    anterior, así los feriados y fines de semana no dejan huecos.
+    """
+    df = serie_a_frame(puntos)
+    df["Referencia"] = df["Fecha"] - pd.DateOffset(years=1)
+    previo = df[["Fecha", "valor"]].rename(columns={"Fecha": "Referencia", "valor": "valor_previo"})
+    cruce = pd.merge_asof(df.sort_values("Referencia"), previo, on="Referencia", direction="backward")
+    cruce = cruce.sort_values("Fecha").reset_index(drop=True)
+    cruce["interanual"] = (cruce["valor"] / cruce["valor_previo"] - 1) * 100
+    return cruce[["Fecha", "valor", "interanual"]]
