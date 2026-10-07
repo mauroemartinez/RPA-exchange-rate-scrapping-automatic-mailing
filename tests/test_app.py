@@ -91,3 +91,18 @@ def test_timeout(cliente, monkeypatch):
     monkeypatch.setattr(app.subprocess, "run", run)
     assert cliente.post("/run", headers=KEY).status_code == 504
     assert not app._lock.locked()
+
+
+def test_si_el_pipeline_muere_sin_json_la_respuesta_no_tiene_estado(cliente, monkeypatch):
+    monkeypatch.setattr(app.subprocess, "run", lambda comando, **k: subprocess.CompletedProcess(comando, -9))
+    datos = cliente.post("/run", headers=KEY).json()
+    assert datos == {"success": False, "returncode": -9}
+
+
+def test_un_error_inesperado_da_500_y_libera_el_lock(cliente, monkeypatch):
+    def run(comando, **kwargs):
+        raise OSError("no se pudo lanzar el proceso")
+
+    monkeypatch.setattr(app.subprocess, "run", run)
+    assert cliente.post("/run", headers=KEY).status_code == 500
+    assert not app._lock.locked()

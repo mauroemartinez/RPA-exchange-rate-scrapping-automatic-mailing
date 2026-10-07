@@ -2,8 +2,10 @@
 
 import contextlib
 import smtplib
+import subprocess
 from dataclasses import replace
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -21,8 +23,13 @@ class EngineFalso:
 
 
 @pytest.fixture
-def entorno(historico, resultados, btc_crudo, tmp_path):
-    """(Dependencias falsas, registro de lo que se hizo, carpeta de salida)."""
+def entorno(historico, resultados, btc_crudo, tmp_path, monkeypatch):
+    """(Dependencias falsas, registro de lo que se hizo, carpeta de salida).
+
+    PREVIEWS apunta a una carpeta temporal: un test que no pase `salida` escribe
+    ahí y no en el Previews/ del repo, que se commitea y se pushea solo.
+    """
+    monkeypatch.setattr(pipeline, "PREVIEWS", tmp_path / "Previews")
     hechos = {"filas": [], "parrafos": [], "mails": [], "alertas": [], "previews": [], "limpiezas": []}
 
     def guardar_fila(engine, fila, sobrescribir=False):
@@ -493,3 +500,158 @@ def test_una_serie_rota_no_frena_a_las_demas(entorno):
 def test_opciones_que_solo_van_con_dry_run(argumentos):
     with pytest.raises(SystemExit):
         pipeline.main(argumentos)
+
+
+# ── Etapa previews ───────────────────────────────────────────────────────────
+
+def test_una_corrida_real_actualiza_previews(entorno):
+    deps, hechos, salida = entorno
+    llamadas = []
+    deps = replace(deps, actualizar_previews=lambda repo, archivos=None: llamadas.append((repo, archivos)) or (True, "ok"))
+
+    r = pipeline.correr(pipeline.Opciones(), deps)
+
+    assert _estados(r)["previews"] == "ok"
+    assert llamadas == [(pipeline.RAIZ, list(charts.ORDEN_EN_MAIL))]
+    assert {p.name for p in pipeline.PREVIEWS.glob("*.jpg")} == set(charts.ORDEN_EN_MAIL)
+
+
+def test_previews_sin_cambios_queda_omitida(entorno):
+    deps, _, _ = entorno
+    r = pipeline.correr(pipeline.Opciones(), replace(deps, actualizar_previews=lambda repo, archivos=None: (False, "sin cambios")))
+    assert _estados(r)["previews"] == "omitida" and r.estado == "ok"
+
+
+def test_un_push_que_falla_pone_la_corrida_en_rojo_con_una_alerta(entorno):
+    import preview_git
+
+    deps, hechos, _ = entorno
+
+    def actualizar(repo, archivos=None):
+        raise preview_git.GitError("git push terminó con código 128")
+
+    r = pipeline.correr(pipeline.Opciones(), replace(deps, actualizar_previews=actualizar))
+    assert _estados(r)["previews"] == "error" and r.estado == "error"
+    assert len(hechos["mails"]) == 2 and len(hechos["alertas"]) == 1
+
+
+def test_previews_no_se_toca_si_ruta_repo_es_otra_carpeta(entorno, monkeypatch, tmp_path):
+    deps, hechos, _ = entorno
+    monkeypatch.setattr(pipeline.settings, "ruta_repo", tmp_path / "otro-repo")
+    r = pipeline.correr(pipeline.Opciones(), deps)
+    previews = next(e for e in r.etapas if e.nombre == "previews")
+    assert previews.estado == "omitida" and "RUTA_REPO" in previews.detalle
+
+
+# ── Gráficos, dry-run y otras ramas ──────────────────────────────────────────
+
+def test_un_grafico_que_falla_no_viaja_aunque_quede_el_de_ayer(entorno, monkeypatch):
+    deps, hechos, salida = entorno
+    (salida / charts.INFLACION).write_bytes(b"jpg de ayer")
+
+    def falla(*a, **k):
+        raise ValueError("datos raros")
+
+    monkeypatch.setattr(pipeline.charts, "grafico_inflacion", falla)
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+
+    assert _estados(r)["graficos"] == "error" and r.estado == "error"
+    mensaje = hechos["mails"][0][0]
+    cids = [p.get("Content-ID") for p in mensaje.walk() if p.get_content_type() == "image/jpeg"]
+    assert cids == ["<image1>", "<image3>", "<image4>"]
+    assert len(hechos["alertas"]) == 1
+
+
+def test_dry_run_con_la_fila_de_hoy_usa_el_parrafo_y_los_comentarios_guardados(entorno, historico):
+    deps, hechos, salida = entorno
+    con_hoy = historico.copy()
+    con_hoy.loc[0, "Fecha"] = str(HOY)
+    con_hoy.loc[0, "ai_paragraph"] = "Párrafo guardado del día"
+    con_hoy["ai_secciones"] = None
+    con_hoy.at[0, "ai_secciones"] = {"paralelas": "Comentario guardado de paralelas.", "btc": None}
+
+    r = pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida), replace(deps, leer_historico=lambda e: (con_hoy, "supabase")))
+
+    assert r.estado == "ok"
+    vista = (salida / "mail_preview.html").read_text(encoding="utf-8")
+    assert "Párrafo guardado del día" in vista and "Comentario guardado de paralelas." in vista
+
+
+def test_si_no_se_puede_crear_el_engine_alerta(entorno):
+    deps, hechos, salida = entorno
+
+    def crear():
+        raise ValueError("URL de base inválida")
+
+    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, crear_engine=crear))
+    assert _estados(r) == {"pipeline": "error"} and len(hechos["alertas"]) == 1
+
+
+def test_si_el_candado_falla_la_corrida_sigue(entorno):
+    deps, hechos, salida = entorno
+
+    def candado(engine):
+        raise ConnectionError("el pooler no responde")
+
+    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, candado=candado))
+    assert r.estado == "ok" and len(hechos["mails"]) == 2
+
+
+def test_sin_mail_y_sin_push(entorno):
+    deps, hechos, _ = entorno
+    r = pipeline.correr(pipeline.Opciones(enviar_mail=False, push_previews=False), deps)
+    assert _estados(r)["mail"] == "omitida" and _estados(r)["previews"] == "omitida"
+    assert hechos["mails"] == [] and hechos["previews"] == [] and len(hechos["filas"]) == 1
+
+
+def test_enviar_a_manda_un_solo_mail_con_el_csv(entorno):
+    deps, hechos, salida = entorno
+    pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida, enviar_a=["yo@example.com"]), deps)
+    mensaje, _ = hechos["mails"][0]
+    assert any(p.get_content_type() == "text/csv" for p in mensaje.walk())
+
+
+def test_secciones_guardadas_en_cero_filas_caen_al_parrafo_unico(entorno):
+    deps, hechos, salida = entorno
+    deps = replace(deps, columna_secciones=lambda engine: True,
+                   generar_secciones=lambda prompt: (_secciones(), "gemini-x"),
+                   guardar_secciones=lambda engine, fecha, secciones, modelo: 0)
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+    assert _estados(r)["ia"] == "advertencia" and hechos["parrafos"] == [HOY]
+
+
+def test_si_no_se_puede_consultar_la_columna_sale_el_parrafo_unico(entorno):
+    deps, hechos, salida = entorno
+
+    def columna(engine):
+        raise ConnectionError("Supabase no responde")
+
+    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, columna_secciones=columna))
+    assert _estados(r)["ia"] == "ok" and hechos["parrafos"] == [HOY]
+
+
+def test_el_json_de_la_corrida_tiene_lo_que_lee_app(entorno, tmp_path, monkeypatch):
+    """El contrato entre pipeline.py y app.py: --json con estado y etapas[nombre, estado, segundos]."""
+
+    from fastapi.testclient import TestClient
+
+    import app
+
+    deps, _, salida = entorno
+    resultado = pipeline.correr(pipeline.Opciones(salida=salida), deps)
+    monkeypatch.setattr(pipeline, "correr", lambda opciones: resultado)
+    monkeypatch.setattr(pipeline, "configurar_logging", lambda archivo: None)
+    escrito = tmp_path / "resultado.json"
+    pipeline.main(["--dry-run", "--json", str(escrito)])
+
+    def run(comando, **kwargs):
+        destino = comando[comando.index("--json") + 1]
+        Path(destino).write_text(escrito.read_text(encoding="utf-8"), encoding="utf-8")
+        return subprocess.CompletedProcess(comando, 0)
+
+    monkeypatch.setattr(app.subprocess, "run", run)
+    datos = TestClient(app.app).post("/run", headers={"x-api-key": "clave-de-test"}).json()
+
+    assert datos["estado"] == "ok"
+    assert [e["nombre"] for e in datos["etapas"]] == [e.nombre for e in resultado.etapas]
+    assert all(set(e) == {"nombre", "estado", "segundos"} for e in datos["etapas"])
