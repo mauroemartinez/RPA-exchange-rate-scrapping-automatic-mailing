@@ -27,7 +27,6 @@ from datetime import date, datetime
 from urllib.parse import urljoin
 
 import httpx
-import openpyxl
 
 from scrapers.utils import ScraperError, retry_http
 
@@ -112,6 +111,10 @@ def _leer_serie(filas: list[tuple], total: int, hoja: str) -> tuple[list[tuple[d
 
 def leer_planilla(contenido: bytes) -> tuple[list[tuple[date, float]], set[date]]:
     """(saldos de la deuda bruta total por mes, meses provisorios) desde el Excel de la Secretaría."""
+    # Acá y no arriba: pipeline.py y email_report.py importan este módulo al arrancar,
+    # y un venv sin openpyxl tiene que poder mandar el mail igual (sin la deuda bruta)
+    import openpyxl
+
     libro = openpyxl.load_workbook(io.BytesIO(contenido), read_only=True, data_only=True)
     try:
         for hoja in libro.worksheets:
