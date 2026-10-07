@@ -16,3 +16,6 @@ nbstripout       # limpia outputs antes de commitear
 # ── Tests y lint ──
 pytest
 ruff
+
+# ── Prototipos de la fase 5 ──
+python-pptx      # scripts/presentacion_ejecutiva.py
