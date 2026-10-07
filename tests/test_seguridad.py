@@ -123,3 +123,10 @@ def test_el_json_de_la_corrida_sale_redactado(tmp_path, monkeypatch):
     texto = salida.read_text(encoding="utf-8")
     assert "no-es-una-clave" not in texto and "uno@example.com" not in texto
     assert json.loads(texto)["etapas"][0]["detalle"] == "falló con *** para [destinatario]"
+
+
+def test_la_direccion_de_alertas_tambien_se_tapa(monkeypatch):
+    import config
+
+    monkeypatch.setattr(config.settings, "email_alertas", ["dev@example.com"])
+    assert config.redactar("535 rechazado: dev@example.com") == "535 rechazado: [destinatario]"

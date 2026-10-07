@@ -24,7 +24,7 @@ Rezagos: las diarias salen con 2 o 3 días hábiles; el M3 mensual, con unos dos
 Por qué estas y no otras:
 
 - **M1, M2 y M3 diarios del "Informe Monetario Diario" (ids 1232, 1233, 1234) no sirven:** la API los lista, pero no tienen datos desde el 7 de mayo de 2026. Por eso el M2 diario sale de la variable 109 y el M3 de la mensual 1624.
-- **Las dos inflaciones se guardan aunque ya se usen**: es la recomendación de [evaluacion-cache.md](evaluacion-cache.md). Con la serie en Supabase, el reenvío manual y cualquier análisis dejan de depender de la API del BCRA.
+- **Las dos inflaciones se guardan aunque ya se usen**: es la recomendación de [evaluacion-cache.md](evaluacion-cache.md). Con la serie en Supabase, el reenvío manual y cualquier análisis van a poder dejar de depender de la API del BCRA, cuando lean de `Fact_Series_Macro`; hoy nada lee de esa tabla todavía.
 - **Se guardan en la unidad de la fuente.** La base monetaria en millones y el M3 en miles, tal cual los publica el BCRA. La conversión a billones es solo del gráfico.
 
 ### Qué hay en el código
@@ -36,7 +36,7 @@ Por qué estas y no otras:
 | `data_access.py` | Tabla `Fact_Series_Macro` y su upsert, que solo reescribe valores que cambiaron (el BCRA revisa datos ya publicados) |
 | `sql/06_series_macro.sql` | La migración: formato largo `(serie, Fecha)`, con unidad, frecuencia y fuente; RLS activado como en `Fact_Mercado_Macro` |
 | `charts.py` | `grafico_agregados`: niveles del último año en billones de ARS y variación interanual contra la inflación |
-| `pipeline.py` | Etapa `series`: cada día vuelve a pedir los últimos 120 días y los guarda. Sin la tabla se omite con un aviso; si falla, queda como advertencia y no pone la corrida en rojo |
+| `pipeline.py` | Etapa `series`: cada día vuelve a pedir los últimos 120 días y los guarda. Cada serie se valida y se guarda por separado, así que una discontinuada no frena a las demás. Sin la tabla se omite con un aviso; si falla, queda como advertencia y no pone la corrida en rojo |
 | `scripts/agregados_monetarios.py` | Resumen por serie y gráfico de prueba; con `--guardar`, carga toda la historia |
 
 Verificación: la migración, el upsert (1000 filas la primera vez, 0 al repetir, 1 al revisar un valor) y RLS se probaron contra un PostgreSQL 16 local descartable, no contra Supabase. El resto tiene tests sin red (`tests/test_agregados.py`).

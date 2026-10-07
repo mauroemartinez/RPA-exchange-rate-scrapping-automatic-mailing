@@ -31,6 +31,8 @@ jobs:
       EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
       EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
       EMAIL_RECEIVER_CSV: ${{ secrets.EMAIL_RECEIVER_CSV }}
+      # Opcional: sin el secreto llega vacía y las alertas van a EMAIL_RECEIVER_CSV
+      EMAIL_ALERTAS: ${{ secrets.EMAIL_ALERTAS }}
       GEMINI_API_KEY_1: ${{ secrets.GEMINI_API_KEY_1 }}
       FED_API_KEY: ${{ secrets.FED_API_KEY }}
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
