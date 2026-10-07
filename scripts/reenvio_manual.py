@@ -50,12 +50,16 @@ import email_report
 import fechas
 import ia_generator
 import indicadores
+import preview_git
 import transformations
 from config import settings
 from scrapers import agregados, finanzas
 
 # Las series que necesitan las frases de los gráficos de agregados y deuda
-CLAVES_FRASES = ["base_monetaria", "m2", "inflacion_interanual", "prestamos_sector_privado", "tipo_cambio_mayorista"]
+# inflacion_mensual también: la frase compone la interanual igual que la tabla del mail
+CLAVES_FRASES = [
+    "base_monetaria", "m2", "inflacion_mensual", "inflacion_interanual", "prestamos_sector_privado", "tipo_cambio_mayorista",
+]
 
 
 def armar_inflacion() -> pd.DataFrame:
@@ -92,18 +96,23 @@ def leer_imagenes(fecha_reporte: dt.date) -> dict[str, bytes]:
     Previews/ quedó el de una corrida anterior: el mail diario no lo llevó, así
     que el reenvío tampoco. El template omite el que falte.
     """
-    imagenes = {}
+    imagenes, viejos = {}, False
     for archivo in charts.ORDEN_EN_MAIL:
         ruta = RAIZ / "Previews" / archivo
         if not ruta.exists():
             print(f"  ⚠️ Falta {archivo}: el mail sale sin ese gráfico")
             continue
-        modificado = dt.datetime.fromtimestamp(ruta.stat().st_mtime)
-        if modificado.date() < fecha_reporte:
-            print(f"  ⚠️ {archivo} es del {modificado:%d/%m/%Y}, anterior al reporte: no se adjunta")
+        # La del commit si el archivo llegó con git pull (corrida en GitHub Actions);
+        # la de modificación si lo generó una corrida en esta PC
+        fecha = preview_git.fecha_del_archivo(RAIZ, ruta)
+        if fecha < fecha_reporte:
+            print(f"  ⚠️ {archivo} es del {fecha:%d/%m/%Y}, anterior al reporte: no se adjunta")
+            viejos = True
             continue
         imagenes[archivo] = ruta.read_bytes()
-        print(f"  {archivo}: {len(imagenes[archivo]):,} bytes, {modificado:%d/%m/%Y %H:%M}")
+        print(f"  {archivo}: {len(imagenes[archivo]):,} bytes, del {fecha:%d/%m/%Y}")
+    if viejos:
+        print("  Si la corrida es en GitHub Actions, hacé git pull para traer los gráficos del día.")
     return imagenes
 
 

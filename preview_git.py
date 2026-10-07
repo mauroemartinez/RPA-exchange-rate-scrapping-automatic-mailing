@@ -10,6 +10,7 @@ el historial. Va solo, en su propia rama, que se reemplaza entera cada día.
 
 import logging
 import subprocess
+from datetime import date
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -123,3 +124,20 @@ def publicar_presentacion(
     _git(repo, "push", "--force", "origin", f"{commit}:refs/heads/{rama_destino}")
     log.info("%s publicado en la rama %s", archivo.name, rama_destino)
     return True, f"{archivo.name} publicado en la rama {rama_destino}"
+
+
+def fecha_del_archivo(repo: Path, ruta: Path) -> date:
+    """La fecha de un gráfico de Previews/: la de su último commit si no tiene cambios locales.
+
+    Con la corrida en GitHub Actions, los gráficos llegan a esta PC con `git pull`, y el
+    pull les pone la hora del pull: la fecha que cuenta es la del commit. Si el archivo
+    tiene cambios sin commitear (lo generó una corrida local), cuenta la de modificación.
+    """
+    try:
+        if not _git(repo, "status", "--porcelain", "--", str(ruta)).strip():
+            commit = _git(repo, "log", "-1", "--format=%cs", "--", str(ruta)).strip()
+            if commit:
+                return date.fromisoformat(commit)
+    except (FileNotFoundError, GitError, subprocess.TimeoutExpired):
+        pass
+    return date.fromtimestamp(Path(ruta).stat().st_mtime)

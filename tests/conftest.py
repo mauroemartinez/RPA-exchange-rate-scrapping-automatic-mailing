@@ -167,7 +167,8 @@ def series_sinteticas(hoy: date = HOY) -> tuple[dict, set]:
         "m2": diaria(60e6, 95.6e6),
         "m2_transaccional_privado": diaria(45e6, 69.4e6),
         "m3": mensual(120e9, 186.9e9),
-        "inflacion_mensual": mensual(2.4, 1.7),
+        # 2,437% por mes compone 33,5% en 12 meses: coherente con la interanual de abajo
+        "inflacion_mensual": mensual(2.437, 2.437),
         "inflacion_interanual": mensual(45.0, 33.5),
         "letras_bcra_pesos": diaria(2.9e5, 2.3e5),
         "letras_bcra_moneda_extranjera": diaria(12.8e6, 7.4e6),

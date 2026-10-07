@@ -158,7 +158,7 @@ def validar_serie(serie, puntos: list[tuple[date, float]], hoy: date) -> list[st
             raise ValueError(f"{serie.clave}: valor no positivo ({valor}) el {fecha}")
 
     rezago = (hoy - fechas[-1]).days
-    if rezago > MAX_REZAGO_DIAS[serie.frecuencia]:
+    if rezago > (getattr(serie, "rezago_maximo", None) or MAX_REZAGO_DIAS[serie.frecuencia]):
         return [f"{serie.nombre}: el último dato es del {fechas[-1]} ({rezago} días)"]
     return []
 
@@ -189,11 +189,14 @@ def a_dolares(puntos: list[tuple[date, float]], tipo_cambio: list[tuple[date, fl
     (merge_asof hacia atrás), así un día sin cotización usa la anterior. Devuelve
     Fecha, valor (en pesos), tipo_cambio y usd, en la misma escala que el valor:
     millones de ARS dan millones de USD. Las fechas anteriores al primer tipo de
-    cambio quedan afuera.
+    cambio quedan afuera, y también las que no tienen uno de los 7 días previos: mejor
+    un hueco que una conversión con un tipo de cambio viejo presentada como de ese día.
     """
     serie = serie_a_frame(puntos)
     cambio = serie_a_frame(tipo_cambio, "tipo_cambio")
-    cruce = pd.merge_asof(serie, cambio, on="Fecha", direction="backward").dropna(subset=["tipo_cambio"])
+    cruce = pd.merge_asof(
+        serie, cambio, on="Fecha", direction="backward", tolerance=pd.Timedelta(days=7)
+    ).dropna(subset=["tipo_cambio"])
     cruce["usd"] = cruce["valor"] / cruce["tipo_cambio"]
     return cruce.reset_index(drop=True)
 
@@ -212,3 +215,18 @@ def interanual_por_fecha(puntos: list[tuple[date, float]]) -> pd.DataFrame:
     cruce = cruce.sort_values("Fecha").reset_index(drop=True)
     cruce["interanual"] = (cruce["valor"] / cruce["valor_previo"] - 1) * 100
     return cruce[["Fecha", "valor", "interanual"]]
+
+
+def inflacion_interanual(series: dict) -> list[tuple[date, float]]:
+    """La inflación interanual mes a mes, calculada como en la tabla de inflación del mail.
+
+    La tabla del mail compone la interanual con las 12 inflaciones mensuales (variable
+    27 del BCRA). El gráfico y la frase de agregados usan la misma cuenta, así el mail
+    no muestra dos interanuales distintas para el mismo mes. Si no llegó la mensual,
+    queda la interanual que publica el BCRA (variable 28).
+    """
+    mensual = series.get("inflacion_mensual")
+    if mensual and len(mensual) >= 12:
+        anual = serie_inflacion(mensual).dropna(subset=["Inflación Anual"])
+        return [(fecha.date(), float(valor)) for fecha, valor in zip(anual["Fecha"], anual["Inflación Anual"])]
+    return list(series.get("inflacion_interanual") or [])

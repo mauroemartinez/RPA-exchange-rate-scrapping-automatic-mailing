@@ -569,7 +569,9 @@ def preparar_agregados(series: dict, hoy) -> tuple[pd.DataFrame, pd.DataFrame]:
     interanuales = []
     for clave, rotulo in {**INTERANUALES, "inflacion_interanual": "Inflación interanual"}.items():
         if clave == "inflacion_interanual":
-            df = transformations.serie_a_frame(series[clave]).rename(columns={"valor": "interanual"})
+            # La misma interanual que la tabla del mail (compuesta con las mensuales)
+            df = transformations.serie_a_frame(transformations.inflacion_interanual(series))
+            df = df.rename(columns={"valor": "interanual"})
         else:
             df = transformations.interanual_por_fecha(series[clave])
         interanuales.append(df[df["Fecha"] >= corte].assign(serie=rotulo))
@@ -600,8 +602,9 @@ def grafico_agregados(niveles: pd.DataFrame, interanual: pd.DataFrame, carpeta: 
         colores = {"Base monetaria": paleta[0], "M2": paleta[2], "M3 (mensual)": paleta[4], "Inflación interanual": "darkred"}
         for rotulo, datos in interanual.groupby("serie", sort=False):
             if rotulo == "Inflación interanual":
+                # Fechada a fin de mes, cubre ese mes: el escalón va hacia atrás, como en Variaciones.jpg
                 ax[1].plot(datos["Fecha"], datos["interanual"], color=colores[rotulo], linewidth=2.5,
-                           drawstyle="steps-post", label=rotulo)
+                           drawstyle="steps-pre", label=rotulo)
             elif rotulo == "M3 (mensual)":
                 ax[1].plot(datos["Fecha"], datos["interanual"], color=colores[rotulo], linestyle="none",
                            marker="D", markersize=6, label=rotulo)
@@ -642,7 +645,9 @@ def _sumar_por_fecha(*series: list[tuple]) -> list[tuple]:
     presentes = [transformations.serie_a_frame(s).set_index("Fecha")["valor"] for s in series if s]
     if not presentes:
         return []
-    suma = pd.concat(presentes, axis=1).sort_index().ffill().dropna().sum(axis=1)
+    # El último valor se arrastra unos pocos días (feriados, publicaciones desfasadas), no
+    # para siempre: una serie que dejó de publicar no se sigue sumando como si fuera de hoy
+    suma = pd.concat(presentes, axis=1).sort_index().ffill(limit=5).dropna().sum(axis=1)
     return [(fecha.date(), float(valor)) for fecha, valor in suma.items()]
 
 

@@ -45,6 +45,10 @@ class Serie:
     positiva: bool = True  # un stock no puede ser <= 0; una variación de precios sí
     fuente: str = "BCRA"
     referencia: str | None = None  # dónde está el dato en una fuente sin ids (hoja y fila de un Excel)
+    # Días sin dato nuevo a partir de los cuales avisar. None: el de su frecuencia
+    # (transformations.MAX_REZAGO_DIAS). El M3 sale con unos dos meses de atraso y,
+    # con el de las mensuales, avisaría medio mes todos los meses
+    rezago_maximo: int | None = None
 
     @property
     def id_fuente(self) -> str:
@@ -58,7 +62,7 @@ SERIES = (
     Serie("billetes_publico", 17, "Billetes y monedas en poder del público", "D", "millones de ARS"),
     Serie("m2", 109, "M2", "D", "millones de ARS"),
     Serie("m2_transaccional_privado", 197, "M2 transaccional del sector privado", "D", "millones de ARS"),
-    Serie("m3", 1624, "M3 en moneda local", "M", "miles de ARS"),
+    Serie("m3", 1624, "M3 en moneda local", "M", "miles de ARS", rezago_maximo=100),
     # La inflación ya se descarga todos los días para el reporte. Guardarla permitirá
     # que el reenvío manual y los gráficos no dependan de la API, cuando lean
     # Fact_Series_Macro (docs/evaluacion-cache.md)
