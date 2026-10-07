@@ -116,6 +116,8 @@ python pipeline.py                                    # the real run
 
 A dry run leaves the charts, a browser preview and an `.eml` of the report in a temp folder. The exit code is 1 when any stage fails, so schedulers can alert on it.
 
+**Daily control.** `python scripts/control_diario.py` fails and sends an alert when a business day ends without its row in the warehouse, which catches the run that never started. `--sin-alerta` only reports.
+
 **Tests.** `pytest` runs an offline suite that never touches the network, the warehouse or SMTP: fake credentials override any real `.env`, and a test that tries to open a real SMTP connection fails. `ruff check .` lints the codebase.
 
 Scripts under `scripts/` run independently of the daily pipeline, for the situations the scheduler does not cover.
@@ -150,7 +152,7 @@ The following modules are mapped in the architecture blueprint and are undergoin
 * **Native Logging:** *Done for the pipeline.* Every module logs through `logging`, with an optional file handler (`--log-archivo`) so unattended runs leave an auditable trace. The legacy notebook still prints.
 * **API Data Persistence in Supabase:** Store API data in Supabase instead of re-consuming the full dataset on every execution.
 * **Automated Executive PowerPoint Reporting:** Developing a fully automated `.pptx` executive summary generation layer containing macroeconomic charts, spreads, and key indicators. The generated presentations will be versioned and automatically pushed to GitHub alongside analytical preview assets through integrated Git automation workflows.
-* **Workflow Orchestration & Automation:** Migrating from local execution to serverless execution via **GitHub Actions**.
+* **Workflow Orchestration & Automation:** *Ready to switch on.* GitHub Actions workflows for the daily run and a daily control ship disabled; holidays and weekends are skipped, and a database lock prevents duplicate runs across schedulers. CI already runs lint and the offline tests on every push.
 * **Streamlit Dashboard:** Build a Streamlit dashboard so users can consume the full Supabase dataset interactively.
 
 ---
