@@ -1,6 +1,11 @@
 # Fase 3: agregados monetarios y endeudamiento
 
-Estado al 6 de octubre de 2026: **los agregados monetarios están implementados pero todavía no van en el mail**, como pide el roadmap ("integrar los indicadores nuevos al correo una vez que las series y gráficos estén verificados"). **El endeudamiento está sin implementar a propósito**: el roadmap pide definir primero qué significa para el reporte, y esa definición es tuya. Abajo están las opciones, con fuente, frecuencia, unidad y rezago verificados.
+Estado al 7 de octubre de 2026: **los dos van en el mail diario**, cada uno con su gráfico y una explicación para quien no es economista.
+
+- **Agregados monetarios:** implementados y verificados el 6 de octubre; el 7 se sumaron al mail.
+- **Endeudamiento:** se eligieron las opciones C, D y A de la sección 2, siempre en dólares; quedaron implementadas el 7 de octubre.
+
+La sección 2 conserva las cuatro opciones que se evaluaron, con fuente, frecuencia, unidad y rezago.
 
 ## 1. Agregados monetarios
 
@@ -45,14 +50,21 @@ Verificación: la migración, el upsert (1000 filas la primera vez, 0 al repetir
 
 En el último año todos los agregados crecieron por debajo de la inflación interanual (33,5% en agosto): la base monetaria quedó por debajo desde abril de 2026 y hoy crece 14%, el M2 alrededor de 20% y el M3 entre 27% y 30%. Es una contracción en términos reales.
 
-### Para activarlo (pasos tuyos)
+### En el mail
+
+El gráfico va en el mail diario (`Agregados Monetarios.jpg`), con un texto fijo que explica qué es cada agregado y cómo leer el gráfico. Lo acompaña una frase calculada en Python con los últimos datos y sus fechas (`indicadores.py`), por ejemplo:
+
+> En el último año la base monetaria creció 14,0% (al 02/10/2026) y el M2 creció 20,9% (al 01/10/2026), contra una inflación interanual de 33,5% en agosto de 2026: descontada la inflación, las dos cayeron.
+
+Gemini no escribe ni la explicación ni esa frase. La corrida baja las series en cada ejecución, en la etapa `indicadores`, así que el gráfico sale aunque la tabla todavía no exista.
+
+### Para guardar la historia en Supabase (pasos tuyos)
 
 1. Aplicar `scripts/sql/06_series_macro.sql` en el SQL Editor de Supabase. Es lo único que toca la base de producción, y por eso no lo hice yo.
-2. Cargar la historia: `python scripts/agregados_monetarios.py --guardar` (unos 7.500 puntos por serie diaria, desde 1996).
+2. Cargar la historia de todas las series, agregados y deuda: `python scripts/agregados_monetarios.py --guardar` (unos 7.500 puntos por serie diaria, desde 1996).
 3. Desde ahí, la corrida diaria mantiene la tabla al día sola.
-4. Revisar el gráfico (`python scripts/agregados_monetarios.py` lo deja en una carpeta temporal) y decidir si entra en el mail: dónde va, si lleva texto propio y si conviene sumarlo a la respuesta estructurada de Gemini (fase 4).
 
-## 2. Endeudamiento: decisión pendiente
+## 2. Endeudamiento
 
 "Endeudamiento" puede querer decir cosas muy distintas, con fuentes y frecuencias que no se parecen. Estas son las opciones que encontré, verificadas el 6 de octubre de 2026:
 
@@ -65,10 +77,37 @@ En el último año todos los agregados crecieron por debajo de la inflación int
 
 Lo que descarté: la API de series de tiempo de datos.gob.ar tiene series de deuda, pero las que encontré están discontinuadas (la deuda externa privada termina en 2017 y el gasto en servicios de deuda en 2023).
 
-Mi recomendación, si el reporte tiene que seguir siendo diario: **C y D ya**, porque salen de la misma API con el mismo código y se actualizan todos los días; y **A como dato mensual** si lo que buscás es la deuda pública propiamente dicha, aceptando que depende de un Excel. B la dejaría afuera del mail diario.
+La recomendación fue **C y D ya**, porque salen de la misma API con el mismo código y se actualizan todos los días, y **A como dato mensual**, para tener la deuda pública propiamente dicha aunque dependa de un Excel. B quedó afuera del mail diario.
 
-Para avanzar necesito que me digas:
+### Lo que se decidió (7 de octubre de 2026)
 
-1. Qué opción u opciones (A, B, C, D, otra).
-2. Si la deuda en dólares (A, B) se muestra en dólares o convertida a pesos, y con qué tipo de cambio.
-3. Si va en el mail diario o en una sección que cambie solo cuando hay dato nuevo.
+**C, D y A, en el mail diario y siempre en dólares.** Lo que se publica en pesos (C y D) se pasa a dólares con el tipo de cambio mayorista de referencia de cada día (Comunicación A 3500, variable 5 del BCRA). La conversión es solo para mostrar: en `Fact_Series_Macro` cada valor queda en la unidad de la fuente.
+
+| Clave | Fuente e id | Qué es | Frecuencia | Unidad de la fuente |
+|---|---|---|---|---|
+| `letras_bcra_pesos` | BCRA 1258 | Letras del BCRA en pesos | Diaria | millones de ARS |
+| `letras_bcra_moneda_extranjera` | BCRA 1259 | Letras del BCRA en moneda extranjera | Diaria | millones de ARS |
+| `adelantos_transitorios` | BCRA 1268 | Adelantos transitorios del BCRA al Tesoro | Diaria | millones de ARS |
+| `prestamos_sector_privado` | BCRA 26 | Préstamos de los bancos al sector privado | Diaria | millones de ARS |
+| `tipo_cambio_mayorista` | BCRA 5 | Tipo de cambio mayorista de referencia (A 3500) | Diaria | ARS por USD |
+| `deuda_bruta_tesoro` | Secretaría de Finanzas | Deuda bruta de la Administración Central, saldo a fin de mes | Mensual | millones de USD |
+
+Lo que quedó afuera: la posición neta de pases (BCRA 1261) está en cero desde hace más de un año.
+
+La deuda bruta sale del Excel mensual de la Secretaría (`scrapers/finanzas.py`). Como el nombre del archivo cambia cada mes, primero se lee la página de datos y se toma el link de la fila "Serie mensual". La planilla se lee por rótulos y no por posiciones. Los últimos meses vienen como provisorios y se marcan en el gráfico con puntos huecos. Si el rótulo, la unidad o el rango de valores no son los esperados, la lectura levanta en vez de devolver un número mal leído.
+
+El gráfico (`Deuda en Dólares.jpg`) tiene tres paneles, en miles de millones de USD:
+
+1. la deuda bruta del Tesoro, de los últimos 24 meses;
+2. los préstamos a familias y empresas, del último año;
+3. las letras del BCRA y los adelantos al Tesoro, del último año.
+
+Lo acompaña una explicación fija y una frase calculada con los últimos datos, por ejemplo:
+
+> A fines de agosto de 2026 (dato provisorio), la deuda bruta del Tesoro era de USD 484,9 mil millones, 30,7 mil millones más que un año antes; al 02/10/2026, familias y empresas les debían a los bancos USD 97,7 mil millones.
+
+Rezagos:
+
+- Series diarias del BCRA: 2 o 3 días hábiles.
+- Deuda bruta: unas cinco semanas, con los dos últimos meses provisorios.
+- Los adelantos transitorios están fijos en pesos desde hace meses: en dólares bajan a medida que sube el tipo de cambio.
