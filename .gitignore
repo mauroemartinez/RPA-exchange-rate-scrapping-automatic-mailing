@@ -36,3 +36,10 @@ CLAUDE.md
 
 # Apuntes personales de estudio del código
 APUNTES.md
+
+# El PowerPoint diario no va en main: se publica solo en la rama reporte-ejecutivo
+Previews/*.pptx
+
+# Archivos de bloqueo de Office (~$Reporte...): se crean al abrir un documento y
+# llevan el nombre de usuario de Office
+~$*

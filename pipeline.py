@@ -50,13 +50,20 @@ import email_report
 import fechas
 import ia_generator
 import mailer
-import presentacion
 import preview_git
 import scrapers
 import transformations
 from config import redactar, reemplazos_sensibles, settings
 from scrapers import agregados, btc, feriados
 from scrapers.utils import ScraperError
+
+# python-pptx puede faltar en un venv instalado antes de que entrara a requirements.txt.
+# Sin este resguardo, `import pipeline` fallaría entero: ni mail ni alerta ese día.
+try:
+    import presentacion
+except ImportError as _exc:
+    presentacion = None
+    FALTA_PRESENTACION = f"{type(_exc).__name__}: {_exc}"
 
 log = logging.getLogger("pipeline")
 
@@ -155,6 +162,7 @@ class Dependencias:
     limpiar_secciones: Callable = ia_generator.limpiar_secciones
     enviar_mail: Callable = email_report.enviar
     actualizar_previews: Callable = preview_git.actualizar_previews
+    publicar_presentacion: Callable = preview_git.publicar_presentacion
     tabla_series: Callable = data_access.tabla_existe
     descargar_series: Callable = agregados.descargar
     guardar_series: Callable = data_access.guardar_series
@@ -364,8 +372,8 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
         opciones, deps, registro, fecha, comienzo, df, df_base, inflacion_12, fwd_oficial, fwd_blue,
         parrafo, texto_ia, comentarios, generados,
     )
-    _etapa_presentacion(registro, carpeta, df_base, parrafo, comentarios, generados)
-    _etapa_previews(opciones, deps, registro, carpeta)
+    deck = _etapa_presentacion(registro, carpeta, df_base, parrafo, comentarios, generados)
+    _etapa_previews(opciones, deps, registro, carpeta, deck, fecha)
     _etapa_series(opciones, deps, registro, engine, fecha)
 
 
@@ -486,7 +494,7 @@ def _guardar_secciones(deps: Dependencias, engine, fecha: date, secciones, model
 def _carpeta_de_salida(opciones: Opciones) -> Path:
     """Previews/ en una corrida real; una carpeta temporal (o --salida) en un dry-run."""
     carpeta = opciones.salida or (Path(tempfile.mkdtemp(prefix="macro_dryrun_")) if opciones.dry_run else PREVIEWS)
-    if opciones.dry_run and carpeta.resolve() == PREVIEWS:
+    if opciones.dry_run and carpeta.resolve().is_relative_to(PREVIEWS):
         # La vista previa (mail.eml, con el remitente) terminaría commiteada en el repo público
         log.warning("Un dry-run no escribe en Previews/: se usa una carpeta temporal")
         carpeta = Path(tempfile.mkdtemp(prefix="macro_dryrun_"))
@@ -571,28 +579,42 @@ def _etapa_mail(
 
 def _etapa_presentacion(
     registro: _Registro, carpeta: Path, df_base, parrafo: str, comentarios: dict, generados: dict[str, Path],
-) -> None:
+) -> Path | None:
     """El PowerPoint del día, con los datos, los textos de IA y los gráficos de esta corrida.
 
-    Queda en la misma carpeta que los gráficos: en una corrida real, Previews/, y
-    se commitea con ellos. Va después del mail, así que si falla el reporte ya
-    salió: es una advertencia y no pone la corrida en rojo.
+    Queda en la misma carpeta que los gráficos (en una corrida real, Previews/) y
+    la etapa previews lo publica en su propia rama. Va después del mail, así que si
+    falla el reporte ya salió: es una advertencia y no pone la corrida en rojo.
+    Devuelve la ruta del archivo armado en esta corrida, o None.
     """
     with registro.etapa("presentacion", critica=False) as e:
+        if presentacion is None:
+            e.estado = ADVERTENCIA
+            e.detalle = f"no se pudo importar presentacion ({FALTA_PRESENTACION}): pip install -r requirements.txt"
+            return None
         try:
             ruta = presentacion.armar(df_base, generados, carpeta, parrafo=parrafo, comentarios=comentarios)
         except Exception as exc:
             log.exception("No se pudo armar la presentación")
             e.estado = ADVERTENCIA
             e.detalle = f"{type(exc).__name__}: {exc}"
-            return
+            return None
         e.detalle = f"{ruta.name}, {ruta.stat().st_size / 1024:,.0f} KB"
         faltan = [nombre for nombre in charts.ORDEN_EN_MAIL if nombre not in generados]
         if faltan:
             e.detalle += f"; sin {', '.join(faltan)}"
+        return ruta
 
 
-def _etapa_previews(opciones: Opciones, deps: Dependencias, registro: _Registro, carpeta: Path) -> None:
+def _etapa_previews(
+    opciones: Opciones, deps: Dependencias, registro: _Registro, carpeta: Path, deck: Path | None, fecha: date,
+) -> None:
+    """Los gráficos van a main, en Previews/; el PowerPoint, a su propia rama, que se reemplaza entera.
+
+    Solo se publica el PowerPoint armado en esta corrida: si hoy falló, el de ayer
+    no se vuelve a subir con la fecha de hoy. Si su publicación falla, es una
+    advertencia: los gráficos ya quedaron y el mail ya salió.
+    """
     if opciones.dry_run or not opciones.push_previews:
         registro.omitir("previews", "dry-run" if opciones.dry_run else "--sin-push")
     elif carpeta != PREVIEWS:
@@ -600,14 +622,22 @@ def _etapa_previews(opciones: Opciones, deps: Dependencias, registro: _Registro,
     elif Path(settings.ruta_repo).resolve() != RAIZ:
         registro.omitir("previews", f"RUTA_REPO ({settings.ruta_repo}) no es la carpeta de este código ({RAIZ})")
     else:
-        archivos = list(charts.ORDEN_EN_MAIL)
-        # El .pptx solo si existe: si nunca se pudo armar, `git add` de una ruta
-        # inexistente fallaría y pondría la corrida en rojo por un archivo secundario
-        if (carpeta / presentacion.ARCHIVO).exists():
-            archivos.append(presentacion.ARCHIVO)
         with registro.etapa("previews", critica=False) as e:
-            hecho, e.detalle = deps.actualizar_previews(RAIZ, archivos=archivos)
-            if not hecho:
+            hecho, detalle = deps.actualizar_previews(RAIZ, archivos=list(charts.ORDEN_EN_MAIL))
+            partes = [detalle]
+            if deck is not None:
+                try:
+                    publicado, detalle_deck = deps.publicar_presentacion(
+                        RAIZ, deck, mensaje=f"Reporte ejecutivo del {fecha:%d/%m/%Y}"
+                    )
+                    partes.append(detalle_deck)
+                    hecho = hecho or publicado
+                except Exception as exc:
+                    log.exception("No se pudo publicar la presentación")
+                    partes.append(f"presentación sin publicar: {type(exc).__name__}: {exc}")
+                    e.estado = ADVERTENCIA
+            e.detalle = "; ".join(partes)
+            if not hecho and e.estado != ADVERTENCIA:
                 e.estado = OMITIDA
 
 
@@ -725,8 +755,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--origen", default="cli", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
-    if args.dry_run and args.salida and args.salida.resolve() == PREVIEWS:
-        parser.error("--salida no puede ser Previews/ en un dry-run: esa carpeta se commitea y se pushea sola")
+    if args.dry_run and args.salida and args.salida.resolve().is_relative_to(PREVIEWS):
+        parser.error("--salida no puede estar dentro de Previews/ en un dry-run: esa carpeta se commitea y se pushea sola")
 
     # Sin dry-run, --enviar-a guardaría la fila del día y mandaría el mail solo a
     # esas direcciones: la corrida programada vería la fila y la lista se quedaría sin reporte.
