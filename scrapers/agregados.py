@@ -49,6 +49,9 @@ class Serie:
     # (transformations.MAX_REZAGO_DIAS). El M3 sale con unos dos meses de atraso y,
     # con el de las mensuales, avisaría medio mes todos los meses
     rezago_maximo: int | None = None
+    # Un stock que puede quedar en cero: las letras del BCRA tuvieron años sin nada en
+    # circulación, y los adelantos al Tesoro se pueden cancelar. Negativo, nunca
+    admite_cero: bool = False
 
     @property
     def id_fuente(self) -> str:
@@ -69,9 +72,11 @@ SERIES = (
     Serie("inflacion_mensual", 27, "Inflación mensual", "M", "porcentaje", positiva=False),
     Serie("inflacion_interanual", 28, "Inflación interanual", "M", "porcentaje", positiva=False),
     # Endeudamiento, opción C: deuda del BCRA y financiamiento al Tesoro
-    Serie("letras_bcra_pesos", 1258, "Letras del BCRA en pesos", "D", "millones de ARS"),
-    Serie("letras_bcra_moneda_extranjera", 1259, "Letras del BCRA en moneda extranjera", "D", "millones de ARS"),
-    Serie("adelantos_transitorios", 1268, "Adelantos transitorios del BCRA al Tesoro", "D", "millones de ARS"),
+    Serie("letras_bcra_pesos", 1258, "Letras del BCRA en pesos", "D", "millones de ARS", admite_cero=True),
+    Serie("letras_bcra_moneda_extranjera", 1259, "Letras del BCRA en moneda extranjera", "D", "millones de ARS",
+          admite_cero=True),
+    Serie("adelantos_transitorios", 1268, "Adelantos transitorios del BCRA al Tesoro", "D", "millones de ARS",
+          admite_cero=True),
     # Endeudamiento, opción D: lo que familias y empresas les deben a los bancos
     Serie("prestamos_sector_privado", 26, "Préstamos al sector privado", "D", "millones de ARS"),
     # Para pasar a dólares las series en pesos, fecha por fecha
