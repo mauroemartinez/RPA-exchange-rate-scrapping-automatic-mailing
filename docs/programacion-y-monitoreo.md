@@ -1,6 +1,6 @@
 # Fase 6: ejecución programada y monitoreo
 
-Estado al 7 de octubre de 2026: **el programador elegido es GitHub Actions, en el plan gratis, y todo está listo.** Faltan los pasos de abajo, que son tuyos porque usan tus credenciales. Nada queda programado por el solo hecho de mergear: el horario se prende con una variable del repo (paso 5).
+Estado al 7 de octubre de 2026: **el programador elegido es GitHub Actions, en el plan gratis, y todo está listo.** Faltan los pasos de abajo, que se hacen a mano porque usan las credenciales del repo. Nada queda programado por el solo hecho de mergear: el horario se prende con una variable del repo (paso 5).
 
 Hoy la corrida se lanza a mano desde el notebook. En los últimos 90 días quedaron tres días hábiles sin fila que no eran feriados: el 19/08, el 24/09 y el 02/10.
 
@@ -27,12 +27,12 @@ Hay dos opciones reales. No hace falta ningún servidor (ni EasyPanel ni otro): 
 | Costo | Gratis (repo público) | Nada |
 | Dónde corre | Servidores de GitHub, en EE.UU.: tu PC puede estar apagada | Tu PC, que tiene que estar prendida (no suspendida) a las 17 |
 | Logs | **Públicos** (repo público), con los secretos tapados | Privados, en `logs/` |
-| `Previews/` (gráficos y PowerPoint) en GitHub | Sí: el workflow commitea y pushea a tu nombre | Sí, como hoy |
+| Gráficos en `Previews/` y PowerPoint en su rama | Sí: los commits salen a nombre del dueño del repo | Sí, como hoy |
 | Aviso si falla | Mail de GitHub, además de la alerta propia | Solo la alerta propia |
 | Puntualidad | El cron de GitHub puede atrasarse varios minutos | Exacta |
 | Lo que falta | Mergear la rama, cargar los secretos y probar | Mergear la rama y crear la tarea |
 
-Mi recomendación es **GitHub Actions**, con una condición: que las webs argentinas respondan desde los servidores de GitHub. Es lo único que no se puede saber sin probar, y se prueba en dos minutos con el paso 3 de abajo. Si BNA, DolarHoy o Ámbito bloquean esas IPs, la alternativa más simple es el Programador de tareas de Windows.
+La opción recomendada es **GitHub Actions**, con una condición: que las webs argentinas respondan desde los servidores de GitHub. Es lo único que no se puede saber sin probar, y se prueba en dos minutos con el paso 3 de abajo. Si BNA, DolarHoy o Ámbito bloquean esas IPs, la alternativa más simple es el Programador de tareas de Windows.
 
 ### GitHub Actions, paso a paso (plan gratis)
 
@@ -40,13 +40,16 @@ En un repo público, GitHub Actions no cobra los minutos de sus máquinas están
 
 1. **Mergear y subir.** Mergear `roadmap/implementacion` a `main` y pushear. GitHub solo muestra y programa los workflows que están en `main`.
 2. **Cargar los secretos.** En el repo: Settings > Secrets and variables > Actions, pestaña *Secrets* > New repository secret. Uno por uno, con los mismos valores del `.env`: `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECEIVER`, `EMAIL_RECEIVER_CSV`, `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`, `FED_API_KEY` y `SUPABASE_DB_URL`. Opcional: `EMAIL_ALERTAS`, para que las alertas te lleguen solo a vos.
-3. **Probar sin efectos.** Actions > Corrida diaria > Run workflow, con modo `dry-run`. Scrapea y arma todo sin escribir ni mandar nada. Si la etapa `scraping` termina en `ok`, las webs argentinas responden desde los servidores de GitHub.
-4. **Una corrida real, a mano.** Un día que no hayas corrido el notebook: Run workflow con modo `real`. Escribe en Supabase, manda el mail, commitea los gráficos en `Previews/` y publica el PowerPoint en la rama `reporte-ejecutivo`. Fijate en GitHub que el commit de `Previews/` salga con tu foto. Si no (pasa con algunas cuentas creadas antes de 2017), creá en la pestaña *Variables* la variable `EMAIL_COMMITS` con el mail de tus commits.
-5. **Prender el horario.** En Settings > Secrets and variables > Actions, pestaña *Variables* > New repository variable: nombre `CORRIDA_AUTOMATICA`, valor `si`. Desde ahí corre solo de lunes a viernes a las 17:13 de Argentina, y el control a las 19:43. Para apagarlo, cambiá el valor a `no`.
+3. **Probar sin efectos.** Actions > Corrida diaria > Run workflow, con modo `dry-run`. Scrapea y arma todo sin escribir ni mandar nada. Si las etapas `scraping`, `indicadores` y `graficos` terminan en `ok`, las fuentes responden desde los servidores de GitHub. Las etapas con advertencias o errores aparecen como avisos en la página de la corrida, junto con un resumen.
+4. **Una corrida real, a mano.** Un día que no hayas corrido el notebook: Run workflow con modo `real`. Escribe en Supabase, manda el mail, commitea los gráficos en `Previews/` y publica el PowerPoint en la rama `reporte-ejecutivo`. En GitHub, el commit de `Previews/` tiene que salir con la foto del dueño del repo (el push técnico lo hace el token automático de GitHub Actions, que es lo normal). Si no (pasa con algunas cuentas creadas antes de 2017), creá en la pestaña *Variables* la variable `EMAIL_COMMITS` con el mail de tus commits.
+5. **Prender el horario.** En Settings > Secrets and variables > Actions, pestaña *Variables* > New repository variable: nombre `CORRIDA_AUTOMATICA`, valor `si` (vale también `sí`, con o sin mayúscula). Desde ahí corre solo de lunes a viernes a las 17:13 de Argentina, y el control a las 19:43. Para apagarlo, cambiá el valor a `no`.
 6. **Dejar de correr el notebook.** Si corren los dos el mismo día, sale un mail duplicado.
 
-Dos cosas de GitHub para tener en cuenta:
+Si un día el mail salió pero la fila no se guardó (la alerta de la corrida muestra la etapa `persistencia` en error), el modo `sin-mail` del mismo botón carga la fila y hace todo lo demás sin volver a mandar el mail. La corrida completa lo mandaría dos veces.
 
+Tres cosas de GitHub para tener en cuenta:
+
+- **Reglas de protección del repo.** Si `main` exige pull requests, o una regla bloquea los force push en todas las ramas, los commits diarios de la corrida y la publicación del PowerPoint fallan. Si el repo no tiene reglas de ese tipo, no hace falta tocar nada.
 - **Las corridas programadas pueden atrasarse** unos minutos cuando GitHub está cargado. Por eso el horario está a los 13 minutos y no en punto, que es cuando más se atrasan.
 - **En un repo público, GitHub apaga los horarios después de 60 días sin actividad.** Los commits diarios de `Previews/` cuentan como actividad, así que con la corrida andando no pasa. Si alguna vez pasa, GitHub te avisa por mail y se vuelve a prender desde la pestaña Actions.
 
@@ -74,4 +77,4 @@ El repo trae un `Dockerfile` y una API (`app.py`, `POST /run`) para correr el re
 
 **Sin reintentos automáticos.** No actives los reintentos del programador (en el Programador de tareas, no tildes "Si la tarea no se ejecuta correctamente, reiniciar cada"; GitHub Actions no reintenta solo). Una corrida que falló después de insertar la fila no se puede repetir a ciegas: una de las dos variantes del mail puede haber salido. Con la alerta en la mano, el día se rehace con `--forzar` o se reenvía con `scripts/reenvio_manual.py`. Repetir sin `--forzar` es seguro en el otro sentido: omite un día terminado y frena con error en uno a medio hacer.
 
-**`SUPABASE_DB_URL` en modo sesión.** El candado dura lo que la sesión de Postgres. Con una conexión directa, una corrida que muere no lo deja puesto, porque la sesión muere con ella; detrás de un pooler en modo sesión tampoco, siempre que el pooler limpie la conexión al recibirla de vuelta (`DISCARD ALL` suelta los advisory locks). Detrás del pooler de Supabase en modo transacción (puerto 6543), tomarlo y soltarlo pueden caer en conexiones distintas del servidor, y el candado quedaría tomado. Por eso la URL tiene que ir al pooler en modo sesión (puerto 5432, como hoy) o a la conexión directa. Si aun así quedara tomado, cada corrida terminaría como `omitida` sin escribir la fila, y eso es justamente lo que detecta `scripts/control_diario.py`.
+**`SUPABASE_DB_URL` en modo sesión.** El candado dura lo que la sesión de Postgres. Con una conexión directa, una corrida que muere no lo deja puesto, porque la sesión muere con ella; detrás de un pooler en modo sesión tampoco, siempre que el pooler limpie la conexión al recibirla de vuelta (`DISCARD ALL` suelta los advisory locks). Detrás del pooler de Supabase en modo transacción (puerto 6543), tomarlo y soltarlo pueden caer en conexiones distintas del servidor, y el candado quedaría tomado. Por eso la URL tiene que ir al pooler en modo sesión (puerto 5432, como hoy). La conexión directa también serviría en una PC, pero no en GitHub Actions: es solo IPv6 y las máquinas de GitHub no tienen IPv6. Si aun así quedara tomado, cada corrida terminaría como `omitida` sin escribir la fila, y eso es justamente lo que detecta `scripts/control_diario.py`.

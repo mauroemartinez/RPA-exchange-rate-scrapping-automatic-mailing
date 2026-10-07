@@ -5,7 +5,7 @@
 -- QUÉ HACE, EN SIMPLE
 --   Agrega una columna nueva, vacía, al final de la tabla de siempre
 --   (Fact_Mercado_Macro), al lado de ai_paragraph. Ahí se guardan, en formato
---   JSON, los comentarios que Gemini escribe para cada gráfico del mail. No
+--   JSON, los comentarios que Gemini escribe para los gráficos del mail. No
 --   modifica ni borra ningún dato que ya exista.
 --
 -- POR QUÉ
@@ -27,8 +27,9 @@
 --
 -- QUÉ CAMBIA DESPUÉS
 --   Desde la primera corrida de pipeline.py con la columna, se pide a Gemini el
---   resumen y un comentario por gráfico en una sola llamada, y van debajo de cada
---   gráfico del mail. Sin la columna, sigue el párrafo único de siempre.
+--   resumen y los comentarios en una sola llamada: van debajo del gráfico de tipos
+--   de cambio y riesgo país (paralelas, oficiales y riesgo país) y del de Bitcoin.
+--   Sin la columna, sigue el párrafo único de siempre.
 --
 -- CÓMO SE VERIFICA
 --   SELECT column_name FROM information_schema.columns
