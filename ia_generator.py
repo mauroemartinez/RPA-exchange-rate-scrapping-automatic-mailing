@@ -148,9 +148,10 @@ def generar_parrafo(prompt: str, config=None) -> tuple[str | None, str | None]:
     """(texto, modelo), o (None, None) si no hubo caso.
 
     Reintenta mientras se hayan consumido menos de MAX_INTENTOS intentos. Cada
-    vuelta de generar_con_failover puede gastar más de uno (una key agotada pasa a
-    la siguiente, un modelo saturado al otro), así que en el peor caso son unas
-    cuatro llamadas. Es la lógica que tenía el notebook.
+    vuelta de generar_con_failover puede gastar hasta tres (una key agotada pasa a
+    la siguiente, un modelo saturado al otro), así que en el peor caso son cinco
+    llamadas, no tres. Los 429 y 503 vuelven al instante; lo que acota el tiempo
+    es el TIMEOUT_MS de cada llamada. Es la lógica que tenía el notebook.
     """
     total = 0
     while total < MAX_INTENTOS:

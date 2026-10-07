@@ -686,7 +686,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--enviar-a", nargs="+", metavar="MAIL",
                         help="Con --dry-run: manda el mail solo a estas direcciones, en lugar de a las listas del .env")
     parser.add_argument("--con-ia", action="store_true",
-                        help="Con --dry-run: pide a Gemini los comentarios por gráfico, sin guardarlos (una llamada, más los reintentos)")
+                        help="Con --dry-run: pide a Gemini los comentarios por gráfico, sin guardarlos (una consulta estructurada, con sus reintentos)")
     parser.add_argument("--salida", type=Path, help="Carpeta para los gráficos y la vista previa")
     parser.add_argument("--log-archivo", type=Path, help="Además de la consola, escribe el log en este archivo")
     parser.add_argument("--json", type=Path, help="Escribe el resultado de la corrida como JSON en este archivo")
@@ -702,6 +702,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--enviar-a va con --dry-run")
     if args.con_ia and not args.dry_run:
         parser.error("--con-ia va con --dry-run: en una corrida real la IA se pide sola")
+    if args.enviar_a and args.sin_mail:
+        parser.error("--enviar-a y --sin-mail se contradicen")
 
     if args.enviar_a:
         try:
