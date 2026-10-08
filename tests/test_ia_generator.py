@@ -4,7 +4,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
-import ia_generator
+from reporte import ia_generator
 
 
 def _historial(filas=30, blue_hoy=1555.0, tea_hoy=25.0, tea_ayer=25.0):

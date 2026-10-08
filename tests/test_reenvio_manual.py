@@ -2,11 +2,9 @@ import sys
 
 import pytest
 
-import charts
-import email_report
-import indicadores
 import reenvio_manual
 from conftest import jpeg_minimo
+from reporte import charts, email_report, indicadores
 
 
 @pytest.fixture
@@ -84,7 +82,7 @@ def test_el_html_es_el_mismo_que_el_del_mail_diario(monkeypatch, entorno, histor
     """La afirmación central del reenvío: mismo HTML que el pipeline, salvo la línea de performance."""
     import re
 
-    import transformations as t
+    from reporte import transformations as t
 
     con_hoy, enviados = entorno
     _correr(monkeypatch, "a@example.com")

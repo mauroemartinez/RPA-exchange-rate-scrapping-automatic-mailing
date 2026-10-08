@@ -1,6 +1,6 @@
 from datetime import UTC, date, datetime
 
-import fechas
+from reporte import fechas
 
 
 def _reloj_utc(monkeypatch, instante_utc: datetime):

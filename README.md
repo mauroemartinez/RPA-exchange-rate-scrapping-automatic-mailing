@@ -77,12 +77,12 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 * **HTTP Client Modernization (2026):** Migrated from `requests` to `httpx` for all REST API calls (BCRA, St. Louis FED). `httpx` is the modern standard, offering native async support and HTTP/2 compatibility while maintaining a fully compatible API surface.
 * **Automated WebDriver Version Management (2026):** Replaced the manually managed `msedgedriver` binary with `webdriver-manager`. The library auto-detects the installed Edge version, downloads the matching driver on first run, and caches it locally, eliminating manual updates on every browser upgrade.
 * **Selenium to Playwright Migration (2026):** Migrated the entire web scraping layer (BNA, DolarHoy, Ambito MEP/riesgo país/euro) from Selenium to Playwright's async API, replacing brittle, deep XPath chains with short, semantic CSS/id-based selectors. All four scrapers now run concurrently via `asyncio.gather()` instead of sequentially through a single shared WebDriver, further reducing total scraping time. Each scraper raises a structured `ScraperError` with site and step context on failure, so a broken selector fails loudly through the existing Pydantic validation gate instead of silently persisting bad data. This also unified browser handling between local Windows development and the Dockerized production environment, removing the previous Edge-vs-Chromium branching in driver setup.
-* **Jinja2 Templating for the Email Report (2026):** Extracted the report's HTML/CSS out of the Python orchestration script into a standalone `templates/report_email.html` Jinja2 template, replacing a large inline f-string. The notebook now only computes values and renders the template; markup, styling, and the responsive mobile media query live in one dedicated, readable file instead of being interleaved with business logic.
-* **Centralized Configuration Layer (2026):** Replaced scattered `os.getenv` calls across the notebook, `app.py`, and `ia_generator.py` with a single `config.py` built on **Pydantic-Settings**. Every environment variable is now declared once with a strict type: secrets use `SecretStr` (masked on print, explicit `.get_secret_value()` to read), recipient lists are parsed and validated address-by-address with `EmailStr`, and filesystem paths resolve to `Path` objects. A missing or malformed variable now fails at import time rather than surfacing as a `None` deep inside the pipeline. Shipped alongside a committed `.env.example` documenting every required key.
+* **Jinja2 Templating for the Email Report (2026):** Extracted the report's HTML/CSS out of the Python orchestration script into a standalone `reporte/templates/report_email.html` Jinja2 template, replacing a large inline f-string. The notebook now only computes values and renders the template; markup, styling, and the responsive mobile media query live in one dedicated, readable file instead of being interleaved with business logic.
+* **Centralized Configuration Layer (2026):** Replaced scattered `os.getenv` calls across the notebook, `app.py`, and `reporte/ia_generator.py` with a single `reporte/config.py` built on **Pydantic-Settings**. Every environment variable is now declared once with a strict type: secrets use `SecretStr` (masked on print, explicit `.get_secret_value()` to read), recipient lists are parsed and validated address-by-address with `EmailStr`, and filesystem paths resolve to `Path` objects. A missing or malformed variable now fails at import time rather than surfacing as a `None` deep inside the pipeline. Shipped alongside a committed `.env.example` documenting every required key.
 * **Country Risk API Migration (2026):** Replaced the Playwright scrape of Ámbito's historical country-risk table with the **ArgentinaDatos REST API**, which exposes the same underlying source as JSON. Eliminates a full Chromium launch to read a single table cell. The new module is fully async (`httpx.AsyncClient`) and returns the value together with its true publication date.
-* **Full Async HTTP Ingestion Layer (2026):** Extracted the BCRA and St. Louis FED API calls out of the notebook into dedicated `scrapers/bcra.py` and `scrapers/fed.py` modules using async `httpx`. All six sources, three Playwright browsers and three REST APIs, now execute inside a single `asyncio.gather()` sharing one connection pool. The three API calls, previously sequential and blocking before scraping began, now run inside the browsers' idle wait: **total ingestion time dropped from 22.8s to 18.3s despite adding two sources**. Retry policy distinguishes transient failures (5xx, network) from permanent ones (4xx) and applies exponential backoff.
+* **Full Async HTTP Ingestion Layer (2026):** Extracted the BCRA and St. Louis FED API calls out of the notebook into dedicated `reporte/scrapers/bcra.py` and `reporte/scrapers/fed.py` modules using async `httpx`. All six sources, three Playwright browsers and three REST APIs, now execute inside a single `asyncio.gather()` sharing one connection pool. The three API calls, previously sequential and blocking before scraping began, now run inside the browsers' idle wait: **total ingestion time dropped from 22.8s to 18.3s despite adding two sources**. Retry policy distinguishes transient failures (5xx, network) from permanent ones (4xx) and applies exponential backoff.
 * **Data Integrity Audit & Historical Backfill (2026):** A systematic comparison of the warehouse against its upstream APIs surfaced two silent capture defects. **Country risk** was shifted one business day: the scraper read Ámbito's last *published* close and stored it against the current date, 160 of 171 divergent rows matched the previous business day exactly. **BCRA effective annual rate** was reading `.iloc[-1]` on a descending-ordered API response, persisting the oldest record of a 1000-point window, a June 2022 rate stored as current, propagating into the AI narrative and the Irving Fisher forward-rate projections. 936 rows were corrected against source; both series now reconcile at 100%. Both modules now sort explicitly and expose the value's true publication date, with staleness warnings surfaced at runtime.
-* **Scraper Failure Alerting (2026):** Introduced a standalone `mailer.py` module that converts a `ScraperError` into a plain-text alert email carrying source, failed step, root cause, and traceback. Wired around the ingestion call so a broken selector or a downed API notifies the maintainer before the run aborts, closing the gap where failures died silently in an unattended process. The alert path never raises: an unreachable SMTP server degrades to a console warning rather than masking the original failure.
+* **Scraper Failure Alerting (2026):** Introduced a standalone `reporte/mailer.py` module that converts a `ScraperError` into a plain-text alert email carrying source, failed step, root cause, and traceback. Wired around the ingestion call so a broken selector or a downed API notifies the maintainer before the run aborts, closing the gap where failures died silently in an unattended process. The alert path never raises: an unreachable SMTP server degrades to a console warning rather than masking the original failure.
 * **TLS Verification Restored (2026):** The BCRA API integration carried `verify=False`, disabling certificate validation to work around a broken chain on the bank's side. Verified as fixed upstream and removed, restoring standard TLS validation on that request path.
 * **Notebook-free Pipeline (2026):** Ported the orchestration notebook into plain Python modules (`data_access`, `transformations`, `charts`, `email_report`, `preview_git`) driven by a `pipeline.py` entry point that both the CLI and the FastAPI service execute. The port was verified against the original notebook run dry on frozen inputs: the four charts, the rendered HTML and both MIME messages come out byte-identical. Three later, intentional fixes (the accumulated-inflation line of the variations chart, one decimal on the inflation axis, and a CSV attachment built from the warehouse instead of a stale local file) are the only differences from the notebook's output, and a golden-file test now pins the HTML byte for byte. Each stage now reports its state and duration, a failed email send turns the run red instead of printing a line, a `--dry-run` mode exercises live scraping without writing or sending anything, and the row date is computed in Argentina time, so a containerized run in UTC can no longer stamp tomorrow's date.
 * **Monetary Aggregates & Public Debt in Dollars (2026):** Added two charts to the daily report. The monetary aggregates (monetary base, M2, M3) show how much money circulates and how it grows against inflation. The debt chart tracks, always in US dollars, the Treasury's gross debt, private-sector bank loans, the Central Bank's letters and its transitory advances to the Treasury: BCRA series published in pesos are converted with the official wholesale rate of each day, and the Treasury's monthly workbook is read by its labels, with provisional months flagged. Each chart carries a plain-language explanation plus one sentence computed in Python from the latest figures, so the AI never writes the numbers.
@@ -95,34 +95,35 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 ## 📁 Repository Layout
 
 ```
-├── pipeline.py         Daily run and its CLI: stages, per-stage results, alerts
-├── data_access.py      Supabase reads, idempotent insert, run lock
-├── transformations.py  Today's row, validation, spreads, Fisher forwards, inflation
-├── charts.py           The six report charts
-├── indicadores.py      Plain-language explanations of the aggregates and debt charts
-├── email_report.py     HTML rendering, MIME assembly and sending
-├── presentacion.py     The daily executive PowerPoint deck
-├── preview_git.py      Commit of Previews/ and publication of the deck branch
-├── fechas.py           Argentina-time dates and Spanish month names
-├── scrapers/           Ingestion layer: Playwright scrapers + async REST clients
-├── templates/          Jinja2 email template
-├── notebooks/          The original orchestration notebook, kept as a reference
-├── scripts/            Operational tooling (backfills, manual resends, daily control, prototypes)
-├── sql/                SQL applied by hand in Supabase: schema, migrations, cleaning
-├── tests/              Offline test suite; tests/datos/ pins the mail HTML
-├── docs/               Roadmap evaluations and runbooks (Spanish)
-├── dashboard/          Streamlit prototype, read-only, with its own requirements
-├── .github/workflows/  CI, plus the daily run and daily control (switched on by a variable)
-├── data/               Local CSV history (gitignored)
-├── Previews/           Daily charts, auto-committed by the pipeline
-├── Assets/             Architecture diagrams and their generator
-├── config.py           Typed environment configuration (Pydantic-Settings)
-├── models.py           Row-level validation schema (Pydantic)
-├── mailer.py           Failure alerting over SMTP
-├── ia_generator.py     Gemini narrative layer
-├── app.py              FastAPI entrypoint
-├── pyproject.toml      pytest and ruff configuration
-└── requirements*.in    Direct dependencies, locked into the matching .txt
+├── pipeline.py              Entry point: the daily run and its CLI (stages, per-stage results, alerts)
+├── app.py                   FastAPI entry point: POST /run executes pipeline.py
+├── reporte/                 The report itself, as a Python package
+│   ├── config.py            Typed environment configuration (Pydantic-Settings)
+│   ├── models.py            Row-level validation schema (Pydantic)
+│   ├── data_access.py       Supabase reads, idempotent insert, run lock
+│   ├── transformations.py   Today's row, validation, spreads, Fisher forwards, inflation
+│   ├── charts.py            The six report charts
+│   ├── indicadores.py       Plain-language explanations of the aggregates and debt charts
+│   ├── ia_generator.py      Gemini narrative layer
+│   ├── email_report.py      HTML rendering, MIME assembly and sending
+│   ├── mailer.py            SMTP sending and failure alerts
+│   ├── presentacion.py      The daily executive PowerPoint deck
+│   ├── preview_git.py       Commit of Previews/ and publication of the deck branch
+│   ├── fechas.py            Argentina-time dates and Spanish month names
+│   ├── scrapers/            Ingestion layer: Playwright scrapers + async REST clients
+│   └── templates/           Jinja2 email template
+├── scripts/                 Operational tooling (manual resend, daily control, backfills, deck by hand)
+├── tests/                   Offline test suite; tests/datos/ pins the mail HTML
+├── sql/                     SQL applied by hand in Supabase: schema, migrations, cleaning
+├── notebooks/               The original notebook (reference) and the read-only SQL lab
+├── dashboard/               Streamlit prototype, read-only, with its own requirements
+├── docs/                    Roadmap evaluations and runbooks (Spanish)
+├── Assets/                  Architecture diagrams and their generator
+├── Previews/                Daily charts, auto-committed by the pipeline
+├── .github/workflows/       CI, plus the daily run and daily control (switched on by a variable)
+├── Dockerfile               Optional container image, for running the API on a server
+├── pyproject.toml           pytest and ruff configuration
+└── requirements*.in / .txt  Direct dependencies, locked into the matching .txt
 ```
 
 ---
@@ -201,7 +202,7 @@ The following modules are mapped in the architecture blueprint and are undergoin
 
 ## 🔐 Security & Production Standards
 
-* **Credential Management:** All API keys, connection strings, and sensitive tokens are fully decoupled via environment variables using `.env` files (explicitly excluded via `.gitignore`). Secrets are typed as `SecretStr` in `config.py`, so they render masked in logs and tracebacks and require an explicit `.get_secret_value()` call to read.
+* **Credential Management:** All API keys, connection strings, and sensitive tokens are fully decoupled via environment variables using `.env` files (explicitly excluded via `.gitignore`). Secrets are typed as `SecretStr` in `reporte/config.py`, so they render masked in logs and tracebacks and require an explicit `.get_secret_value()` call to read.
 * **Resilience:** Built with basic exception-handling blocks to prevent operational failure during scraping anomalies without exposing server secrets in standard logs. Ingestion failures raise a structured `ScraperError` carrying source and step, which triggers an alert email before the run aborts.
 * **Public Logs:** GitHub Actions logs are public in a public repository, so every log line, tracebacks included, is scrubbed of each secret and recipient address before it is written.
 * **Unattended Runs:** A database lock prevents duplicate runs, an unfinished day is reported instead of skipped, and a daily control alerts when a business day ends without its data. A failed run sends one summary alert.

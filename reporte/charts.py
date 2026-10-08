@@ -29,9 +29,9 @@ from matplotlib.artist import setp
 from matplotlib.figure import Figure
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 
-import transformations
-from fechas import mes_abreviado
-from transformations import etiqueta_mes
+from reporte import transformations
+from reporte.fechas import mes_abreviado
+from reporte.transformations import etiqueta_mes
 
 log = logging.getLogger(__name__)
 

@@ -7,8 +7,8 @@ import httpx
 import openpyxl
 import pytest
 
-from scrapers import agregados, finanzas
-from scrapers.utils import ScraperError
+from reporte.scrapers import agregados, finanzas
+from reporte.scrapers.utils import ScraperError
 
 PAGINA_HTML = """
 <html><body>

@@ -4,9 +4,8 @@ from datetime import date, timedelta
 
 import pytest
 
-import charts
-import indicadores
 from conftest import HOY
+from reporte import charts, indicadores
 
 
 def test_numeros_con_formato_argentino():
@@ -90,7 +89,7 @@ def test_explicaciones_por_cid(series_indicadores):
 
 def test_la_frase_usa_la_misma_interanual_que_la_tabla_del_mail(series_indicadores):
     """Con la mensual, la interanual se compone como en la tabla de inflación, no se toma la del BCRA."""
-    import transformations
+    from reporte import transformations
 
     series, _ = series_indicadores
     series = {**series, "inflacion_interanual": [(date(2026, 8, 31), 40.0)]}  # la publicada, distinta a propósito
@@ -100,7 +99,7 @@ def test_la_frase_usa_la_misma_interanual_que_la_tabla_del_mail(series_indicador
 
 
 def test_cerca_de_la_inflacion_no_afirma_que_cayo_ni_que_crecio(series_indicadores):
-    import transformations
+    from reporte import transformations
 
     series, _ = series_indicadores
     series = {k: v for k, v in series.items() if k != "inflacion_mensual"}

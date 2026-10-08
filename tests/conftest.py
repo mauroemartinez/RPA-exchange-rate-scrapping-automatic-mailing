@@ -32,8 +32,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from models import COLUMNAS_TABLA
-from transformations import ResultadosScraping
+from reporte.models import COLUMNAS_TABLA
+from reporte.transformations import ResultadosScraping
 
 HOY = date(2026, 10, 6)
 
@@ -74,7 +74,7 @@ def sin_red_real(monkeypatch):
 @pytest.fixture(autouse=True)
 def sin_fuentes_fuera_de_httpx(monkeypatch):
     """yfinance (curl_cffi) y Playwright no pasan por httpx: se cortan en su propia puerta."""
-    from scrapers import ambito, bna, btc, dolarhoy
+    from reporte.scrapers import ambito, bna, btc, dolarhoy
 
     def _prohibido(*args, **kwargs):
         raise AssertionError("un test intentó bajar datos de Yahoo o lanzar un navegador real")

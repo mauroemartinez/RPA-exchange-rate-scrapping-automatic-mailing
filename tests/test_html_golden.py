@@ -15,11 +15,9 @@ from pathlib import Path
 
 import pytest
 
-import email_report
-import ia_generator
-import indicadores
-import transformations as t
 from conftest import HOY, series_sinteticas
+from reporte import email_report, ia_generator, indicadores
+from reporte import transformations as t
 
 DATOS = Path(__file__).resolve().parent / "datos"
 

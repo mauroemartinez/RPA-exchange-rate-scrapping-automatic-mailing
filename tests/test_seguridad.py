@@ -9,12 +9,10 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 import app
-import config
-import email_report
-import mailer
 import pipeline
-from scrapers import fed
-from scrapers.utils import ScraperError, run_async
+from reporte import config, email_report, mailer
+from reporte.scrapers import fed
+from reporte.scrapers.utils import ScraperError, run_async
 
 
 def test_una_key_vacia_cuenta_como_no_configurada():
@@ -97,7 +95,7 @@ def test_el_csv_no_deja_formulas_en_el_texto(historico):
 
 
 def test_el_parrafo_de_ia_se_escapa_en_el_mail(resultados, historico):
-    import transformations as t
+    from reporte import transformations as t
 
     df = t.agregar_brechas_y_variaciones(t.sumar_al_historico(t.armar_fila_nueva(resultados, historico["Fecha"].iloc[0]), historico))
     inflacion = t.ultimos_meses(t.serie_inflacion(resultados.bcra["inflacion_mensual"]))
@@ -126,7 +124,7 @@ def test_el_json_de_la_corrida_sale_redactado(tmp_path, monkeypatch):
 
 
 def test_la_direccion_de_alertas_tambien_se_tapa(monkeypatch):
-    import config
+    from reporte import config
 
     monkeypatch.setattr(config.settings, "email_alertas", ["dev@example.com"])
     assert config.redactar("535 rechazado: dev@example.com") == "535 rechazado: [destinatario]"

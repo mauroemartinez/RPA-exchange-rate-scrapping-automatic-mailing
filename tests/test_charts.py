@@ -6,9 +6,9 @@ import pandas as pd
 import pytest
 from PIL import Image
 
-import charts
-import transformations as t
 from conftest import HOY
+from reporte import charts
+from reporte import transformations as t
 
 AHORA = datetime(2026, 10, 6, 16, 43)
 

@@ -25,11 +25,7 @@ from pptx.enum.text import PP_ALIGN
 from pptx.opc.constants import RELATIONSHIP_TYPE
 from pptx.util import Inches, Pt
 
-import charts
-import email_report
-import ia_generator
-import indicadores
-import transformations
+from reporte import charts, email_report, ia_generator, indicadores, transformations
 
 ARCHIVO = "Reporte Ejecutivo.pptx"
 

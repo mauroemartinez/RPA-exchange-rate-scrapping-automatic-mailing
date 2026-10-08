@@ -4,7 +4,7 @@ from datetime import date
 
 import httpx
 
-from scrapers.utils import ScraperError, retry_http
+from reporte.scrapers.utils import ScraperError, retry_http
 
 API_URL = "https://api.stlouisfed.org/fred/series/observations"
 SERIE_EFFR = "EFFR"
@@ -32,7 +32,7 @@ async def run(client: httpx.AsyncClient | None = None, api_key: str | None = Non
     """Última EFFR publicada, con su fecha. Claves: fed_tea, fed_tea_fecha."""
     if api_key is None:
         # Import diferido: así importar el paquete scrapers no exige un .env válido.
-        from config import settings
+        from reporte.config import settings
 
         api_key = settings.fed_api_key.get_secret_value()
 

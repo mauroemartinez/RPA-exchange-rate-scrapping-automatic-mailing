@@ -13,7 +13,7 @@ from datetime import date
 
 import httpx
 
-from scrapers.utils import ScraperError, retry_http
+from reporte.scrapers.utils import ScraperError, retry_http
 
 API_BASE = "https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais"
 API_ULTIMO = f"{API_BASE}/ultimo"
