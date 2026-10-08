@@ -22,8 +22,8 @@ COMPARACIONES_ANIOS = (4, 8, 12)
 CLAVES_COMPARACIONES = ("prestamos_sector_privado", "tipo_cambio_mayorista")
 MARGEN_DIAS = 15
 
-CID_AGREGADOS = f"image{charts.ORDEN_EN_MAIL.index(charts.AGREGADOS) + 1}"
-CID_DEUDA = f"image{charts.ORDEN_EN_MAIL.index(charts.DEUDA) + 1}"
+CID_AGREGADOS = charts.cid(charts.AGREGADOS)
+CID_DEUDA = charts.cid(charts.DEUDA)
 
 TITULO_AGREGADOS = "Agregados monetarios, en simple"
 # Los textos fijos van en párrafos separados por "\n": el mail y la presentación

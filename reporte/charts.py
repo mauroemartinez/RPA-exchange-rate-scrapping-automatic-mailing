@@ -45,7 +45,12 @@ VARIACIONES = "Variaciones.jpg"
 BTC = "Gráfico BTC.jpg"
 AGREGADOS = "Agregados Monetarios.jpg"
 DEUDA = "Deuda en Dólares.jpg"
-ORDEN_EN_MAIL = (TIPOS_DE_CAMBIO, INFLACION, VARIACIONES, BTC, AGREGADOS, DEUDA)
+ORDEN_EN_MAIL = (TIPOS_DE_CAMBIO, INFLACION, VARIACIONES, AGREGADOS, DEUDA, BTC)
+
+
+def cid(nombre: str) -> str:
+    """El Content-ID del gráfico en el mail ('image1'...): sale de su lugar en ORDEN_EN_MAIL."""
+    return f"image{ORDEN_EN_MAIL.index(nombre) + 1}"
 
 COTIZACIONES_A_MOSTRAR = 25
 

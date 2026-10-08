@@ -5,8 +5,8 @@
 3. Tipos de cambio: el análisis de IA del día y los paneles de paralelas y oficiales.
 4. Riesgo país.
 5. Inflación y variaciones acumuladas.
-6. Bitcoin, en fondo negro.
-7 y 8. Agregados monetarios y deuda, con el resumen del día y lo ideal.
+6 y 7. Agregados monetarios y deuda, con el resumen del día y lo ideal.
+8. Bitcoin, en fondo negro.
 9. Fuentes y contacto, como el pie del mail.
 
 Cada gráfico lleva su frase: la de Gemini cuando la hay y, si no, un resumen
@@ -45,14 +45,15 @@ ARCHIVO = "Reporte Ejecutivo.pptx"
 # (last_modified_by, un comentario y fechas de 2013): se reemplazan todos.
 AUTOR = "Seguimiento Macroeconómico"
 
-# Los colores del mail
-OSCURO = RGBColor(0x1A, 0x25, 0x2F)
-AZUL = RGBColor(0x2C, 0x3E, 0x50)
+# Los colores del mail, los de Globalaize
+# Los azules del logo de Globalaize (#081E40) y uno intermedio para los degradés
+OSCURO = RGBColor(0x08, 0x1E, 0x40)
+AZUL = RGBColor(0x16, 0x3A, 0x6B)
 NARANJA = RGBColor(0xF3, 0x9C, 0x12)
 NARANJA_TEXTO = RGBColor(0xC0, 0x56, 0x0E)  # el naranja de los títulos sobre fondo claro, legible
 GRIS = RGBColor(0x5D, 0x6D, 0x7E)
 CLARO = RGBColor(0xEC, 0xF0, 0xF1)
-FONDO_TARJETA = RGBColor(0xEE, 0xF1, 0xF4)
+FONDO_TARJETA = RGBColor(0xE7, 0xF2, 0xF8)  # el celeste claro del logo
 VERDE = RGBColor(0x1E, 0x84, 0x49)
 ROJO = RGBColor(0xC0, 0x39, 0x2B)
 BLANCO = RGBColor(0xFF, 0xFF, 0xFF)
@@ -415,7 +416,7 @@ def armar(
 
     # 1. Portada
     portada = prs.slides.add_slide(prs.slide_layouts[6])
-    _degrade(_rectangulo(portada, 0, 0, ANCHO, ALTO, OSCURO), RGBColor(0x0B, 0x11, 0x18), AZUL, 315)
+    _degrade(_rectangulo(portada, 0, 0, ANCHO, ALTO, OSCURO), RGBColor(0x03, 0x0C, 0x1C), AZUL, 315)
     for x, y, lado, color, opacidad in [
         (8.4, -1.6, 6.4, CELESTE, 0.16), (10.6, 3.9, 3.6, NARANJA, 0.18), (7.3, 4.6, 2.2, CELESTE, 0.10),
     ]:
@@ -472,7 +473,7 @@ def armar(
             ]):
                 x = Inches(0.45) + j * Inches(6.33)
                 _imagen(cambio, ruta, x, Inches(2.85), Inches(6.1), Inches(2.75))
-                texto = _comentario(comentarios, "image1", clave)
+                texto = _comentario(comentarios, charts.cid(charts.TIPOS_DE_CAMBIO), clave)
                 _bloques(cambio, x, Inches(5.65), Inches(6.1), Inches(1.4),
                          [("🤖 Análisis IA" if texto else "Resumen del día", texto or frase)], 11)
         elif charts.TIPOS_DE_CAMBIO in imagenes:
@@ -486,7 +487,7 @@ def armar(
         else:
             _texto(riesgo, Inches(0.6), Inches(3), Inches(8), Inches(1), "Gráfico no disponible para este día.", 18, GRIS)
         _bloques(riesgo, Inches(9.25), Inches(1.3), Inches(3.65), Inches(5.6),
-                 [("Resumen del día", frase_riesgo(df)), ("🤖 Análisis IA", _comentario(comentarios, "image1", "riesgo"))], 13)
+                 [("Resumen del día", frase_riesgo(df)), ("🤖 Análisis IA", _comentario(comentarios, charts.cid(charts.TIPOS_DE_CAMBIO), "riesgo"))], 13)
 
     # 5. Inflación
     inflacion_slide = _encabezado(prs, "Inflación y variaciones acumuladas", fecha, next(numero))
@@ -500,16 +501,7 @@ def armar(
     if frase:
         _bloques(inflacion_slide, Inches(0.45), Inches(5.6), Inches(12.43), Inches(1.45), [("Resumen del día", frase)], 13)
 
-    # 6. Bitcoin, en negro como su gráfico
-    bitcoin = _encabezado(prs, "Bitcoin", fecha, next(numero), oscuro=True, icono=RECURSOS / "bitcoin.png")
-    if charts.BTC in imagenes:
-        _imagen(bitcoin, imagenes[charts.BTC], Inches(0.45), Inches(1.15), Inches(8.5), Inches(5.8))
-    else:
-        _texto(bitcoin, Inches(0.6), Inches(3), Inches(8), Inches(1), "Gráfico no disponible para este día.", 18, CLARO)
-    _bloques(bitcoin, Inches(9.25), Inches(1.3), Inches(3.65), Inches(5.6),
-             [("Resumen del día", frase_btc(btc)), ("🤖 Análisis IA", _comentario(comentarios, "image4", "bitcoin"))], 13, CLARO, NARANJA)
-
-    # 7 y 8. Agregados y deuda: el resumen del día y lo ideal; el texto completo, en las notas
+    # 6 y 7. Agregados y deuda: el resumen del día y lo ideal; el texto completo, en las notas
     for titulo, nombre, cid in [("Agregados monetarios", charts.AGREGADOS, indicadores.CID_AGREGADOS),
                                 ("Endeudamiento, en dólares", charts.DEUDA, indicadores.CID_DEUDA)]:
         slide = _encabezado(prs, titulo, fecha, next(numero))
@@ -524,6 +516,15 @@ def armar(
             _bloques(slide, Inches(8.1), Inches(1.2), Inches(4.8), Inches(5.8),
                      [("Resumen del día", explicacion["dato"]), ("¿Qué sería lo ideal?", ideal)], 12)
             slide.notes_slide.notes_text_frame.text = "\n\n".join(filter(None, [*parrafos, explicacion["dato"]]))
+
+    # 8. Bitcoin, en negro como su gráfico
+    bitcoin = _encabezado(prs, "Bitcoin", fecha, next(numero), oscuro=True, icono=RECURSOS / "bitcoin.png")
+    if charts.BTC in imagenes:
+        _imagen(bitcoin, imagenes[charts.BTC], Inches(0.45), Inches(1.15), Inches(8.5), Inches(5.8))
+    else:
+        _texto(bitcoin, Inches(0.6), Inches(3), Inches(8), Inches(1), "Gráfico no disponible para este día.", 18, CLARO)
+    _bloques(bitcoin, Inches(9.25), Inches(1.3), Inches(3.65), Inches(5.6),
+             [("Resumen del día", frase_btc(btc)), ("🤖 Análisis IA", _comentario(comentarios, charts.cid(charts.BTC), "bitcoin"))], 13, CLARO, NARANJA)
 
     # 9. Fuentes y contacto
     cierre = _encabezado(prs, "Fuentes y contacto", fecha, next(numero))

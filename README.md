@@ -21,6 +21,12 @@
 ### 📊 Today's Executive Deck
 The pipeline rebuilds a nine-slide PowerPoint every business day and keeps only the latest one, on the [`reporte-ejecutivo`](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/tree/reporte-ejecutivo) branch.
 
+<p align="center">
+  <a href="https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/raw/reporte-ejecutivo/Reporte%20Ejecutivo.pptx">
+    <img src="https://raw.githubusercontent.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/main/Assets/Presentacion.jpg" width="900" alt="Executive deck: the nine slides">
+  </a>
+</p>
+
 **[⬇️ Download today's deck](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/raw/reporte-ejecutivo/Reporte%20Ejecutivo.pptx)**
 
 ---

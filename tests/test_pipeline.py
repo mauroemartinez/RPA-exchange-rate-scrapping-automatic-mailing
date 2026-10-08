@@ -193,8 +193,8 @@ def test_sin_btc_el_mail_sale_igual_sin_ese_grafico(entorno):
     assert _estados(r)["graficos"] == "advertencia"
     mensaje = hechos["mails"][0][0]
     cids = [p.get("Content-ID") for p in mensaje.walk() if p.get_content_type() == "image/jpeg"]
-    assert cids == ["<image1>", "<image2>", "<image3>", "<image5>", "<image6>"]
-    assert "cid:image4" not in mensaje.get_payload()[0].get_payload(decode=True).decode()
+    assert cids == ["<image1>", "<image2>", "<image3>", "<image4>", "<image5>"]
+    assert "cid:image6" not in mensaje.get_payload()[0].get_payload(decode=True).decode()
 
 
 def test_si_no_se_guarda_la_fila_no_se_llama_a_gemini(entorno):
@@ -324,7 +324,7 @@ def test_una_falla_en_las_series_no_pone_la_corrida_en_rojo(entorno):
     assert len(hechos["mails"]) == 2
     # Sin el BCRA no hay gráfico de agregados; el de deuda sale con la deuda bruta sola
     cids = [p.get("Content-ID") for p in hechos["mails"][0][0].walk() if p.get_content_type() == "image/jpeg"]
-    assert "<image5>" not in cids and "<image6>" in cids
+    assert "<image4>" not in cids and "<image5>" in cids
     # Y la etapa de series guarda lo que sí llegó
     assert _estados(r)["series"] == "ok"
 
@@ -744,7 +744,7 @@ def test_la_presentacion_lleva_los_textos_de_esta_corrida(entorno):
 
     textos = _diapositivas(salida / presentacion.ARCHIVO)
     assert _secciones().resumen in textos[2]
-    assert _secciones().paralelas in textos[2] and _secciones().btc in textos[5]
+    assert _secciones().paralelas in textos[2] and _secciones().btc in textos[7]
 
 
 def test_si_la_presentacion_falla_es_advertencia_y_el_mail_sale(entorno, monkeypatch):
@@ -871,7 +871,7 @@ def test_sin_las_fuentes_el_mail_sale_sin_esos_graficos(entorno):
     assert _estados(r)["indicadores"] == "advertencia" and _estados(r)["graficos"] == "advertencia"
     assert r.estado == "advertencia" and hechos["alertas"] == []
     mensaje = hechos["mails"][0][0]
-    assert _cids(mensaje) == ["<image1>", "<image2>", "<image3>", "<image4>"]
+    assert _cids(mensaje) == ["<image1>", "<image2>", "<image3>", "<image6>"]
     assert 'class="explicacion"' not in _html(mensaje)
 
 
@@ -885,7 +885,7 @@ def test_sin_la_secretaria_el_grafico_de_deuda_sale_con_el_bcra(entorno):
 
     assert _estados(r)["indicadores"] == "advertencia" and _estados(r)["graficos"] == "ok"
     html = _html(hechos["mails"][0][0])
-    assert "<image6>" in _cids(hechos["mails"][0][0])
+    assert "<image5>" in _cids(hechos["mails"][0][0])
     assert "Deuda bruta del Tesoro a fines de" not in html and "les deben a los bancos, al" in html
 
 
@@ -898,7 +898,7 @@ def test_un_grafico_nuevo_que_falla_es_una_advertencia(entorno, monkeypatch):
     monkeypatch.setattr(pipeline.charts, "grafico_deuda", falla)
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
     assert _estados(r)["graficos"] == "advertencia" and r.estado == "advertencia"
-    assert "<image6>" not in _cids(hechos["mails"][0][0])
+    assert "<image5>" not in _cids(hechos["mails"][0][0])
 
 
 def test_el_dry_run_baja_los_indicadores_pero_no_los_guarda(entorno):

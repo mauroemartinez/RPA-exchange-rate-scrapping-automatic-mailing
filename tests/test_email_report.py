@@ -72,8 +72,10 @@ def test_el_template_sin_la_variable_graficos_muestra_los_cuatro(df, inflacion_1
 def test_cids_disponibles(imagenes):
     assert er.cids_disponibles(imagenes) == [f"image{i}" for i in range(1, 7)]
     del imagenes[charts.BTC]
-    # Los cid son fijos por gráfico: sin BTC, los de agregados y deuda siguen siendo 5 y 6
-    assert er.cids_disponibles(imagenes) == ["image1", "image2", "image3", "image5", "image6"]
+    # Los cid son fijos por gráfico: BTC es el último (image6) y sin él no se corre nada
+    assert er.cids_disponibles(imagenes) == ["image1", "image2", "image3", "image4", "image5"]
+    del imagenes[charts.AGREGADOS]
+    assert er.cids_disponibles(imagenes) == ["image1", "image2", "image3", "image5"]
 
 
 def test_armar_mensaje(imagenes):
@@ -84,7 +86,7 @@ def test_armar_mensaje(imagenes):
     partes = [(p.get_content_type(), p.get("Content-ID")) for p in msg.walk() if not p.is_multipart()]
     assert partes == [("text/html", None), ("image/jpeg", "<image1>"), ("image/jpeg", "<image3>"),
                       ("image/jpeg", "<image4>"), ("image/jpeg", "<image5>"), ("image/jpeg", "<image6>"),
-                      ("text/csv", None)]
+                      ("image/png", "<logo>"), ("text/csv", None)]
     assert msg["Bcc"] == "a@example.com, b@example.com"
     assert msg["To"] == "remitente@example.com"
 
@@ -188,7 +190,7 @@ def test_las_tarjetas_de_ia_y_explicaciones_tienen_el_mismo_look(df, inflacion_1
                          comentarios=comentarios, explicaciones=explicaciones)
     for clase in ('class="ai-box"', 'class="comentario-ia"', 'class="explicacion"'):
         caja = html[html.index(clase):html.index(clase) + 400]
-        assert "#1a252f" in caja and "border-left:4px solid #f39c12" in caja
+        assert "#081e40" in caja and "border-left:4px solid #f39c12" in caja
     # Cada renglón del texto y del dato, en su propio párrafo
     assert ">Uno</p>" in html and ">Dos</p>" in html and "📌 Dato A</p>" in html and "📌 Dato B</p>" in html
 
