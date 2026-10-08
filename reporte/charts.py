@@ -255,10 +255,15 @@ def _dibujar_tipos_de_cambio(data: pd.DataFrame, n: int, al_terminar):
                 color=color_var,
             )
 
+        # Una fecha cada dos ruedas y sin el año ('02/09' y no '02/09/26'): con el
+        # año, en el ancho del mail se enciman. El eje es por posición (0, 1, 2...)
+        fechas = ultimos["Fecha"].tolist()
+        sin_anio = FuncFormatter(lambda x, _: fechas[int(round(x))][:5] if 0 <= int(round(x)) < len(fechas) else "")
         for axis in ax:
             axis.set_xlabel("")
             axis.xaxis.set_major_locator(MultipleLocator(2))
             axis.xaxis.set_minor_locator(MultipleLocator(1))
+            axis.xaxis.set_major_formatter(sin_anio)
 
         for i in range(2):
             ax[i].yaxis.set_major_formatter(FuncFormatter("{:,.2f}".format))
