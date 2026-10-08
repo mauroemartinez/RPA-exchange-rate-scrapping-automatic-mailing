@@ -23,7 +23,7 @@ jobs:
   verificar:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    # Valores falsos, solo para que config.py se pueda importar
+    # Valores falsos, solo para que reporte/config.py se pueda importar
     env:
       EMAIL_SENDER: remitente@example.com
       EMAIL_PASSWORD: no-es-una-clave
@@ -53,9 +53,9 @@ jobs:
 
       - name: Imports
         run: >
-          python -c "import pipeline, app, data_access, transformations, charts, email_report,
-          preview_git, ia_generator, mailer, models, fechas, scrapers.agregados, scrapers.btc,
-          scrapers.feriados"
+          python -c "import pipeline, app; from reporte import data_access, transformations, charts,
+          email_report, preview_git, ia_generator, mailer, models, fechas, indicadores, presentacion;
+          from reporte.scrapers import agregados, btc, feriados, finanzas"
 
       - name: Tests
         run: pytest -q

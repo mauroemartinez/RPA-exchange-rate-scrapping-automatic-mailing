@@ -3,10 +3,10 @@ from email import message_from_string
 
 import pytest
 
-import charts
-import email_report as er
-import transformations as t
 from conftest import HOY, jpeg_minimo
+from reporte import charts
+from reporte import email_report as er
+from reporte import transformations as t
 
 
 @pytest.fixture

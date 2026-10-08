@@ -1,6 +1,6 @@
 from playwright.async_api import async_playwright
 
-from scrapers.utils import ScraperError, parse_money, retry_scrape
+from reporte.scrapers.utils import ScraperError, parse_money, retry_scrape
 
 WEB_DOLARHOY = "https://dolarhoy.com/cotizaciondolarblue"
 

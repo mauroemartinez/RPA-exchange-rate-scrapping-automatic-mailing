@@ -22,13 +22,12 @@ import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 from tabulate import tabulate
 
-import indicadores
-import mailer
-from charts import COTIZACIONES_A_MOSTRAR, ORDEN_EN_MAIL
-from config import settings
-from models import COLUMNAS_FILA
-from scrapers import ambito, bcra, bna, dolarhoy, fed, finanzas, riesgo_pais
-from transformations import etiqueta_mes
+from reporte import indicadores, mailer
+from reporte.charts import COTIZACIONES_A_MOSTRAR, ORDEN_EN_MAIL
+from reporte.config import settings
+from reporte.models import COLUMNAS_FILA
+from reporte.scrapers import ambito, bcra, bna, dolarhoy, fed, finanzas, riesgo_pais
+from reporte.transformations import etiqueta_mes
 
 log = logging.getLogger(__name__)
 

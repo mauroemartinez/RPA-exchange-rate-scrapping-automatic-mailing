@@ -12,7 +12,7 @@ from datetime import date
 
 import httpx
 
-from scrapers.utils import ScraperError, retry_http
+from reporte.scrapers.utils import ScraperError, retry_http
 
 API_BASE = "https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias"
 

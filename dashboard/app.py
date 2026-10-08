@@ -1,7 +1,7 @@
 """Prototipo de dashboard en Streamlit sobre el histórico (fase 5 del roadmap: evaluación).
 
 Solo lee Fact_Mercado_Macro, dentro de una transacción READ ONLY, o el CSV que
-llega adjunto en el mail. No importa config.py a propósito: config exige todas
+llega adjunto en el mail. No importa reporte/config.py a propósito: config exige todas
 las credenciales del pipeline (mail, Gemini, FRED) y un dashboard publicado no
 tiene por qué tenerlas. Le alcanza con DASHBOARD_DB_URL, la URL de un usuario de
 solo lectura (ver docs/evaluacion-powerpoint-y-streamlit.md).

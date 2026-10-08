@@ -27,8 +27,8 @@ from datetime import date
 
 import httpx
 
-from scrapers.bcra import API_BASE, TIMEOUT
-from scrapers.utils import ScraperError, retry_http, run_async
+from reporte.scrapers.bcra import API_BASE, TIMEOUT
+from reporte.scrapers.utils import ScraperError, retry_http, run_async
 
 # La API devuelve hasta 1000 puntos si no se le pide otra cosa; con limit se
 # pueden pedir más por página (3000 probado) y paginar con offset.

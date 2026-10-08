@@ -25,10 +25,8 @@ sys.path.insert(0, str(RAIZ))
 
 from sqlalchemy import text
 
-import data_access
-import fechas
-import mailer
-from scrapers import feriados
+from reporte import data_access, fechas, mailer
+from reporte.scrapers import feriados
 
 
 def fila_de_hoy(engine, hoy) -> tuple[bool, bool]:

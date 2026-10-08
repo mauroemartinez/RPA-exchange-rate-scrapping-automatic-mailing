@@ -6,9 +6,9 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 
-import transformations as t
 from conftest import HOY
-from models import COLUMNAS_FILA
+from reporte import transformations as t
+from reporte.models import COLUMNAS_FILA
 
 
 def test_fila_nueva_respeta_el_orden_de_la_tabla(resultados):

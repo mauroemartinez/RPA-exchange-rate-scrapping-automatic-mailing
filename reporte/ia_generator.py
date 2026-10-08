@@ -14,8 +14,8 @@ from google.genai import types
 from pydantic import ValidationError
 from sqlalchemy import text
 
-from config import settings
-from models import SeccionesIA
+from reporte.config import settings
+from reporte.models import SeccionesIA
 
 log = logging.getLogger(__name__)
 

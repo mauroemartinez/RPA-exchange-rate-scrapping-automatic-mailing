@@ -10,7 +10,7 @@ from datetime import datetime
 import pandas as pd
 import yfinance as yf
 
-from scrapers.utils import ScraperError
+from reporte.scrapers.utils import ScraperError
 
 TICKER = "BTC-USD"
 

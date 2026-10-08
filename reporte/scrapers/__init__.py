@@ -2,8 +2,8 @@ import asyncio
 
 import httpx
 
-from scrapers import ambito, bcra, bna, dolarhoy, fed, riesgo_pais
-from scrapers.utils import run_async
+from reporte.scrapers import ambito, bcra, bna, dolarhoy, fed, riesgo_pais
+from reporte.scrapers.utils import run_async
 
 
 async def _run_all():

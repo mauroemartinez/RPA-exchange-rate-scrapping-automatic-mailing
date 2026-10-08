@@ -12,7 +12,7 @@ import traceback
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from config import redactar, settings
+from reporte.config import redactar, settings
 
 log = logging.getLogger(__name__)
 

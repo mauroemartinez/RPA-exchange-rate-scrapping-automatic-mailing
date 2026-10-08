@@ -28,7 +28,7 @@ from urllib.parse import urljoin
 
 import httpx
 
-from scrapers.utils import ScraperError, retry_http
+from reporte.scrapers.utils import ScraperError, retry_http
 
 PAGINA = "https://www.argentina.gob.ar/economia/finanzas/datos-mensuales-de-la-deuda/datos"
 TIMEOUT = httpx.Timeout(60.0, connect=15.0)

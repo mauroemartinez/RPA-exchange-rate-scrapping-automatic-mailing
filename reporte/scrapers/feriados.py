@@ -11,7 +11,7 @@ from datetime import date
 
 import httpx
 
-from scrapers.utils import ScraperError, retry_http, run_async
+from reporte.scrapers.utils import ScraperError, retry_http, run_async
 
 API = "https://api.argentinadatos.com/v1/feriados"
 TIMEOUT = httpx.Timeout(20.0, connect=10.0)

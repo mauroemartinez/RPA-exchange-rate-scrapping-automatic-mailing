@@ -8,12 +8,11 @@ import pandas as pd
 import pytest
 from sqlalchemy.dialects import postgresql
 
-import charts
-import data_access
-import transformations as t
 from conftest import HOY
-from scrapers import agregados
-from scrapers.utils import ScraperError, run_async
+from reporte import charts, data_access
+from reporte import transformations as t
+from reporte.scrapers import agregados
+from reporte.scrapers.utils import ScraperError, run_async
 
 BASE = agregados.POR_CLAVE["base_monetaria"]
 INFLACION = agregados.POR_CLAVE["inflacion_mensual"]
@@ -223,7 +222,7 @@ def test_una_variable_rota_no_se_lleva_a_las_demas():
 
 
 def test_un_429_se_reintenta():
-    from scrapers.utils import _es_error_http_transitorio
+    from reporte.scrapers.utils import _es_error_http_transitorio
 
     pedido = httpx.Request("GET", "https://api.bcra.gob.ar/x")
     error = lambda codigo: httpx.HTTPStatusError("x", request=pedido, response=httpx.Response(codigo, request=pedido))  # noqa: E731
