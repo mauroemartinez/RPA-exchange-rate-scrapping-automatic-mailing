@@ -13,15 +13,18 @@ python scripts/presentacion_ejecutiva.py --salida DIR
 
 `python-pptx` es una dependencia de producción (`requirements.txt`): la corrida diaria lo necesita.
 
-Arma ocho diapositivas en 16:9 con lo que la corrida ya dejó:
+Arma nueve diapositivas en 16:9 con lo que la corrida ya dejó (diseño del 8 de octubre):
 
-- portada;
-- un tablero con blue, MEP, billete, riesgo país, BADLAR y el forward de Fisher, cada uno con su variación;
-- el párrafo de IA;
-- tres de gráficos: tipos de cambio y riesgo país, inflación con variaciones acumuladas, y BTC;
-- desde el 7 de octubre, agregados monetarios y endeudamiento en dólares, con la misma explicación para no especialistas que el mail.
+- portada con los temas del día, la moneda de BTC y los links del autor y de Globalaize;
+- un tablero con blue, MEP, billete, riesgo país, BADLAR y el forward de Fisher, cada uno con su variación: subir es rojo y bajar, verde, como en el mail;
+- tipos de cambio: el análisis de IA arriba y los paneles de paralelas y oficiales por separado, cada uno con su frase;
+- riesgo país, con su frase;
+- inflación con variaciones acumuladas, con una frase calculada en Python;
+- BTC en fondo negro, con su frase;
+- agregados monetarios y endeudamiento en dólares, con "Resumen del día" y "¿Qué sería lo ideal?";
+- fuentes y contacto, con los links y el alias, como el pie del mail.
 
-Si la fila tiene los comentarios por gráfico de la fase 4, van al lado de cada gráfico (debajo, en el de BTC). Usa los colores del mail. Con las ocho diapositivas pesa unos 640 KB: como vive en una rama que se reemplaza entera, ese peso no se acumula.
+Si la fila tiene los comentarios por gráfico de la fase 4, van al lado de cada gráfico (debajo, en el de BTC). Usa los colores del mail. Con las nueve diapositivas pesa unos 870 KB: como vive en una rama que se reemplaza entera, ese peso no se acumula.
 
 Lo que salió de la prueba, con los datos del 6 de octubre:
 
