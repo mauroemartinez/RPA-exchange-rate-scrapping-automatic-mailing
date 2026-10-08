@@ -372,8 +372,8 @@ def opcion_1() -> str:
         f'<div class="barra"><div class="iconos"><img src="{CALENDARIO}">'
         f'<img class="gh" src="{si("github", "#FFFFFF")}"><img class="gha" src="{dev("githubactions")}"></div>'
         '<div><div class="t1">Orchestration · GitHub Actions</div>'
-        '<div class="t2"><b>Free plan:</b> runs pipeline.py every business day at 16:19, skips holidays and checks the row at 17:07.'
-        '<br>Tests every push in CI. FastAPI + Docker stay optional for a future server.</div></div></div>'
+        '<div class="t2"><b>Free plan:</b> business days at 16:19, retries at 17:07 and 19:12, skips holidays.'
+        '<br>Checks the row at 19:43 and tests every push in CI. FastAPI + Docker stay optional.</div></div></div>'
     )
 
     return (

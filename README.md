@@ -18,6 +18,11 @@
 [![Top language](https://img.shields.io/github/languages/top/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing?style=flat&color=6c757d)](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing)
 [![Repo size](https://img.shields.io/github/repo-size/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing?style=flat&color=6c757d)](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing)
 
+### 📊 Today's Executive Deck
+The pipeline rebuilds a nine-slide PowerPoint every business day and keeps only the latest one, on the [`reporte-ejecutivo`](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/tree/reporte-ejecutivo) branch.
+
+**[⬇️ Download today's deck](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/raw/reporte-ejecutivo/Reporte%20Ejecutivo.pptx)**
+
 ---
 
 ### 🏗️ System Architecture & Data Pipeline Blueprint
@@ -139,7 +144,7 @@ A dry run leaves the six charts, the executive deck, a browser preview and an `.
 2. Load the `.env` values as repository secrets: Settings > Secrets and variables > Actions.
 3. Run *Corrida diaria* by hand in `dry-run` mode, to check that the Argentine sites answer from GitHub's servers.
 4. Run it once in `real` mode.
-5. Create the repository variable `CORRIDA_AUTOMATICA` with the value `si`. From then on it runs Monday to Friday at 16:19 Argentina time, and the daily control at 17:07. Set it to `no` to pause.
+5. Create the repository variable `CORRIDA_AUTOMATICA` with the value `si`. From then on it runs Monday to Friday at 16:19 Argentina time, retries at 17:07 and 19:12 if that one did not go out, and the daily control at 19:43. Set it to `no` to pause.
 
 **Executive deck.** The latest deck is always at [`Reporte Ejecutivo.pptx`](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/raw/reporte-ejecutivo/Reporte%20Ejecutivo.pptx), on the `reporte-ejecutivo` branch. That branch is rebuilt as a single commit every day, so it never accumulates versions. `python scripts/presentacion_ejecutiva.py` builds the same deck by hand from the warehouse.
 
