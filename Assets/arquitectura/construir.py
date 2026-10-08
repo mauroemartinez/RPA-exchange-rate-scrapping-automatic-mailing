@@ -173,17 +173,8 @@ def tarjeta_css(clase: str, borde: str, titulo: str) -> str:
 COLUMNAS = [
     {
         "clase": "c1", "borde": "#A855F7", "titulo_color": "#C17BFF", "titulo": "Data Sources",
-        "logos": f"""
-          <img src="{GLOBO}" style="width:86px;margin-top:6px;filter:drop-shadow(0 0 8px rgba(184,102,255,.45))">
-          <img src="{NUBE_API}" style="width:108px;margin-top:22px;filter:drop-shadow(0 0 8px rgba(196,107,255,.45))">""",
-        "items": [
-            "FX portals: BNA, DolarHoy, Ámbito",
-            "BCRA API: rates, inflation, money &amp; debt",
-            "St. Louis FED API (EFFR)",
-            "ArgentinaDatos: country risk &amp; holidays",
-            "Yahoo Finance (BTC)",
-            "Secretaría de Finanzas: public debt",
-        ],
+        # Sin logos ni viñetas: la lista de fuentes de la opción 2 (FUENTES_2), cada una con su ícono
+        "fuentes": True,
     },
     {
         "clase": "c2", "borde": "#1ECBEA", "titulo_color": "#33D6F2", "titulo": "Data Extraction",
@@ -313,9 +304,19 @@ li::before { content: ""; position: absolute; left: 1px; top: 8px; width: 5px; h
 .rejilla > div { display: flex; flex-direction: column; align-items: center; }
 .disco { display: inline-flex; width: 50px; height: 50px; border-radius: 50%; background: #F3F3F3;
   align-items: center; justify-content: center; margin-bottom: 1px; }
+.fuentes1 { flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: space-around;
+  margin-top: 6px; }
+.fuentes1 .fuente { display: flex; align-items: center; gap: 10px; padding: 6px 2px; }
+.fuentes1 .fuente + .fuente { border-top: 1px dashed #3B2350; }
+.fuentes1 .fuente img { width: 36px; flex: 0 0 36px; }
+.fuentes1 .n { font: 600 16px/1.15 'Barlow', sans-serif; color: #fff; }
+.fuentes1 .d { font: 400 13.5px/1.25 'Barlow', sans-serif; color: #C9C9D1; margin-top: 2px; }
 .conectores { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
-.barra { position: absolute; top: 806px; left: 610px; display: flex; align-items: center; gap: 22px; }
-.barra img { width: 82px; filter: drop-shadow(0 0 8px rgba(196,107,255,.6)); }
+.barra { position: absolute; top: 806px; left: 470px; display: flex; align-items: center; gap: 22px; }
+.barra .iconos { display: flex; align-items: center; gap: 14px; }
+.barra .iconos img { width: 64px; filter: drop-shadow(0 0 8px rgba(196,107,255,.6)); }
+.barra .iconos img.gh { width: 54px; filter: drop-shadow(0 0 8px rgba(255,255,255,.35)); }
+.barra .iconos img.gha { width: 58px; filter: drop-shadow(0 0 8px rgba(32,136,255,.7)); }
 .barra .t1 { font: 600 26px/1.15 'Barlow Condensed', sans-serif; letter-spacing: 1.2px; color: #D27BFF;
   text-transform: uppercase; text-shadow: 0 0 10px rgba(196,107,255,.45); }
 .barra .t2 { font: 400 17.5px/1.35 'Barlow', sans-serif; color: #E4E4E7; margin-top: 4px; }
@@ -330,11 +331,17 @@ def opcion_1() -> str:
     for i, col in enumerate(COLUMNAS):
         x = izq + i * (ancho + hueco)
         centros.append(x + ancho / 2)
-        items = "".join(f"<li>{t}</li>" for t in col["items"])
+        if col.get("fuentes"):
+            cuerpo = '<div class="fuentes1">' + "".join(
+                f'<div class="fuente"><img src="{icono}"><div><div class="n">{n}</div><div class="d">{d}</div></div></div>'
+                for icono, n, d in FUENTES_2
+            ) + "</div>"
+        else:
+            items = "".join(f"<li>{t}</li>" for t in col["items"])
+            cuerpo = f'<div class="logos">{col["logos"]}</div><ul>{items}</ul>'
         tarjetas.append(
             f'<div class="tarjeta {col["clase"]}" style="left:{x}px">'
-            f'<div class="num">{i + 1}</div><div class="titulo">{col["titulo"]}</div>'
-            f'<div class="logos">{col["logos"]}</div><ul>{items}</ul></div>'
+            f'<div class="num">{i + 1}</div><div class="titulo">{col["titulo"]}</div>{cuerpo}</div>'
         )
         if i < len(COLUMNAS) - 1:
             fx = x + ancho + hueco / 2 - 22
@@ -352,17 +359,18 @@ def opcion_1() -> str:
         lineas.append(f'<line x1="{cx}" y1="776" x2="{cx}" y2="796" stroke="{color}" stroke-width="2" stroke-dasharray="3 3"/>')
     c1, c7 = centros[0], centros[-1]
     lineas.append(f'<line x1="{c1}" y1="796" x2="{c7}" y2="796" stroke="{violeta}" stroke-width="2.2" stroke-dasharray="7 6"/>')
-    lineas.append(f'<path d="M{c1} 806 V866 H596" fill="none" stroke="{violeta}" stroke-width="2.2" stroke-dasharray="7 6"/>')
-    lineas.append(f'<path d="M588 860 L598 866 L588 872" fill="none" stroke="{violeta}" stroke-width="2.4"/>')
-    lineas.append(f'<path d="M1366 866 H{c7} V806" fill="none" stroke="{violeta}" stroke-width="2.2" stroke-dasharray="7 6"/>')
+    lineas.append(f'<path d="M{c1} 806 V866 H456" fill="none" stroke="{violeta}" stroke-width="2.2" stroke-dasharray="7 6"/>')
+    lineas.append(f'<path d="M448 860 L458 866 L448 872" fill="none" stroke="{violeta}" stroke-width="2.4"/>')
+    lineas.append(f'<path d="M1430 866 H{c7} V806" fill="none" stroke="{violeta}" stroke-width="2.2" stroke-dasharray="7 6"/>')
     lineas.append(f'<path d="M{c7 - 6} 814 L{c7} 804 L{c7 + 6} 814" fill="none" stroke="{violeta}" stroke-width="2.4"/>')
     conectores = f'<svg class="conectores" viewBox="0 0 {ANCHO} {ALTO}">{"".join(lineas)}</svg>'
 
     barra = (
-        f'<div class="barra"><img src="{CALENDARIO}">'
-        '<div><div class="t1">Scheduled cloud automation · GitHub Actions</div>'
-        '<div class="t2"><b>Free plan:</b> runs pipeline.py every business day, skips holidays, '
-        'tests every push in CI.<br>FastAPI + Docker stay optional for a future server.</div></div></div>'
+        f'<div class="barra"><div class="iconos"><img src="{CALENDARIO}">'
+        f'<img class="gh" src="{si("github", "#FFFFFF")}"><img class="gha" src="{dev("githubactions")}"></div>'
+        '<div><div class="t1">Orchestration · GitHub Actions</div>'
+        '<div class="t2"><b>Free plan:</b> runs pipeline.py every business day at 16:00, skips holidays and checks the row at 17:00.'
+        '<br>Tests every push in CI. FastAPI + Docker stay optional for a future server.</div></div></div>'
     )
 
     return (
