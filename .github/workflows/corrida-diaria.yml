@@ -8,8 +8,8 @@
 # Con la variable en si, dejá de correr el notebook: no respeta el candado que
 # evita dos corridas el mismo día. Pasos completos: docs/programacion-y-monitoreo.md.
 #
-# El horario está en UTC, no en hora argentina: 20:13 UTC son las 17:13 en
-# Argentina. Va a los 13 minutos y no en punto porque GitHub recomienda evitar el
+# El horario está en UTC, no en hora argentina: 19:30 UTC son las 16:30 en
+# Argentina. Va a la media y no en punto porque GitHub recomienda evitar el
 # comienzo de cada hora, cuando más se atrasan las corridas programadas.
 #
 # El repo es público, así que el log de cada corrida también lo es. GitHub tapa
@@ -31,7 +31,7 @@ on:
         type: boolean
         default: false
   schedule:
-    - cron: "13 20 * * 1-5"   # 17:13 en Argentina (UTC-3), de lunes a viernes
+    - cron: "30 19 * * 1-5"   # 16:30 en Argentina (UTC-3), de lunes a viernes
 
 permissions:
   contents: write  # para el commit de Previews/ y la rama del PowerPoint

@@ -5,8 +5,10 @@
 #
 # Se prende con el mismo interruptor que la corrida: la variable del repo
 # CORRIDA_AUTOMATICA en si. A mano se puede correr siempre y, si no se pide lo
-# contrario, sin mandar el mail de alerta. Corre a las 19:43 de Argentina (22:43
-# UTC), después de la corrida de las 17:13: antes, la fila todavía no existe.
+# contrario, sin mandar el mail de alerta. Corre a las 17:00 de Argentina (20:00
+# UTC), media hora después de la corrida de las 16:30: antes, la fila todavía no
+# existe. Si GitHub atrasa mucho la corrida, este control puede avisar de más:
+# conviene mirar Actions antes de correr nada a mano.
 name: Control diario
 
 on:
@@ -17,7 +19,7 @@ on:
         type: boolean
         default: false
   schedule:
-    - cron: "43 22 * * 1-5"   # 19:43 en Argentina (UTC-3), de lunes a viernes
+    - cron: "0 20 * * 1-5"    # 17:00 en Argentina (UTC-3), de lunes a viernes
 
 permissions:
   contents: read
