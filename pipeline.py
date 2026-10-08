@@ -393,7 +393,8 @@ def _etapas(opciones: Opciones, deps: Dependencias, registro: _Registro, engine,
         opciones, deps, registro, fecha, comienzo, df, df_base, inflacion_12, fwd_oficial, fwd_blue,
         parrafo, texto_ia, comentarios, generados, explicaciones,
     )
-    deck = _etapa_presentacion(registro, carpeta, df_base, parrafo, comentarios, generados, explicaciones)
+    deck = _etapa_presentacion(registro, carpeta, df_base, parrafo, comentarios, generados, explicaciones,
+                               inflacion=inflacion, btc=btc_df)
     _etapa_previews(opciones, deps, registro, carpeta, deck, fecha)
     _etapa_series(opciones, deps, registro, engine, fecha, series)
 
@@ -690,7 +691,7 @@ def _etapa_mail(
 
 def _etapa_presentacion(
     registro: _Registro, carpeta: Path, df_base, parrafo: str, comentarios: dict, generados: dict[str, Path],
-    explicaciones: dict | None = None,
+    explicaciones: dict | None = None, inflacion=None, btc=None,
 ) -> Path | None:
     """El PowerPoint del día, con los datos, los textos de IA y los gráficos de esta corrida.
 
@@ -707,6 +708,7 @@ def _etapa_presentacion(
         try:
             ruta = presentacion.armar(
                 df_base, generados, carpeta, parrafo=parrafo, comentarios=comentarios, explicaciones=explicaciones,
+                inflacion=inflacion, btc=btc,
             )
         except Exception as exc:
             log.exception("No se pudo armar la presentación")

@@ -722,7 +722,7 @@ def test_dry_run_arma_la_presentacion_en_la_salida_y_no_en_previews(entorno):
     r = pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida), deps)
 
     assert _estados(r)["presentacion"] == "ok"
-    assert len(_diapositivas(salida / presentacion.ARCHIVO)) == 8
+    assert len(_diapositivas(salida / presentacion.ARCHIVO)) == 9
     assert not (pipeline.PREVIEWS / presentacion.ARCHIVO).exists()
 
 
@@ -744,7 +744,7 @@ def test_la_presentacion_lleva_los_textos_de_esta_corrida(entorno):
 
     textos = _diapositivas(salida / presentacion.ARCHIVO)
     assert _secciones().resumen in textos[2]
-    assert _secciones().paralelas in textos[3] and _secciones().btc in textos[5]
+    assert _secciones().paralelas in textos[2] and _secciones().btc in textos[5]
 
 
 def test_si_la_presentacion_falla_es_advertencia_y_el_mail_sale(entorno, monkeypatch):
