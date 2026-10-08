@@ -76,6 +76,8 @@ def armar_explicaciones(fecha_reporte: dt.date, cids: list[str]) -> dict:
     series, provisorios = {}, set()
     try:
         series.update(agregados.descargar(desde=indicadores.desde(fecha_reporte), claves=CLAVES_FRASES))
+        series.update(agregados.descargar(desde=indicadores.desde_comparaciones(fecha_reporte),
+                                          claves=list(indicadores.CLAVES_COMPARACIONES)))
     except Exception as exc:
         print(f"  ⚠️ Sin series del BCRA para las explicaciones: {exc}")
     try:

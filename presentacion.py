@@ -216,7 +216,11 @@ def armar(
         textos = list(comentarios.get(cid, [])) if cid else []
         explicacion = explicaciones.get(cid) if cid else None
         if explicacion:
-            textos.append((explicacion["titulo"], "\n\n".join(filter(None, [explicacion["texto"], explicacion["dato"]]))))
+            # El texto completo no entra al costado del gráfico: en la diapositiva van los
+            # datos del día y "lo ideal" (el último párrafo); todo lo demás, en las notas
+            parrafos = explicacion["texto"].split("\n")
+            textos.append((explicacion["titulo"], "\n\n".join(filter(None, [explicacion["dato"], parrafos[-1]]))))
+            slide.notes_slide.notes_text_frame.text = "\n\n".join(filter(None, [*parrafos, explicacion["dato"]]))
         cuerpo = "\n\n".join(f"{t.upper()}\n{x}" for t, x in textos)
 
         if len(presentes) > 1:

@@ -75,7 +75,7 @@ def entorno(historico, resultados, btc_crudo, tmp_path, monkeypatch):
         alertar_scraper=lambda exc: hechos["alertas"].append("scraper") or True,
         alertar_validacion=lambda exc: hechos["alertas"].append("validacion") or True,
         tabla_series=lambda engine: False,
-        descargar_series=lambda desde: dict(del_bcra),
+        descargar_series=lambda desde, claves=None: dict(del_bcra),
         descargar_deuda=lambda: (series[agregados.DEUDA_BRUTA.clave], provisorios),
         columna_secciones=lambda engine: False,
         limpiar_secciones=lambda engine, fecha: hechos["limpiezas"].append(fecha) or 1,
@@ -304,7 +304,7 @@ def test_series_se_guardan_cuando_existe_la_tabla(entorno):
     deps = replace(
         deps,
         tabla_series=lambda engine: True,
-        descargar_series=lambda desde: _series_falsas(),
+        descargar_series=lambda desde, claves=None: _series_falsas(),
         guardar_series=lambda engine, serie, puntos: guardadas.append(serie.clave) or len(puntos),
     )
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
@@ -316,7 +316,7 @@ def test_series_se_guardan_cuando_existe_la_tabla(entorno):
 def test_una_falla_en_las_series_no_pone_la_corrida_en_rojo(entorno):
     deps, hechos, salida = entorno
 
-    def descargar(desde):
+    def descargar(desde, claves=None):
         raise ScraperError("BCRA", "leer agregados monetarios", TimeoutError("timeout"))
 
     deps = replace(deps, tabla_series=lambda engine: True, descargar_series=descargar,
@@ -517,7 +517,7 @@ def test_una_serie_rota_no_frena_a_las_demas(entorno):
     series = _series_falsas()
     series["m2"] = []  # discontinuada
     guardadas = []
-    deps = replace(deps, tabla_series=lambda engine: True, descargar_series=lambda desde: series,
+    deps = replace(deps, tabla_series=lambda engine: True, descargar_series=lambda desde, claves=None: series,
                    guardar_series=lambda engine, serie, puntos: guardadas.append(serie.clave) or len(puntos))
 
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
@@ -857,9 +857,10 @@ def test_los_graficos_nuevos_viajan_con_su_explicacion(entorno, monkeypatch):
     mensaje = hechos["mails"][0][0]
     assert _cids(mensaje) == [f"<image{i}>" for i in range(1, 7)]
     html = _html(mensaje)
-    assert indicadores.TEXTO_AGREGADOS in html and indicadores.TEXTO_DEUDA in html
+    for parrafo in (*indicadores.TEXTO_AGREGADOS.split("\n"), *indicadores.TEXTO_DEUDA.split("\n")):
+        assert parrafo in html
     assert "descontada la inflación, las dos cayeron." in html
-    assert "la deuda bruta del Tesoro era de USD 484,9 mil millones" in html
+    assert "Deuda bruta del Tesoro a fines de agosto de 2026 (dato provisorio): USD 484,9 mil millones" in html
 
 
 def test_sin_las_fuentes_el_mail_sale_sin_esos_graficos(entorno):
@@ -888,7 +889,7 @@ def test_sin_la_secretaria_el_grafico_de_deuda_sale_con_el_bcra(entorno):
     assert _estados(r)["indicadores"] == "advertencia" and _estados(r)["graficos"] == "ok"
     html = _html(hechos["mails"][0][0])
     assert "<image6>" in _cids(hechos["mails"][0][0])
-    assert "deuda bruta del Tesoro era de" not in html and "familias y empresas les debían a los bancos" in html
+    assert "Deuda bruta del Tesoro a fines de" not in html and "les deben a los bancos, al" in html
 
 
 def test_un_grafico_nuevo_que_falla_es_una_advertencia(entorno, monkeypatch):
@@ -909,12 +910,12 @@ def test_el_dry_run_baja_los_indicadores_pero_no_los_guarda(entorno):
     original = deps.descargar_series
     deps = replace(
         deps, tabla_series=lambda engine: True,
-        descargar_series=lambda desde: bajadas.append(desde) or original(desde),
+        descargar_series=lambda desde, claves=None: bajadas.append(desde) or original(desde),
         guardar_series=lambda engine, serie, puntos: guardadas.append(serie.clave) or len(puntos),
     )
     r = pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida), deps)
     assert _estados(r)["indicadores"] == "ok" and _estados(r)["series"] == "omitida"
-    assert bajadas == [indicadores.desde(HOY)] and guardadas == []
+    assert bajadas == [indicadores.desde(HOY), indicadores.desde_comparaciones(HOY)] and guardadas == []
 
 
 def test_series_diarias_desde_el_corte_y_mensuales_enteras(entorno):
@@ -955,14 +956,14 @@ def test_si_las_frases_fallan_el_mail_sale_con_los_textos_fijos(entorno, monkeyp
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
 
     assert len(hechos["mails"]) == 2 and r.estado != "error"
-    assert indicadores.TEXTO_DEUDA in _html(hechos["mails"][0][0])
+    assert indicadores.TEXTO_DEUDA.split("\n")[0] in _html(hechos["mails"][0][0])
 
 
 def test_falta_una_serie_del_bcra_y_se_avisa(entorno):
     deps, hechos, salida = entorno
     original = deps.descargar_series
 
-    def sin_m3(desde):
+    def sin_m3(desde, claves=None):
         series = dict(original(desde))
         series.pop("m3", None)
         return series

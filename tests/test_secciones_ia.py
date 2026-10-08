@@ -138,7 +138,7 @@ def test_los_comentarios_van_debajo_de_su_grafico_y_escapados(df, resultados):
     html = email_report.renderizar(df, inflacion_12, 1.0, 1.0, "x", 1.0, comentarios=comentarios)
 
     i1, i2, i4 = html.index("cid:image1"), html.index("cid:image2"), html.index("cid:image4")
-    assert i1 < html.index("Cotizaciones paralelas") < html.index("Riesgo país</b>") < i2
+    assert i1 < html.index("Cotizaciones paralelas") < html.index("Riesgo país</div>") < i2
     assert html.index("Bitcoin") > i4
     assert "BTC &lt;b&gt;sube&lt;/b&gt;" in html
 
