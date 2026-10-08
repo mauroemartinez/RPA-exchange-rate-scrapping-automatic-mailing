@@ -22,12 +22,12 @@
 The pipeline rebuilds a nine-slide PowerPoint every business day and keeps only the latest one, on the [`reporte-ejecutivo`](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/tree/reporte-ejecutivo) branch.
 
 <p align="center">
-  <a href="https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/raw/reporte-ejecutivo/Reporte%20Ejecutivo.pptx">
+  <a href="https://view.officeapps.live.com/op/view.aspx?src=https%3A%2F%2Fraw.githubusercontent.com%2Fmauroemartinez%2FRPA-exchange-rate-scrapping-automatic-mailing%2Freporte-ejecutivo%2FReporte%2520Ejecutivo.pptx">
     <img src="https://raw.githubusercontent.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/main/Assets/Presentacion.jpg" width="900" alt="Executive deck: the nine slides">
   </a>
 </p>
 
-**[⬇️ Download today's deck](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/raw/reporte-ejecutivo/Reporte%20Ejecutivo.pptx)**
+**[▶️ View today's deck online](https://view.officeapps.live.com/op/view.aspx?src=https%3A%2F%2Fraw.githubusercontent.com%2Fmauroemartinez%2FRPA-exchange-rate-scrapping-automatic-mailing%2Freporte-ejecutivo%2FReporte%2520Ejecutivo.pptx)** · [⬇️ Download the .pptx](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/raw/reporte-ejecutivo/Reporte%20Ejecutivo.pptx)
 
 ---
 
