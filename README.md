@@ -27,14 +27,7 @@ Below is the end-to-end blueprint of the production data life cycle.
   <img src="https://raw.githubusercontent.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/main/Assets/Architecture.png" width="900" alt="Project Architecture">
 </p>
 
-### 🗓️ A Business Day, Step by Step
-GitHub Actions runs `pipeline.py` every business day: twelve stages, from the run lock to the warehouse, each one reporting its state and duration.
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/main/Assets/Architecture_opcion2.png" width="900" alt="Daily run on GitHub Actions">
-</p>
-
-Both diagrams are generated from `Assets/arquitectura/construir.py`, so they can be updated without redrawing them.
+The diagram is generated from `Assets/arquitectura/construir.py`, so it can be updated without redrawing it.
 
 ---
 
