@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         /* RESET Y BASE */
-        body { background-color: #2c3e50; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+        body { background-color: #1a252f; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
 
         /* CONTENEDOR PRINCIPAL - clave para mobile */
         .container {
@@ -22,11 +22,12 @@
 
         /* TABLAS - scroll horizontal en mobile */
         .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        table { border-collapse: collapse; width: 100%; min-width: 400px; margin: 12px 0; border: 1px solid #dcdde1;
+        /* Solo las tablas de datos: las de maquetación no llevan borde, ni ancho mínimo, ni filas grises */
+        .table-wrapper table { border-collapse: collapse; width: 100%; min-width: 400px; margin: 12px 0; border: 1px solid #dcdde1;
                 box-shadow: 0 2px 6px rgba(44,62,80,0.16); }
-        table td, table th { font-size: 8px !important; padding: 4px 2px; text-align: center; border: 1px solid #dcdde1; }
-        th { background-color: #2c3e50; color: #ffffff; text-transform: uppercase; }
-        tr:nth-child(even) { background-color: #f8f9fa; }
+        .table-wrapper table td, .table-wrapper table th { font-size: 8px !important; padding: 4px 2px; text-align: center; border: 1px solid #dcdde1; }
+        .table-wrapper th { background-color: #2c3e50; color: #ffffff; text-transform: uppercase; }
+        .table-wrapper tr:nth-child(even) { background-color: #f8f9fa; }
 
         /* Inflación (4 columnas) y Variaciones (7) entran cómodas a 12px.
            Cotizaciones tiene 14 columnas: a 12px se pasa del ancho del mail, así
@@ -42,7 +43,7 @@
         .grafico { box-shadow: 0 2px 6px rgba(44,62,80,0.16); }
 
         /* HEADER */
-        .header-box { background: #2c3e50; color: white; padding: 20px 15px; text-align: center; }
+        .header-box { background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%); color: white; padding: 20px 15px; text-align: center; }
         .header-box h2 { color: white; font-size: 18px; margin: 0; }
 
         /* PÁRRAFO IA */
@@ -54,10 +55,10 @@
             margin: 20px 0;
         }
         .ai-box .ai-label {
-            font-size: 10px !important;
+            font-size: 11px !important;
             color: #f39c12;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             font-weight: bold;
             margin-bottom: 8px;
             text-align: left !important;
@@ -83,16 +84,17 @@
         }
     </style>
 </head>
-<body style="margin:0; padding:0; background-color:#2c3e50; font-family:Arial,sans-serif;">
-<table width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#2c3e50">
+<body style="margin:0; padding:0; background-color:#1a252f; font-family:Arial,sans-serif;">
+<table width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#1a252f" style="background-color:#1a252f; table-layout:fixed;">
   <tr>
     <td align="center" style="padding:20px 10px;">
-      <table class="container" width="800" border="0" cellspacing="0" cellpadding="0" bgcolor="#ffffff" style="max-width:800px; width:100%; border-radius:8px; overflow:hidden;">
+      <table class="container" width="800" border="0" cellspacing="0" cellpadding="0" bgcolor="#ffffff" style="max-width:800px; width:100%; border-radius:8px; overflow:hidden; table-layout:fixed;">
 
         <!-- HEADER -->
         <tr>
-          <td class="header-box" style="background-color:#2c3e50; padding:20px; text-align:center;">
+          <td class="header-box" bgcolor="#1a252f" style="background-color:#1a252f; background:linear-gradient(135deg,#1a252f 0%,#2c3e50 100%); padding:20px; text-align:center;">
             <h2 style="margin:0; color:white;">📊 Reporte Macroeconómico Diario</h2>
+            <div class="firma" style="margin:6px 0 0 0; font-size:11px !important; color:#bdc3c7; text-align:center !important;">por <a href="https://linkedin.com/in/mauroemartinez/" style="color:#ecf0f1; text-decoration:none;"><b style="color:#ecf0f1;">Mauro E. Martinez</b></a> · <a href="https://www.globalaize.com" style="color:#f39c12; text-decoration:none;"><b style="color:#f39c12;">Globalaize</b></a></div>
           </td>
         </tr>
 
@@ -108,30 +110,30 @@
             <p style="margin:0 0 15px 0; font-size:14px !important; color:#2c3e50;">📅 <b>RESUMEN EJECUTIVO DE MERCADO</b></p>
 
             <div style="margin-bottom:15px;">
-              <span style="font-size:11px; color:#7f8c8d; text-transform:uppercase;">💰 Oportunidad de Arbitraje (Cupo USD 100)</span><br>
+              <span style="font-size:11px; color:#5d6d7e; text-transform:uppercase;">💰 Oportunidad de Arbitraje (Cupo USD 100)</span><br>
               • Costo Blue: <span style="color:#c0392b; font-weight:bold;">$ 155,500.00</span><br>
               • Costo Oficial (impuestos inc.): $ 198,900.00<br>
               • <b>Sobrecosto estimado: <span style="color:#c0392b; font-size:14px;">$ -43,400.00</span></b>
             </div>
 
             <div style="margin-bottom:15px;">
-              <span style="font-size:11px; color:#7f8c8d; text-transform:uppercase;">📊 Variaciones y Brechas</span><br>
+              <span style="font-size:11px; color:#5d6d7e; text-transform:uppercase;">📊 Variaciones y Brechas</span><br>
               • Dólar Blue 💵: <b>-3.46%</b> (Brecha: -27.91%)<br>
               • Dólar Divisas: -3.88%<br>
               • Euro Blue 💶: -1.52% (Brecha c/ Dólar Blue: 13.36%)
             </div>
 
             <div style="margin-bottom:20px;">
-              <span style="font-size:11px; color:#7f8c8d; text-transform:uppercase;">🔮 Proyecciones y Riesgo</span><br>
+              <span style="font-size:11px; color:#5d6d7e; text-transform:uppercase;">🔮 Proyecciones y Riesgo</span><br>
               • Fwd Oficial: <b>$ 1,821.33</b> | Fwd Blue 💸: <b>$ 1,851.09</b><br>
               • Riesgo País ☣️: <b>590 pts</b> (Sobretasa: 5.90%)
             </div>
 
             <!-- PÁRRAFO IA -->
-            <div class="ai-box" style="background:linear-gradient(135deg,#1a252f 0%,#2c3e50 100%); border-left:4px solid #f39c12; border-radius:6px; padding:16px 18px; margin:20px 0;">
-              <div class="ai-label" style="font-size:10px; color:#f39c12; text-transform:uppercase; letter-spacing:1px; font-weight:bold; margin-bottom:8px;">🤖 Análisis IA · Gemini</div>
+            <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="width:100%; margin:20px 0; border-collapse:separate;"><tr><td class="ai-box" bgcolor="#1a252f" style="background-color:#1a252f; background:linear-gradient(135deg,#1a252f 0%,#2c3e50 100%); border:1px solid #3d5166; border-left:4px solid #f39c12; border-radius:6px; padding:16px 18px; text-align:left;">
+              <div class="ai-label" style="font-size:11px; color:#f39c12; text-transform:uppercase; letter-spacing:0.5px; font-weight:bold; margin-bottom:8px;">🤖 Análisis IA · Gemini</div>
               <p style="color:#ecf0f1 !important; font-size:13px !important; line-height:1.7; margin:0;">Párrafo de prueba con &lt;, &amp; y &#34;comillas&#34;.</p>
-            </div>
+            </td></tr></table>
 
             <!-- GRÁFICOS -->
             <div style="text-align:center; width:100%; margin:20px 0;">
@@ -141,6 +143,11 @@
               <img src='cid:image4' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
               <img src='cid:image5' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
               <img src='cid:image6' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+            </div>
+
+            <!-- APOYO: después de los gráficos, donde todavía se lee -->
+            <div class="apoyo" style="margin:0 0 22px 0; padding:12px 16px; background-color:#fef6e9; border:1px solid #f5d9a8; border-radius:6px;">
+              <span style="font-size:13px; color:#2c3e50;">☕ ¿Te sirvió el reporte? Podés apoyar el proyecto al alias <b style="color:#2c3e50;">mauroemartinezmp</b></span>
             </div>
 
             <!-- TABLA COTIZACIONES -->
@@ -241,7 +248,7 @@
 
             <!-- FUENTES -->
             <div style="margin-top:30px; font-size:12px; color:#7f8c8d; border-top:1px solid #eee; padding-top:15px;">
-              <p><b><u>📚 Las fuentes consultadas fueron:</u></b><br>
+              <p style="overflow-wrap:anywhere; word-break:break-word;"><b><u>📚 Las fuentes consultadas fueron:</u></b><br>
               <b>Cotizaciones oficiales: </b>https://www.bna.com.ar/Personas<br>
               <b>Cotizaciones paralelas: </b>https://dolarhoy.com/cotizaciondolarblue<br>
               <b>Cotización Dólar MEP: </b>https://www.ambito.com/contenidos/dolar-mep.html<br>
@@ -266,11 +273,13 @@
                    El #bdc3c7 que estaba antes daba 1.69:1, ilegible. -->
               <div style="background-color:#eef1f4; border:1px solid #dfe4ea; padding:18px 20px; border-radius:8px; margin:20px 0 0 0;">
                 <p style="margin:0 0 10px 0;">
-                  <a href="https://linkedin.com/in/mauroemartinez/" style="text-decoration:none; color:#0077b5;"><b>LinkedIn</b></a>
-                  | <a href="https://github.com/mauroemartinez/" style="text-decoration:none; color:#24292e;"><b>GitHub</b></a>
+                  <a href="https://linkedin.com/in/mauroemartinez/" style="text-decoration:none; color:#0077b5;"><b style="color:#0077b5;">LinkedIn</b></a>
+                  | <a href="https://github.com/mauroemartinez/" style="text-decoration:none; color:#24292e;"><b style="color:#24292e;">GitHub</b></a>
                 </p>
-                <p style="margin:0 0 3px 0; font-size:12px !important; color:#4d5a68;">
-                  ☕ Si este reporte te ahorró tiempo y/o dinero, podés apoyar el proyecto al alias: <b style="color:#2c3e50;">mauroemartinezmp</b>
+                <p style="margin:0 0 10px 0;">
+                  🌐 <b style="color:#2c3e50;">Globalaize:</b>
+                  <a href="https://www.globalaize.com" style="text-decoration:none; color:#1f6391;"><b style="color:#1f6391;">www.globalaize.com</b></a>
+                  | <a href="https://www.linkedin.com/company/globalaize" style="text-decoration:none; color:#0077b5;"><b style="color:#0077b5;">LinkedIn</b></a>
                 </p>
 
                 <!-- Sin separador ni padding entre esta línea y la anterior: la

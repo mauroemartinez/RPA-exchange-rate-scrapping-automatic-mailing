@@ -114,5 +114,5 @@ def test_sin_las_fuentes_de_las_frases_los_graficos_van_con_su_texto_fijo(monkey
     monkeypatch.setattr(reenvio_manual.finanzas, "descargar", caida)
     _correr(monkeypatch, "a@example.com")
     html = enviados[0][0].get_payload()[0].get_payload(decode=True).decode()
-    assert indicadores.TEXTO_DEUDA in html and "deuda bruta del Tesoro era de" not in html
+    assert indicadores.TEXTO_DEUDA.split("\n")[0] in html and "Deuda bruta del Tesoro a fines de" not in html
     assert "contra una inflación interanual de" in html  # la de agregados sí tiene sus series

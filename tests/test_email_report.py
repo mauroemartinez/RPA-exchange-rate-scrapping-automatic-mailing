@@ -166,7 +166,7 @@ def test_la_explicacion_va_debajo_de_su_grafico(df, inflacion_12):
     html = er.renderizar(df, inflacion_12, 2000.0, 2100.0, "x", 1.0, graficos=["image1", "image5"],
                          explicaciones=explicaciones)
     assert html.index("cid:image1") < html.index("cid:image5") < html.index('class="explicacion"')
-    assert "Texto con &lt;b&gt; &amp; más" in html and "<b style=\"color:#1a252f;\">Dato del día.</b>" in html
+    assert "Texto con &lt;b&gt; &amp; más" in html and "📌 Dato del día.</p>" in html
 
     sin_dato = {"image5": {**explicaciones["image5"], "dato": None}}
     html = er.renderizar(df, inflacion_12, 2000.0, 2100.0, "x", 1.0, graficos=["image5"], explicaciones=sin_dato)
@@ -178,3 +178,22 @@ def test_sin_explicaciones_el_html_no_cambia(df, inflacion_12):
     otra = er.renderizar(df, inflacion_12, 2000.0, 2100.0, "x", 1.0, graficos=["image1", "image2"],
                          explicaciones={"image5": {"titulo": "t", "texto": "x", "dato": None}})
     assert 'class="explicacion"' not in base and base == otra
+
+
+def test_las_tarjetas_de_ia_y_explicaciones_tienen_el_mismo_look(df, inflacion_12):
+    """El párrafo de IA, los comentarios y las explicaciones: el mismo fondo oscuro y borde naranja."""
+    explicaciones = {"image5": {"titulo": "Agregados", "texto": "Uno\nDos", "dato": "Dato A\nDato B"}}
+    comentarios = {"image1": [("Paralelas", "Comentario")]}
+    html = er.renderizar(df, inflacion_12, 2000.0, 2100.0, "x", 1.0, graficos=["image1", "image5"],
+                         comentarios=comentarios, explicaciones=explicaciones)
+    for clase in ('class="ai-box"', 'class="comentario-ia"', 'class="explicacion"'):
+        caja = html[html.index(clase):html.index(clase) + 400]
+        assert "#1a252f" in caja and "border-left:4px solid #f39c12" in caja
+    # Cada renglón del texto y del dato, en su propio párrafo
+    assert ">Uno</p>" in html and ">Dos</p>" in html and "📌 Dato A</p>" in html and "📌 Dato B</p>" in html
+
+
+def test_el_cierre_lleva_globalaize(df, inflacion_12):
+    html = er.renderizar(df, inflacion_12, 2000.0, 2100.0, "x", 1.0)
+    assert 'href="https://www.globalaize.com"' in html
+    assert 'href="https://www.linkedin.com/company/globalaize"' in html

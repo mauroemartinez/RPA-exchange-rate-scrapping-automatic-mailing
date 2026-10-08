@@ -129,7 +129,10 @@ def test_agregados_y_deuda_llevan_su_explicacion(historico, imagenes, tmp_path, 
     # Sin explicaciones (el script manual): el texto fijo, sin la frase con datos
     prs = Presentation(presentacion.armar(historico, imagenes, tmp_path))
     assert indicadores.TITULO_AGREGADOS.upper() in _textos(prs.slides[6])
-    assert indicadores.TEXTO_DEUDA in _textos(prs.slides[7])
+    # En la diapositiva, "lo ideal" (el último párrafo); el texto completo, en las notas
+    assert indicadores.TEXTO_DEUDA.split("\n")[-1] in _textos(prs.slides[7])
+    notas = prs.slides[7].notes_slide.notes_text_frame.text
+    assert all(parrafo in notas for parrafo in indicadores.TEXTO_DEUDA.split("\n"))
 
     # Con las de la corrida, también la frase con los últimos datos
     series, provisorios = series_indicadores

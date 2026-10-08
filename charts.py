@@ -725,8 +725,9 @@ def grafico_deuda(datos: dict, carpeta: Path) -> Path:
             firmes, prov = tesoro[~tesoro["provisorio"]], tesoro[tesoro["provisorio"]]
             ax[0].plot(firmes["Mes"], firmes["miles_de_millones"], linestyle="none", marker="o", markersize=6, color=color)
             if not prov.empty:
-                ax[0].plot(prov["Mes"], prov["miles_de_millones"], linestyle="none", marker="o", markersize=7,
-                           markerfacecolor="white", markeredgecolor=color, markeredgewidth=1.8, label="Provisorio")
+                ax[0].plot(prov["Mes"], prov["miles_de_millones"], linestyle="none", marker="o", markersize=10,
+                           markerfacecolor="white", markeredgecolor="#e67e22", markeredgewidth=2.2,
+                           label="Provisorio (puede corregirse)", zorder=5)
             _anotar_ultimo(ax[0], tesoro["Mes"], tesoro["miles_de_millones"], color)
             ax[0].xaxis.set_major_locator(mdates.MonthLocator(interval=2))
         ax[0].set_title("Deuda bruta del Tesoro nacional, a fin de cada mes", fontweight="bold", fontsize=12)

@@ -558,6 +558,19 @@ def _etapa_indicadores(deps: Dependencias, registro: _Registro, fecha: date) -> 
                 avisos.append(str(exc))
                 del series[clave]
 
+        # Historia larga solo para comparar la deuda contra hace 4, 8 y 12 años. Si no
+        # llega o no valida, quedan las de dos años: la frase sale sin esas comparaciones
+        if all(clave in series for clave in indicadores.CLAVES_COMPARACIONES):
+            try:
+                largas = deps.descargar_series(indicadores.desde_comparaciones(fecha),
+                                               claves=list(indicadores.CLAVES_COMPARACIONES))
+                for clave in indicadores.CLAVES_COMPARACIONES:
+                    transformations.validar_serie(agregados.CATALOGO[clave], largas[clave], fecha)
+            except Exception as exc:
+                log.warning("Sin historia larga para comparar la deuda: %s", exc)
+            else:
+                series.update({clave: largas[clave] for clave in indicadores.CLAVES_COMPARACIONES})
+
         e.detalle = f"{len(series)} series" + "".join(f"; {a}" for a in avisos)
         if avisos:
             e.estado = ADVERTENCIA
