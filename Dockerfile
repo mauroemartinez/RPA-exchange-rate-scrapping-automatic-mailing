@@ -9,7 +9,7 @@ FROM python:3.14-slim
 # PLAYWRIGHT_BROWSERS_PATH: ruta fija y compartida, para que el navegador quede
 #   accesible cuando el proceso deje de correr como root.
 # TZ: la hora de los logs, en Argentina. La fecha de cada fila NO depende de
-#   esto: fechas.py la calcula siempre en America/Argentina/Buenos_Aires, así una
+#   esto: reporte/fechas.py la calcula siempre en America/Argentina/Buenos_Aires, así una
 #   corrida después de las 21:00 no queda estampada con el día siguiente.
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

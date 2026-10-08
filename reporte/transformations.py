@@ -11,8 +11,8 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from fechas import mes_abreviado
-from models import COLUMNAS_FILA, FilaMacro
+from reporte.fechas import mes_abreviado
+from reporte.models import COLUMNAS_FILA, FilaMacro
 
 
 @dataclass(frozen=True)

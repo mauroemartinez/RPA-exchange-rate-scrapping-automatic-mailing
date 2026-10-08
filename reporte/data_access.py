@@ -26,8 +26,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Engine
 
-from config import settings
-from models import COLUMNAS_FILA, COLUMNAS_VALORES
+from reporte.config import settings
+from reporte.models import COLUMNAS_FILA, COLUMNAS_VALORES
 
 log = logging.getLogger(__name__)
 

@@ -23,11 +23,8 @@ sys.path.insert(0, str(RAIZ))
 
 import pandas as pd
 
-import charts
-import data_access
-import fechas
-import transformations
-from scrapers import agregados, finanzas
+from reporte import charts, data_access, fechas, transformations
+from reporte.scrapers import agregados, finanzas
 
 # Para el gráfico alcanzan dos años de variación interanual, o sea tres de datos
 ANIOS_GRAFICO = 3

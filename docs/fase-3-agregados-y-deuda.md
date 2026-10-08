@@ -36,11 +36,11 @@ Por qué estas y no otras:
 
 | Pieza | Qué hace |
 |---|---|
-| `scrapers/agregados.py` | Catálogo de las series (clave, id, frecuencia, unidad) y descarga en paralelo, con paginación para traer la historia completa |
-| `transformations.py` | `validar_serie` (vacía, fechas desordenadas, valores no finitos o no positivos, dato atrasado), `variacion_interanual`, `interanual_por_fecha` |
-| `data_access.py` | Tabla `Fact_Series_Macro` y su upsert, que solo reescribe valores que cambiaron (el BCRA revisa datos ya publicados) |
+| `reporte/scrapers/agregados.py` | Catálogo de las series (clave, id, frecuencia, unidad) y descarga en paralelo, con paginación para traer la historia completa |
+| `reporte/transformations.py` | `validar_serie` (vacía, fechas desordenadas, valores no finitos o no positivos, dato atrasado), `variacion_interanual`, `interanual_por_fecha` |
+| `reporte/data_access.py` | Tabla `Fact_Series_Macro` y su upsert, que solo reescribe valores que cambiaron (el BCRA revisa datos ya publicados) |
 | `sql/06_series_macro.sql` | La migración: formato largo `(serie, Fecha)`, con unidad, frecuencia y fuente; RLS activado como en `Fact_Mercado_Macro` |
-| `charts.py` | `grafico_agregados`: niveles del último año en billones de ARS y variación interanual contra la inflación |
+| `reporte/charts.py` | `grafico_agregados`: niveles del último año en billones de ARS y variación interanual contra la inflación |
 | `pipeline.py` | Etapa `indicadores`: baja las series para los gráficos. Etapa `series`: guarda lo que bajó `indicadores` (de las diarias, los últimos 120 días), sin volver a pedirlo. Cada serie se valida y se guarda por separado, así que una discontinuada no frena a las demás. Sin la tabla se omite con un aviso; si falla, queda como advertencia y no pone la corrida en rojo |
 | `scripts/agregados_monetarios.py` | Resumen por serie y gráfico de prueba; con `--guardar`, carga toda la historia |
 
@@ -52,7 +52,7 @@ En el último año todos los agregados crecieron por debajo de la inflación int
 
 ### En el mail
 
-El gráfico va en el mail diario (`Agregados Monetarios.jpg`), con un texto fijo que explica qué es cada agregado y cómo leer el gráfico. Lo acompaña una frase calculada en Python con los últimos datos y sus fechas (`indicadores.py`), por ejemplo:
+El gráfico va en el mail diario (`Agregados Monetarios.jpg`), con un texto fijo que explica qué es cada agregado y cómo leer el gráfico. Lo acompaña una frase calculada en Python con los últimos datos y sus fechas (`reporte/indicadores.py`), por ejemplo:
 
 > En el último año la base monetaria creció 14,0% (al 02/10/2026) y el M2 creció 20,9% (al 01/10/2026), contra una inflación interanual de 33,5% en agosto de 2026: descontada la inflación, las dos cayeron.
 
@@ -94,7 +94,7 @@ La recomendación fue **C y D ya**, porque salen de la misma API con el mismo c�
 
 Lo que quedó afuera: la posición neta de pases (BCRA 1261) está en cero desde hace más de un año.
 
-La deuda bruta sale del Excel mensual de la Secretaría (`scrapers/finanzas.py`). Como el nombre del archivo cambia cada mes, primero se lee la página de datos y se toma el link de la fila "Serie mensual". La planilla se lee por rótulos y no por posiciones. Los últimos meses vienen como provisorios y se marcan en el gráfico con puntos huecos. Si el rótulo, la unidad o el rango de valores no son los esperados, la lectura levanta en vez de devolver un número mal leído.
+La deuda bruta sale del Excel mensual de la Secretaría (`reporte/scrapers/finanzas.py`). Como el nombre del archivo cambia cada mes, primero se lee la página de datos y se toma el link de la fila "Serie mensual". La planilla se lee por rótulos y no por posiciones. Los últimos meses vienen como provisorios y se marcan en el gráfico con puntos huecos. Si el rótulo, la unidad o el rango de valores no son los esperados, la lectura levanta en vez de devolver un número mal leído.
 
 El gráfico (`Deuda en Dólares.jpg`) tiene tres paneles, en miles de millones de USD:
 

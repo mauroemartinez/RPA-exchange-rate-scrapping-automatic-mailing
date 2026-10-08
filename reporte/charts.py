@@ -26,12 +26,13 @@ import matplotlib.patheffects as pe
 import pandas as pd
 import seaborn as sns
 from matplotlib.artist import setp
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 
-import transformations
-from fechas import mes_abreviado
-from transformations import etiqueta_mes
+from reporte import transformations
+from reporte.fechas import mes_abreviado
+from reporte.transformations import etiqueta_mes
 
 log = logging.getLogger(__name__)
 
@@ -113,8 +114,34 @@ def _step_riesgo_pais(valor_max: float) -> tuple[float, float]:
         return 500, 200
 
 
+PANELES_TIPOS_DE_CAMBIO = ("Paralelas.png", "Oficiales.png", "Riesgo País.png")
+
+
 def grafico_tipos_de_cambio(data: pd.DataFrame, carpeta: Path, n: int = COTIZACIONES_A_MOSTRAR) -> Path:
     """Cotizaciones paralelas, oficiales y riesgo país de las últimas n ruedas (celda 40)."""
+    return _dibujar_tipos_de_cambio(data, n, lambda fig, ax: _guardar(fig, carpeta, TIPOS_DE_CAMBIO))
+
+
+def paneles_tipos_de_cambio(data: pd.DataFrame, carpeta: Path, n: int = COTIZACIONES_A_MOSTRAR) -> list[Path]:
+    """Los tres paneles del gráfico de tipos de cambio, cada uno en su imagen, para la presentación.
+
+    Es el mismo dibujo que el del mail: cada panel se recorta con su título y su
+    leyenda, sin el título general. Quedan en PANELES_TIPOS_DE_CAMBIO, en ese orden.
+    """
+    def guardar(fig: Figure, ax) -> list[Path]:
+        fig.suptitle("")  # el título general no va: cada panel tiene el suyo
+        renderer = FigureCanvasAgg(fig).get_renderer()
+        rutas = []
+        for eje, nombre in zip(ax, PANELES_TIPOS_DE_CAMBIO):
+            caja = eje.get_tightbbox(renderer).transformed(fig.dpi_scale_trans.inverted()).padded(0.08)
+            rutas.append(_guardar(fig, carpeta, nombre, bbox_inches=caja, dpi=150))
+        return rutas
+
+    return _dibujar_tipos_de_cambio(data, n, guardar)
+
+
+def _dibujar_tipos_de_cambio(data: pd.DataFrame, n: int, al_terminar):
+    """Arma la figura de tres paneles y se la pasa, con sus ejes, a `al_terminar`, dentro del estilo base."""
     with _estilo_base():
         fig = Figure(figsize=(10, 14))
         ax = fig.subplots(3, 1, sharex=False)
@@ -255,7 +282,7 @@ def grafico_tipos_de_cambio(data: pd.DataFrame, carpeta: Path, n: int = COTIZACI
         ax[1].legend(prop={"size": 8}, loc="upper left", shadow=True)
 
         fig.tight_layout(pad=1)
-        return _guardar(fig, carpeta, TIPOS_DE_CAMBIO)
+        return al_terminar(fig, ax)
 
 
 # ── Variaciones acumuladas ───────────────────────────────────────────────────

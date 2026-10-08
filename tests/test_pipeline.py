@@ -9,14 +9,11 @@ from pathlib import Path
 
 import pytest
 
-import charts
-import ia_generator
-import indicadores
 import pipeline
-import presentacion
 from conftest import HOY, jpeg_minimo, series_sinteticas
-from scrapers import agregados
-from scrapers.utils import ScraperError
+from reporte import charts, ia_generator, indicadores, presentacion
+from reporte.scrapers import agregados
+from reporte.scrapers.utils import ScraperError
 
 # Los gráficos de agregados y deuda de verdad, para los tests que los dibujan: el
 # fixture los reemplaza por un .jpg mínimo para que el resto de los tests no tarde
@@ -333,7 +330,7 @@ def test_una_falla_en_las_series_no_pone_la_corrida_en_rojo(entorno):
 
 
 def _secciones():
-    from models import SeccionesIA
+    from reporte.models import SeccionesIA
 
     return SeccionesIA(
         resumen="Resumen estructurado del día, con la brecha entre el Blue y el MEP y la tendencia de las 25 ruedas.",
@@ -562,7 +559,7 @@ def test_previews_sin_cambios_queda_omitida(entorno):
 
 
 def test_un_push_que_falla_pone_la_corrida_en_rojo_con_una_alerta(entorno):
-    import preview_git
+    from reporte import preview_git
 
     deps, hechos, _ = entorno
 
@@ -705,7 +702,7 @@ def test_historico_desde_el_csv_es_una_advertencia(entorno, historico):
 
 def test_la_guarda_de_conftest_corta_las_fuentes_reales():
     """Si alguien saca la guarda, este test lo nota: el default de Dependencias saldría a Yahoo."""
-    from scrapers.utils import ScraperError
+    from reporte.scrapers.utils import ScraperError
 
     with pytest.raises(ScraperError, match="un test intentó bajar datos de Yahoo") as error:
         pipeline.Dependencias().descargar_btc(HOY - timedelta(days=30), HOY)
@@ -725,7 +722,7 @@ def test_dry_run_arma_la_presentacion_en_la_salida_y_no_en_previews(entorno):
     r = pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida), deps)
 
     assert _estados(r)["presentacion"] == "ok"
-    assert len(_diapositivas(salida / presentacion.ARCHIVO)) == 8
+    assert len(_diapositivas(salida / presentacion.ARCHIVO)) == 9
     assert not (pipeline.PREVIEWS / presentacion.ARCHIVO).exists()
 
 
@@ -747,7 +744,7 @@ def test_la_presentacion_lleva_los_textos_de_esta_corrida(entorno):
 
     textos = _diapositivas(salida / presentacion.ARCHIVO)
     assert _secciones().resumen in textos[2]
-    assert _secciones().paralelas in textos[3] and _secciones().btc in textos[5]
+    assert _secciones().paralelas in textos[2] and _secciones().btc in textos[5]
 
 
 def test_si_la_presentacion_falla_es_advertencia_y_el_mail_sale(entorno, monkeypatch):
@@ -932,7 +929,7 @@ def test_series_diarias_desde_el_corte_y_mensuales_enteras(entorno):
 
 
 def test_si_falla_el_push_de_los_graficos_igual_se_publica_la_presentacion(entorno):
-    import preview_git
+    from reporte import preview_git
 
     deps, hechos, _ = entorno
 

@@ -4,8 +4,8 @@ from datetime import date
 import httpx
 import pytest
 
-from scrapers import feriados
-from scrapers.utils import ScraperError, run_async
+from reporte.scrapers import feriados
+from reporte.scrapers.utils import ScraperError, run_async
 
 RESPUESTA = [
     {"fecha": "2026-10-12", "tipo": "trasladable", "nombre": "Día del Respeto a la Diversidad Cultural"},

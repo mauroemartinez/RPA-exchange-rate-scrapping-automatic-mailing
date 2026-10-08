@@ -4,7 +4,7 @@ Roadmap, fase 5: *evaluar la generación automática de un PowerPoint ejecutivo*
 
 Para evaluar con algo concreto se armó un prototipo de cada uno. **El PowerPoint ya es parte de la corrida diaria** (la decisión está abajo). **El dashboard sigue siendo un prototipo** que se corre a mano y solo lee; quedó para revisarlo más adelante.
 
-## PowerPoint: `presentacion.py`
+## PowerPoint: `reporte/presentacion.py`
 
 ```bash
 python scripts/presentacion_ejecutiva.py                # .pptx en una carpeta temporal
@@ -13,15 +13,18 @@ python scripts/presentacion_ejecutiva.py --salida DIR
 
 `python-pptx` es una dependencia de producción (`requirements.txt`): la corrida diaria lo necesita.
 
-Arma ocho diapositivas en 16:9 con lo que la corrida ya dejó:
+Arma nueve diapositivas en 16:9 con lo que la corrida ya dejó (diseño del 8 de octubre):
 
-- portada;
-- un tablero con blue, MEP, billete, riesgo país, BADLAR y el forward de Fisher, cada uno con su variación;
-- el párrafo de IA;
-- tres de gráficos: tipos de cambio y riesgo país, inflación con variaciones acumuladas, y BTC;
-- desde el 7 de octubre, agregados monetarios y endeudamiento en dólares, con la misma explicación para no especialistas que el mail.
+- portada con los temas del día, la moneda de BTC y los links del autor y de Globalaize;
+- un tablero con blue, MEP, billete, riesgo país, BADLAR y el forward de Fisher, cada uno con su variación: subir es rojo y bajar, verde, como en el mail;
+- tipos de cambio: el análisis de IA arriba y los paneles de paralelas y oficiales por separado, cada uno con su frase;
+- riesgo país, con su frase;
+- inflación con variaciones acumuladas, con una frase calculada en Python;
+- BTC en fondo negro, con su frase;
+- agregados monetarios y endeudamiento en dólares, con "Resumen del día" y "¿Qué sería lo ideal?";
+- fuentes y contacto, con los links y el alias, como el pie del mail.
 
-Si la fila tiene los comentarios por gráfico de la fase 4, van al lado de cada gráfico (debajo, en el de BTC). Usa los colores del mail. Con las ocho diapositivas pesa unos 640 KB: como vive en una rama que se reemplaza entera, ese peso no se acumula.
+Si la fila tiene los comentarios por gráfico de la fase 4, van al lado de cada gráfico (debajo, en el de BTC). Usa los colores del mail. Con las nueve diapositivas pesa unos 870 KB: como vive en una rama que se reemplaza entera, ese peso no se acumula.
 
 Lo que salió de la prueba, con los datos del 6 de octubre:
 
@@ -45,7 +48,7 @@ Muestra los indicadores del día, un período elegible (seis meses por defecto) 
 
 Decisiones del prototipo:
 
-- **No importa `config.py`.** `config` exige todas las credenciales del pipeline (mail, Gemini, FRED). Un dashboard publicado no tiene por qué tenerlas: le alcanza con `DASHBOARD_DB_URL`, la URL de un usuario de solo lectura, que toma de los secrets de Streamlit o del entorno. Si no está, usa `SUPABASE_DB_URL` (secrets, entorno o `.env`) y lo avisa en pantalla, para que nadie lo publique así sin darse cuenta.
+- **No importa `reporte/config.py`.** `config` exige todas las credenciales del pipeline (mail, Gemini, FRED). Un dashboard publicado no tiene por qué tenerlas: le alcanza con `DASHBOARD_DB_URL`, la URL de un usuario de solo lectura, que toma de los secrets de Streamlit o del entorno. Si no está, usa `SUPABASE_DB_URL` (secrets, entorno o `.env`) y lo avisa en pantalla, para que nadie lo publique así sin darse cuenta.
 - **Solo lee.** Cada consulta corre en una transacción `READ ONLY`, y el resultado se cachea una hora (`st.cache_data`), así que la base recibe a lo sumo una consulta por hora por proceso.
 - **También lee el CSV del mail** (`DASHBOARD_CSV=...`), sin base: sirve para explorar offline y es como lo prueban los tests.
 - **Dependencias aparte** (`dashboard/requirements.txt`): Streamlit trae pyarrow y altair, que el pipeline no necesita.

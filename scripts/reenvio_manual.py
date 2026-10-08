@@ -44,16 +44,9 @@ sys.path.insert(0, str(RAIZ))
 
 import pandas as pd
 
-import charts
-import data_access
-import email_report
-import fechas
-import ia_generator
-import indicadores
-import preview_git
-import transformations
-from config import settings
-from scrapers import agregados, finanzas
+from reporte import charts, data_access, email_report, fechas, ia_generator, indicadores, preview_git, transformations
+from reporte.config import settings
+from reporte.scrapers import agregados, finanzas
 
 # Las series que necesitan las frases de los gráficos de agregados y deuda
 # inflacion_mensual también: la frase compone la interanual igual que la tabla del mail
