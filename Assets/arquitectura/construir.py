@@ -12,7 +12,6 @@ salvo por las tipografías de Google Fonts.
 import base64
 import io
 import re
-import sys
 from pathlib import Path
 
 DIR = Path(__file__).resolve().parent
