@@ -56,7 +56,7 @@ def run_pipeline(x_api_key: str | None = Header(default=None), dry_run: bool = F
     # Falla cerrado: si no hay API key configurada, el endpoint no se habilita.
     # La versión anterior hacía `if API_KEY and ...`, o sea que un .env sin la
     # variable dejaba /run abierto a cualquiera.
-    # config.py ya convierte una key vacía en None; se chequea igual, porque una
+    # reporte/config.py ya convierte una key vacía en None; se chequea igual, porque una
     # key vacía con un header vacío pasaría compare_digest.
     if settings.api_key_easy_panel is None or not settings.api_key_easy_panel.get_secret_value().strip():
         logger.error("API_KEY_EASY_PANEL no está configurada; /run deshabilitado")
