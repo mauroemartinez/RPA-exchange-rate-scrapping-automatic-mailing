@@ -8,9 +8,11 @@
 # Con la variable en si, dejá de correr el notebook: no respeta el candado que
 # evita dos corridas el mismo día. Pasos completos: docs/programacion-y-monitoreo.md.
 #
-# El horario está en UTC, no en hora argentina: 19:00 UTC son las 16:00 en
+# El horario está en UTC, no en hora argentina: 19:19 UTC son las 16:19 en
 # Argentina. GitHub avisa que al comienzo de cada hora las corridas programadas
-# se atrasan más: el control de las 17:00 deja una hora de margen.
+# se atrasan más y hasta se pierden (el 08/10/2026, a las 16:00 en punto, no
+# corrió): por eso va a un minuto no redondo. El control de las 17:07 deja
+# casi una hora de margen.
 #
 # El repo es público, así que el log de cada corrida también lo es. GitHub tapa
 # los secretos completos y pipeline.py tapa además cada clave y cada dirección
@@ -31,7 +33,7 @@ on:
         type: boolean
         default: false
   schedule:
-    - cron: "0 19 * * 1-5"    # 16:00 en Argentina (UTC-3), de lunes a viernes
+    - cron: "19 19 * * 1-5"   # 16:19 en Argentina (UTC-3), de lunes a viernes
 
 permissions:
   contents: write  # para el commit de Previews/ y la rama del PowerPoint
