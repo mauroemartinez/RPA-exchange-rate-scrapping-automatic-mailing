@@ -1,6 +1,6 @@
 """Presentación ejecutiva en PowerPoint: nueve diapositivas con lo que deja la corrida del día.
 
-1. Portada, con los links del autor y de Globalaize.
+1. Portada, con un ícono de comercio exterior y los links del autor y de Globalaize.
 2. Tablero: blue, MEP, billete, riesgo país, BADLAR y el forward de Fisher.
 3. Tipos de cambio: el análisis de IA del día y los paneles de paralelas y oficiales.
 4. Riesgo país.
@@ -421,7 +421,8 @@ def armar(
         (8.4, -1.6, 6.4, CELESTE, 0.16), (10.6, 3.9, 3.6, NARANJA, 0.18), (7.3, 4.6, 2.2, CELESTE, 0.10),
     ]:
         _opacidad(_rectangulo(portada, Inches(x), Inches(y), Inches(lado), Inches(lado), color, forma=9), opacidad)
-    portada.shapes.add_picture(str(RECURSOS / "bitcoin.png"), Inches(10.55), Inches(1.45), Inches(1.7), Inches(1.7))
+    # Comercio exterior y Globalaize, no BTC: la tapa habla del reporte entero
+    portada.shapes.add_picture(str(RECURSOS / "comex.png"), Inches(10.55), Inches(1.45), Inches(1.7), Inches(1.7))
     _rectangulo(portada, Inches(0.8), Inches(1.95), Inches(0.12), Inches(2.45), NARANJA)
     _texto(portada, Inches(1.15), Inches(1.45), Inches(9), Inches(0.5), "ARGENTINA · INFORME DIARIO", 15, NARANJA, True)
     _texto(portada, Inches(1.15), Inches(1.9), Inches(9.5), Inches(1.1), "Reporte Macroeconómico", 54, BLANCO, True)
