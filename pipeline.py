@@ -818,6 +818,7 @@ def _guardar_vista_previa(carpeta: Path, html: str, imagenes: dict[str, bytes], 
     navegable = html
     for i, nombre in enumerate(charts.ORDEN_EN_MAIL):
         navegable = navegable.replace(f"cid:image{i + 1}", nombre)
+    navegable = navegable.replace(f"cid:{email_report.CID_LOGO}", email_report.LOGO.as_uri())
     (carpeta / "mail_preview.html").write_text(navegable, encoding="utf-8")
     log.info("Vista previa del mail en %s", carpeta)
 

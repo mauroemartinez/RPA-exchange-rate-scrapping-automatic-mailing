@@ -121,10 +121,10 @@ def test_guardar_secciones():
 def test_comentarios_por_grafico():
     comentarios = ia_generator.comentarios_por_grafico(SeccionesIA(**SECCIONES))
     assert [titulo for titulo, _ in comentarios["image1"]] == ["Cotizaciones paralelas", "Cotizaciones oficiales", "Riesgo país"]
-    assert comentarios["image4"] == [("Bitcoin", SECCIONES["btc"])]
+    assert comentarios["image6"] == [("Bitcoin", SECCIONES["btc"])]
 
     sin_btc = ia_generator.comentarios_por_grafico({**SECCIONES, "btc": None, "modelo": "x"})
-    assert "image4" not in sin_btc
+    assert "image6" not in sin_btc
     assert ia_generator.comentarios_por_grafico(None) == {}
 
 
@@ -135,7 +135,7 @@ def test_los_comentarios_van_debajo_de_su_grafico_y_escapados(df, resultados):
 
     html = email_report.renderizar(df, inflacion_12, 1.0, 1.0, "x", 1.0, comentarios=comentarios)
 
-    i1, i2, i4 = html.index("cid:image1"), html.index("cid:image2"), html.index("cid:image4")
+    i1, i2, i4 = html.index("cid:image1"), html.index("cid:image2"), html.index("cid:image6")
     assert i1 < html.index("Cotizaciones paralelas") < html.index("Riesgo país</div>") < i2
     assert html.index("Bitcoin") > i4
     assert "BTC &lt;b&gt;sube&lt;/b&gt;" in html

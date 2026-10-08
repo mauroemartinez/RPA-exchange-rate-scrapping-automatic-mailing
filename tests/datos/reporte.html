@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         /* RESET Y BASE */
-        body { background-color: #1a252f; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+        body { background-color: #081e40; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
 
         /* CONTENEDOR PRINCIPAL - clave para mobile */
         .container {
@@ -18,15 +18,15 @@
         }
 
         /* TIPOGRAFÍA */
-        p, div, b, span { font-size: 13px !important; color: #1a252f; line-height: 1.6; text-align: left !important; }
+        p, div, b, span { font-size: 13px !important; color: #081e40; line-height: 1.6; text-align: left !important; }
 
         /* TABLAS - scroll horizontal en mobile */
         .table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         /* Solo las tablas de datos: las de maquetación no llevan borde, ni ancho mínimo, ni filas grises */
         .table-wrapper table { border-collapse: collapse; width: 100%; min-width: 400px; margin: 12px 0; border: 1px solid #dcdde1;
-                box-shadow: 0 2px 6px rgba(44,62,80,0.16); }
+                box-shadow: 0 2px 6px rgba(8,30,64,0.16); }
         .table-wrapper table td, .table-wrapper table th { font-size: 8px !important; padding: 4px 2px; text-align: center; border: 1px solid #dcdde1; }
-        .table-wrapper th { background-color: #2c3e50; color: #ffffff; text-transform: uppercase; }
+        .table-wrapper th { background-color: #163a6b; color: #ffffff; text-transform: uppercase; }
         .table-wrapper tr:nth-child(even) { background-color: #f8f9fa; }
 
         /* Inflación (4 columnas) y Variaciones (7) entran cómodas a 12px.
@@ -40,15 +40,15 @@
         /* Sombra en los gráficos. Gmail y Outlook descartan box-shadow, así que
            el borde es lo que garantiza el recorte; la sombra es un extra que se
            ve en Apple Mail y clientes web modernos. */
-        .grafico { box-shadow: 0 2px 6px rgba(44,62,80,0.16); }
+        .grafico { box-shadow: 0 2px 6px rgba(8,30,64,0.16); }
 
         /* HEADER */
-        .header-box { background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%); color: white; padding: 20px 15px; text-align: center; }
+        .header-box { background: linear-gradient(135deg, #081e40 0%, #163a6b 100%); color: white; padding: 20px 15px; text-align: center; }
         .header-box h2 { color: white; font-size: 18px; margin: 0; }
 
         /* PÁRRAFO IA */
         .ai-box {
-            background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%);
+            background: linear-gradient(135deg, #081e40 0%, #163a6b 100%);
             border-left: 4px solid #f39c12;
             border-radius: 6px;
             padding: 16px 18px;
@@ -84,15 +84,16 @@
         }
     </style>
 </head>
-<body style="margin:0; padding:0; background-color:#1a252f; font-family:Arial,sans-serif;">
-<table width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#1a252f" style="background-color:#1a252f; table-layout:fixed;">
+<body style="margin:0; padding:0; background-color:#081e40; font-family:Arial,sans-serif;">
+<table width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#081e40" style="background-color:#081e40; table-layout:fixed;">
   <tr>
     <td align="center" style="padding:20px 10px;">
       <table class="container" width="800" border="0" cellspacing="0" cellpadding="0" bgcolor="#ffffff" style="max-width:800px; width:100%; border-radius:8px; overflow:hidden; table-layout:fixed;">
 
         <!-- HEADER -->
         <tr>
-          <td class="header-box" bgcolor="#1a252f" style="background-color:#1a252f; background:linear-gradient(135deg,#1a252f 0%,#2c3e50 100%); padding:20px; text-align:center;">
+          <td class="header-box" bgcolor="#081e40" style="background-color:#081e40; background:linear-gradient(135deg,#081e40 0%,#163a6b 100%); padding:20px; text-align:center;">
+            <img src="cid:logo" width="64" height="64" alt="Globalaize" style="display:block; margin:0 auto 10px auto; width:64px; height:64px; border-radius:12px; border:2px solid #ffffff; background-color:#ffffff;">
             <h2 style="margin:0; color:white;">📊 Reporte Macroeconómico Diario</h2>
             <div class="firma" style="margin:6px 0 0 0; font-size:11px !important; color:#bdc3c7; text-align:center !important;">por <a href="https://linkedin.com/in/mauroemartinez/" style="color:#ecf0f1; text-decoration:none;"><b style="color:#ecf0f1;">Mauro E. Martinez</b></a> · <a href="https://www.globalaize.com" style="color:#f39c12; text-decoration:none;"><b style="color:#f39c12;">Globalaize</b></a></div>
           </td>
@@ -107,7 +108,7 @@
           <td class="inner-pad" style="padding:26px 30px 36px 30px;">
 
             <!-- RESUMEN EJECUTIVO -->
-            <p style="margin:0 0 15px 0; font-size:14px !important; color:#2c3e50;">📅 <b>RESUMEN EJECUTIVO DE MERCADO</b></p>
+            <p style="margin:0 0 15px 0; font-size:14px !important; color:#163a6b;">📅 <b>RESUMEN EJECUTIVO DE MERCADO</b></p>
 
             <div style="margin-bottom:15px;">
               <span style="font-size:11px; color:#5d6d7e; text-transform:uppercase;">💰 Oportunidad de Arbitraje (Cupo USD 100)</span><br>
@@ -130,28 +131,36 @@
             </div>
 
             <!-- PÁRRAFO IA -->
-            <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="width:100%; margin:20px 0; border-collapse:separate;"><tr><td class="ai-box" bgcolor="#1a252f" style="background-color:#1a252f; background:linear-gradient(135deg,#1a252f 0%,#2c3e50 100%); border:1px solid #3d5166; border-left:4px solid #f39c12; border-radius:6px; padding:16px 18px; text-align:left;">
+            <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="width:100%; margin:20px 0; border-collapse:separate;"><tr><td class="ai-box" bgcolor="#081e40" style="background-color:#081e40; background:linear-gradient(135deg,#081e40 0%,#163a6b 100%); border:1px solid #23426e; border-left:4px solid #f39c12; border-radius:6px; padding:16px 18px; text-align:left;">
               <div class="ai-label" style="font-size:11px; color:#f39c12; text-transform:uppercase; letter-spacing:0.5px; font-weight:bold; margin-bottom:8px;">🤖 Análisis IA · Gemini</div>
               <p style="color:#ecf0f1 !important; font-size:13px !important; line-height:1.7; margin:0;">Párrafo de prueba con &lt;, &amp; y &#34;comillas&#34;.</p>
             </td></tr></table>
 
             <!-- GRÁFICOS -->
             <div style="text-align:center; width:100%; margin:20px 0;">
-              <img src='cid:image1' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
-              <img src='cid:image2' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
-              <img src='cid:image3' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
-              <img src='cid:image4' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
-              <img src='cid:image5' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
-              <img src='cid:image6' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(44,62,80,0.16);">
+              <img src='cid:image1' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(8,30,64,0.16);">
+              <img src='cid:image2' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(8,30,64,0.16);">
+              <img src='cid:image3' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(8,30,64,0.16);">
+              <img src='cid:image4' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(8,30,64,0.16);">
+              <img src='cid:image5' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(8,30,64,0.16);">
+              <img src='cid:image6' class="grafico" style="max-width:100%; height:auto; display:block; margin:0 auto 18px auto; border:1px solid #dcdde1; border-radius:4px; box-shadow:0 2px 6px rgba(8,30,64,0.16);">
             </div>
+
+            <!-- PRESENTACIÓN: la rama reporte-ejecutivo tiene siempre la del último día.
+                 El link es fijo; la corrida la publica unos segundos después de mandar el mail. -->
+            <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="width:100%; margin:0 0 14px 0;"><tr>
+              <td align="center" bgcolor="#081e40" style="background-color:#081e40; border-radius:6px; padding:14px 16px; text-align:center;">
+                <a href="https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing/raw/reporte-ejecutivo/Reporte%20Ejecutivo.pptx" style="color:#f39c12; text-decoration:none; font-weight:bold; font-size:14px;"><span style="color:#f39c12; font-size:14px !important; font-weight:bold;">📊 Descargá la presentación ejecutiva del día (PowerPoint)</span></a>
+              </td>
+            </tr></table>
 
             <!-- APOYO: después de los gráficos, donde todavía se lee -->
             <div class="apoyo" style="margin:0 0 22px 0; padding:12px 16px; background-color:#fef6e9; border:1px solid #f5d9a8; border-radius:6px;">
-              <span style="font-size:13px; color:#2c3e50;">☕ ¿Te sirvió el reporte? Podés apoyar el proyecto al alias <b style="color:#2c3e50;">mauroemartinezmp</b></span>
+              <span style="font-size:13px; color:#163a6b;">☕ ¿Te sirvió el reporte? Podés apoyar el proyecto al alias <b style="color:#163a6b;">mauroemartinezmp</b></span>
             </div>
 
             <!-- TABLA COTIZACIONES -->
-            <p style="color:#2c3e50;">📊 <b><u>Monitoreo de Mercado:</u></b><br>
+            <p style="color:#163a6b;">📊 <b><u>Monitoreo de Mercado:</u></b><br>
             Las siguientes tablas muestran las últimas 25 cotizaciones de dólares, euro, riesgo país y las tasas de referencia (BCRA 🇦🇷 y FED 🇺🇸).<br>
             Analizalas tranquilo mientras te cebás unos mates 🧉:</p>
             <div class="table-wrapper tabla-cotizaciones" style="width:100%; overflow-x:auto;"><table>
@@ -188,7 +197,7 @@
 </table></div>
 
             <!-- TABLA VARIACIONES -->
-            <p style="color:#2c3e50; margin-top:20px;">🔄 <b><u>Brechas y Variaciones:</u></b><br>
+            <p style="color:#163a6b; margin-top:20px;">🔄 <b><u>Brechas y Variaciones:</u></b><br>
             Acá podés ver cómo se están moviendo los arbitrajes entre los distintos tipos de cambio y qué tanto terreno ganó o perdió cada uno en las últimas jornadas.</p>
             <div class="table-wrapper tabla-variaciones" style="width:100%; overflow-x:auto;"><table>
 <thead>
@@ -224,7 +233,7 @@
 </table></div>
 
             <!-- TABLA INFLACIÓN -->
-            <p style="color:#2c3e50; margin-top:20px;">📈 <b><u>Termómetro de Inflación:</u></b><br>
+            <p style="color:#163a6b; margin-top:20px;">📈 <b><u>Termómetro de Inflación:</u></b><br>
             La siguiente tabla muestra las últimas 12 publicaciones del IPC. Tené en cuenta que la <b>inflación interanual es del 31.50%</b>:</p>
             <div class="table-wrapper tabla-inflacion" style="width:100%; overflow-x:auto;"><table>
 <thead>
@@ -261,23 +270,23 @@
 
             <!-- CIERRE -->
             <div style="margin-top:30px; border-top:1px solid #dcdde1; padding-top:20px;">
-              <p style="font-size:14px !important; color:#2c3e50;">🤓 Muchas gracias por leer,<br>
+              <p style="font-size:14px !important; color:#163a6b;">🤓 Muchas gracias por leer,<br>
               🤑 Ojalá esta información te sea de gran utilidad para tus decisiones.</p>
 
               <!-- Todo el cierre vive dentro de este recuadro.
-                   El gris pasa de #f8f9fa a #eef1f4: el anterior era 97% blanco y sobre
+                   El gris pasa de #f8f9fa a #e7f2f8: el anterior era 97% blanco y sobre
                    el fondo del informe no se distinguía, así que la zona no se leía como
                    zona. Con el borde sutil queda delimitada.
-                   Contraste medido sobre #eef1f4: #4d5a68 da 6.22:1 y #2c3e50 9.69:1,
+                   Contraste medido sobre #e7f2f8: #4d5a68 da 6.22:1 y #163a6b 9.69:1,
                    los dos por encima del 4.5:1 que pide WCAG AA para texto chico.
                    El #bdc3c7 que estaba antes daba 1.69:1, ilegible. -->
-              <div style="background-color:#eef1f4; border:1px solid #dfe4ea; padding:18px 20px; border-radius:8px; margin:20px 0 0 0;">
+              <div style="background-color:#e7f2f8; border:1px solid #cfe2ee; padding:18px 20px; border-radius:8px; margin:20px 0 0 0;">
                 <p style="margin:0 0 10px 0;">
                   <a href="https://linkedin.com/in/mauroemartinez/" style="text-decoration:none; color:#0077b5;"><b style="color:#0077b5;">LinkedIn</b></a>
                   | <a href="https://github.com/mauroemartinez/" style="text-decoration:none; color:#24292e;"><b style="color:#24292e;">GitHub</b></a>
                 </p>
                 <p style="margin:0 0 10px 0;">
-                  🌐 <b style="color:#2c3e50;">Globalaize:</b>
+                  <img src="cid:logo" width="28" height="28" alt="Globalaize" style="width:28px; height:28px; vertical-align:middle; border-radius:5px; margin-right:4px;"> <b style="color:#163a6b;">Globalaize:</b>
                   <a href="https://www.globalaize.com" style="text-decoration:none; color:#1f6391;"><b style="color:#1f6391;">www.globalaize.com</b></a> <span style="font-size:11px; color:#4d5a68;">(en construcción)</span>
                   | <a href="https://www.linkedin.com/company/globalaize" style="text-decoration:none; color:#0077b5;"><b style="color:#0077b5;">LinkedIn</b></a>
                 </p>
@@ -287,9 +296,9 @@
                      Mismo tamaño, mismo estilo y sin cursivas en las tres líneas.
                      Solo el nombre y el mail van en negrita. -->
                 <div style="font-size:11px !important; color:#4d5a68; line-height:1.6;">
-                  🤖 Este es un proceso de RPA desarrollado íntegramente en Python por <b style="color:#2c3e50;">Mauro E. Martinez</b>.<br>
+                  🤖 Este es un proceso de RPA desarrollado íntegramente en Python por <b style="color:#163a6b;">Mauro E. Martinez</b>.<br>
                   ⏱️ Performance: el script procesó los datos y generó este envío en 1.00 segundos.<br>
-                  📧 Consultas, desuscripciones o propuestas: <a href="mailto:martinezmauroezequiel@gmail.com" style="color:#2c3e50; text-decoration:underline; font-weight:bold;">martinezmauroezequiel@gmail.com</a>
+                  📧 Consultas, desuscripciones o propuestas: <a href="mailto:martinezmauroezequiel@gmail.com" style="color:#163a6b; text-decoration:underline; font-weight:bold;">martinezmauroezequiel@gmail.com</a>
                 </div>
               </div>
             </div>

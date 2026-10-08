@@ -14,6 +14,7 @@ from google.genai import types
 from pydantic import ValidationError
 from sqlalchemy import text
 
+from reporte import charts
 from reporte.config import settings
 from reporte.models import SeccionesIA
 
@@ -217,9 +218,9 @@ VENTANA = 25
 
 # Qué sección va debajo de qué gráfico del mail (cid) y con qué título
 SECCIONES_POR_GRAFICO = {
-    "image1": [("Cotizaciones paralelas", "paralelas"), ("Cotizaciones oficiales", "oficiales"),
-               ("Riesgo país", "riesgo_pais")],
-    "image4": [("Bitcoin", "btc")],
+    charts.cid(charts.TIPOS_DE_CAMBIO): [("Cotizaciones paralelas", "paralelas"), ("Cotizaciones oficiales", "oficiales"),
+                                         ("Riesgo país", "riesgo_pais")],
+    charts.cid(charts.BTC): [("Bitcoin", "btc")],
 }
 
 

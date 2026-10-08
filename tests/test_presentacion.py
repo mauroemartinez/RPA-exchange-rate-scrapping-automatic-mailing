@@ -64,7 +64,7 @@ def test_con_comentarios_por_grafico_de_la_fila(historico, imagenes, tmp_path):
                                        "riesgo_pais": "Comentario de riesgo.", "btc": "Comentario de BTC."}
     prs = Presentation(presentacion.armar(historico, imagenes, tmp_path))
     assert "Comentario de paralelas." in _textos(prs.slides[2])
-    assert "Comentario de BTC." in _textos(prs.slides[5])
+    assert "Comentario de BTC." in _textos(prs.slides[7])
 
 
 def test_los_textos_de_la_corrida_le_ganan_a_la_fila(historico, imagenes, tmp_path):
@@ -104,7 +104,7 @@ def test_sin_parrafo_lo_dice(historico, imagenes, tmp_path):
 def test_sin_un_grafico_lo_avisa(historico, imagenes, tmp_path):
     del imagenes[charts.BTC]
     prs = Presentation(presentacion.armar(historico, imagenes, tmp_path))
-    assert "Gráfico no disponible" in _textos(prs.slides[5])
+    assert "Gráfico no disponible" in _textos(prs.slides[7])
 
 
 def test_el_script_manual_usa_el_mismo_armado(historico, imagenes, tmp_path, monkeypatch):
@@ -127,19 +127,19 @@ def test_agregados_y_deuda_llevan_su_explicacion(historico, imagenes, tmp_path, 
     # Sin explicaciones (el script manual): el texto fijo, sin la frase con datos
     prs = Presentation(presentacion.armar(historico, imagenes, tmp_path))
     # Sin la frase del día, igual va lo ideal, con su título
-    assert "¿QUÉ SERÍA LO IDEAL?" in _textos(prs.slides[6])
+    assert "¿QUÉ SERÍA LO IDEAL?" in _textos(prs.slides[5])
     # En la diapositiva, "lo ideal" (el último párrafo); el texto completo, en las notas
     ideal = indicadores.TEXTO_DEUDA.split("\n")[-1].removeprefix("¿Qué sería lo ideal?").strip()
-    assert ideal in _textos(prs.slides[7])
-    notas = prs.slides[7].notes_slide.notes_text_frame.text
+    assert ideal in _textos(prs.slides[6])
+    notas = prs.slides[6].notes_slide.notes_text_frame.text
     assert all(parrafo in notas for parrafo in indicadores.TEXTO_DEUDA.split("\n"))
 
     # Con las de la corrida, también la frase con los últimos datos
     series, provisorios = series_indicadores
     explicaciones = indicadores.explicaciones(series, provisorios)
     prs = Presentation(presentacion.armar(historico, imagenes, tmp_path, explicaciones=explicaciones))
-    assert explicaciones[indicadores.CID_DEUDA]["dato"] in _textos(prs.slides[7])
-    assert explicaciones[indicadores.CID_AGREGADOS]["dato"] in _textos(prs.slides[6])
+    assert explicaciones[indicadores.CID_DEUDA]["dato"] in _textos(prs.slides[6])
+    assert explicaciones[indicadores.CID_AGREGADOS]["dato"] in _textos(prs.slides[5])
 
 
 def test_los_metadatos_de_aplicacion_son_los_de_este_archivo(historico, imagenes, tmp_path):
@@ -189,7 +189,7 @@ def test_subir_es_rojo_y_bajar_verde():
 
 def test_bitcoin_en_negro_con_su_moneda(historico, imagenes, tmp_path):
     prs = Presentation(presentacion.armar(historico, imagenes, tmp_path))
-    bitcoin = prs.slides[5]
+    bitcoin = prs.slides[7]
     assert bitcoin.background.fill.fore_color.rgb == presentacion.NEGRO
     assert any(s.shape_type == 13 for s in bitcoin.shapes)  # 13 = imagen: la moneda del título
 
