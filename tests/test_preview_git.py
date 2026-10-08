@@ -6,7 +6,7 @@ import subprocess
 
 import pytest
 
-import preview_git
+from reporte import preview_git
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git no está instalado")
 

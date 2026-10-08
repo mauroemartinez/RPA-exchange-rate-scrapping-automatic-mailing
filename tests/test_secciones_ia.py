@@ -7,12 +7,10 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-import charts
-import email_report
-import ia_generator
-import transformations as t
 from conftest import HOY
-from models import SeccionesIA
+from reporte import charts, email_report, ia_generator
+from reporte import transformations as t
+from reporte.models import SeccionesIA
 
 AHORA = datetime(2026, 10, 6, 16, 43)
 

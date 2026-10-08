@@ -32,9 +32,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pandas as pd
 from sqlalchemy import create_engine, text
 
-from config import settings
-from scrapers import bcra, riesgo_pais
-from scrapers.utils import run_async
+from reporte.config import settings
+from reporte.scrapers import bcra, riesgo_pais
+from reporte.scrapers.utils import run_async
 
 TABLA = "Fact_Mercado_Macro"
 

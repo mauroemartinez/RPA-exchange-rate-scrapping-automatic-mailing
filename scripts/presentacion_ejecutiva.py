@@ -24,10 +24,7 @@ sys.path.insert(0, str(RAIZ))
 
 import pandas as pd
 
-import charts
-import data_access
-import presentacion
-import preview_git
+from reporte import charts, data_access, presentacion, preview_git
 
 
 def main(argv: list[str] | None = None) -> Path:

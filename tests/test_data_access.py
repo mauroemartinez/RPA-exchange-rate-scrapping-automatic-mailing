@@ -3,9 +3,9 @@ from contextlib import contextmanager
 import pandas as pd
 import pytest
 
-import data_access
 from conftest import HOY
-from transformations import armar_fila_nueva
+from reporte import data_access
+from reporte.transformations import armar_fila_nueva
 
 
 class _Resultado:
@@ -139,7 +139,7 @@ def test_si_no_se_puede_liberar_el_candado_no_levanta():
 
 
 def test_guardar_series_cuenta_las_filas_devueltas():
-    from scrapers import agregados
+    from reporte.scrapers import agregados
 
     class Conexion(ConexionFalsa):
         def execute(self, sql, params=None):

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
 
-from config import settings
+from reporte.config import settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)

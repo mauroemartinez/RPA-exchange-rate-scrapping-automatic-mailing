@@ -7,11 +7,9 @@ from pathlib import Path
 import pytest
 from pptx import Presentation
 
-import charts
-import indicadores
-import presentacion
 import presentacion_ejecutiva
 from conftest import jpeg_minimo
+from reporte import charts, indicadores, presentacion
 
 
 def _textos(slide) -> str:

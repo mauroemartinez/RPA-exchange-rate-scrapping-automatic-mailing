@@ -10,9 +10,8 @@ from datetime import date
 
 import pandas as pd
 
-import charts
-import transformations
-from scrapers import agregados
+from reporte import charts, transformations
+from reporte.scrapers import agregados
 
 # Cuánta historia bajar para los dos gráficos: el panel de variación interanual
 # muestra un año, y cada punto se compara con el mismo día del año anterior

@@ -48,24 +48,26 @@ from pathlib import Path
 
 from pydantic import EmailStr, TypeAdapter, ValidationError
 
-import charts
-import data_access
-import email_report
-import fechas
-import ia_generator
-import indicadores
-import mailer
-import preview_git
-import scrapers
-import transformations
-from config import redactar, reemplazos_sensibles, settings
-from scrapers import agregados, btc, feriados, finanzas
-from scrapers.utils import ScraperError
+from reporte import (
+    charts,
+    data_access,
+    email_report,
+    fechas,
+    ia_generator,
+    indicadores,
+    mailer,
+    preview_git,
+    scrapers,
+    transformations,
+)
+from reporte.config import redactar, reemplazos_sensibles, settings
+from reporte.scrapers import agregados, btc, feriados, finanzas
+from reporte.scrapers.utils import ScraperError
 
 # python-pptx puede faltar en un venv instalado antes de que entrara a requirements.txt.
 # Sin este resguardo, `import pipeline` fallaría entero: ni mail ni alerta ese día.
 try:
-    import presentacion
+    from reporte import presentacion
 except ImportError as _exc:
     presentacion = None
     FALTA_PRESENTACION = f"{type(_exc).__name__}: {_exc}"

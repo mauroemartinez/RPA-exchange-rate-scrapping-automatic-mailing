@@ -5,7 +5,7 @@ Si falta una variable obligatoria o tiene un valor inválido, el proceso falla a
 importar este módulo y no a mitad del pipeline, después de haber scrapeado todo.
 
 Uso:
-    from config import settings
+    from reporte.config import settings
     engine = create_engine(settings.supabase_db_url.get_secret_value())
 """
 
@@ -53,7 +53,7 @@ except ModuleNotFoundError:
 
 # La carpeta del proyecto, deducida de dónde está este archivo. Sirve para
 # resolver rutas relativas del .env sin depender del directorio de trabajo.
-RAIZ_PROYECTO = Path(__file__).resolve().parent
+RAIZ_PROYECTO = Path(__file__).resolve().parent.parent  # este archivo vive en reporte/
 
 # Lista de mails separada por comas en el .env
 # NoDecode evita que pydantic-settings intente parsearla como JSON
