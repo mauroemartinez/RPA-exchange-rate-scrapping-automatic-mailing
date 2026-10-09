@@ -46,3 +46,6 @@ Previews/*.pptx
 
 # HTML intermedio del diagrama: se regenera con Assets/arquitectura/construir.py
 Assets/arquitectura/*.html
+
+# Salida del informe macro (scripts/informe_macro.py): datos bajados y PDFs, se comparten a mano
+informes/

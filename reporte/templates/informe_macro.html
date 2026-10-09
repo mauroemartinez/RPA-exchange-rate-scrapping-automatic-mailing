@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Argentina hoy: estado de situación macroeconómica</title>
+{#- Informe macro en PDF (scripts/informe_macro.py). Los números salen de las series;
+    los textos de interpretación son de esta edición y conviene releerlos en la próxima. #}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600&display=block" rel="stylesheet">
+<style>
+  /* La I mayúscula de IBM Plex Sans tiene serifas: "GlobalAIze" no se lee "GlobalAlze" */
+  :root { --marino:#081E40; --azul:#1F6391; --gris:#697E91; --celeste:#E7F2F8; --borde:#DCE6EF; --texto:#1C2B3A;
+          --rojo:#C0392B; --verde:#1E8449; }
+  @page { size: A4; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:#fff; }
+  body { font-family:'IBM Plex Sans', Arial, sans-serif; color:var(--texto); font-size:10.2pt; line-height:1.5;
+         -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .pagina { padding:0 16mm; page-break-after:always; }
+  .pagina:last-child { page-break-after:auto; }
+  h1, h2, h3 { color:var(--marino); margin:0; }
+  h2 { font-size:17pt; font-weight:700; padding-bottom:5px; border-bottom:2px solid var(--gris); margin:4px 0 12px; }
+  h2 .emoji { font-size:15pt; margin-right:6px; }
+  h3 { font-size:11pt; font-weight:600; margin:14px 0 4px; color:var(--azul); text-transform:uppercase; letter-spacing:.4px; }
+  p { margin:0 0 8px; text-align:justify; }
+  b, strong { color:var(--marino); }
+  .tarjeta { background:#fff; border:1px solid var(--borde); border-radius:10px; box-shadow:0 3px 10px rgba(8,30,64,.12);
+             padding:10px 12px; margin:8px 0 12px; break-inside:avoid; }
+  .tarjeta img { width:100%; display:block; }
+  .pie-grafico { font-size:8pt; color:var(--gris); margin-top:4px; }
+  .clave { background:var(--celeste); border-left:4px solid var(--marino); border-radius:6px; padding:9px 12px; margin:10px 0;
+           break-inside:avoid; }
+  .clave b { display:block; font-size:8.5pt; text-transform:uppercase; letter-spacing:.5px; color:var(--azul); margin-bottom:2px; }
+  .kpis { display:grid; grid-template-columns:repeat(4, 1fr); gap:9px; margin:10px 0 14px; }
+  .kpi { background:#fff; border:1px solid var(--borde); border-radius:10px; box-shadow:0 3px 10px rgba(8,30,64,.12); padding:9px 10px; }
+  .kpi .t { font-size:7.6pt; text-transform:uppercase; letter-spacing:.4px; color:var(--gris); font-weight:600; }
+  .kpi .v { font-size:16pt; font-weight:700; color:var(--marino); line-height:1.2; margin:2px 0; }
+  .kpi .d { font-size:8pt; color:var(--texto); }
+  .bien { color:var(--verde) !important; } .mal { color:var(--rojo) !important; }
+  ul.lista { margin:4px 0 8px; padding-left:18px; } ul.lista li { margin-bottom:5px; }
+  table { width:100%; border-collapse:collapse; font-size:9pt; }
+  th { background:var(--marino); color:#fff; font-weight:600; padding:5px 6px; text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  td { padding:5px 6px; border-bottom:1px solid var(--borde); text-align:right; }
+  tr:nth-child(even) td { background:#F6F9FC; }
+  .dos { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  /* Portada */
+  .portada { height:265mm; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; position:relative; }
+  .portada .logo { width:150px; margin-bottom:22px; }
+  .portada .antetitulo { font-size:11pt; letter-spacing:2px; color:var(--gris); font-weight:600; }
+  .portada h1 { font-size:30pt; line-height:1.15; margin:10px 0 12px; }
+  .portada .bajada { font-size:12.5pt; color:var(--gris); max-width:150mm; }
+  .portada .fecha { font-size:15pt; color:var(--azul); font-weight:700; margin:22px 0 6px; }
+  .portada .autor { font-size:11pt; color:var(--gris); }
+  .portada .links { margin-top:14px; font-size:9.5pt; } .portada .links a { color:var(--azul); text-decoration:none; margin:0 8px; }
+  .portada .stack { position:absolute; bottom:4mm; left:0; right:0; background:var(--celeste); border-radius:10px; padding:10px 0 8px; }
+  .portada .stack .t { font-size:8pt; letter-spacing:2px; color:var(--gris); font-weight:700; margin-bottom:6px; }
+  .portada .stack img { width:30px; height:30px; margin:0 9px; vertical-align:middle; }
+  .circulo { position:absolute; border-radius:50%; background:var(--celeste); z-index:-1; }
+  .marca { font-family:'IBM Plex Serif', Georgia, serif; }
+  .chico { font-size:8.5pt; color:var(--gris); }
+</style>
+</head>
+<body>
+
+<!-- ═══ PORTADA ═══ -->
+<section class="pagina">
+  <div class="portada">
+    <div class="circulo" style="width:120mm;height:120mm;left:-55mm;top:-45mm;"></div>
+    <div class="circulo" style="width:80mm;height:80mm;right:-35mm;top:30mm;opacity:.7;"></div>
+    <img class="logo" src="{{ logo }}" alt="GlobalAIze">
+    <div class="antetitulo">ARGENTINA · INFORME MACROECONÓMICO</div>
+    <h1>Argentina hoy:<br>estado de situación macroeconómica</h1>
+    <div class="bajada">Tipos de cambio, inflación, tasas, riesgo país, dinero, deuda y Bitcoin, con toda la historia disponible</div>
+    <div class="fecha">Datos al {{ m.fecha }}</div>
+    <div class="autor">por Mauro E. Martinez · Global<span class="marca">AI</span>ze</div>
+    <div class="links"><a href="https://linkedin.com/in/mauroemartinez/">LinkedIn</a>·<a href="https://github.com/mauroemartinez/">GitHub</a>·<a href="https://www.globalaize.com">www.globalaize.com</a>·<a href="mailto:mauro@globalaize.com">mauro@globalaize.com</a></div>
+    <div class="stack"><div class="t">STACK</div>{% for t in tecnologias %}<img src="{{ t }}">{% endfor %}</div>
+  </div>
+</section>
+
+<!-- ═══ RESUMEN EJECUTIVO ═══ -->
+<section class="pagina">
+  <h2><span class="emoji">📋</span>Resumen ejecutivo</h2>
+  <div class="kpis">
+    <div class="kpi"><div class="t">Dólar blue</div><div class="v">$ {{ m.variaciones[0].valor }}</div><div class="d">{{ m.blue_12m|signo }}% en 12 meses</div></div>
+    <div class="kpi"><div class="t">Brecha con el oficial</div><div class="v">{{ m.brecha_hoy|num }}%</div><div class="d">{{ m.brecha_max|num(0) }}% en {{ m.brecha_max_fecha|mes }}</div></div>
+    <div class="kpi"><div class="t">Inflación interanual</div><div class="v">{{ m.inf_anual|num }}%</div><div class="d">pico de {{ m.inf_pico|num }}% en {{ m.inf_pico_mes }}</div></div>
+    <div class="kpi"><div class="t">Inflación mensual</div><div class="v">{{ m.inf_mensual|num }}%</div><div class="d">{{ m.inf_mensual_mes }}</div></div>
+    <div class="kpi"><div class="t">Tasa real (BADLAR)</div><div class="v {{ 'mal' if m.tasa_real < 0 else 'bien' }}">{{ m.tasa_real|signo }}%</div><div class="d">TEA {{ m.badlar|num }}% contra la inflación</div></div>
+    <div class="kpi"><div class="t">Riesgo país</div><div class="v">{{ m.rp|num(0) }} pb</div><div class="d">{{ m.rp_nov23|num(0) }} pb en noviembre de 2023</div></div>
+    <div class="kpi"><div class="t">Deuda bruta del Tesoro</div><div class="v">USD {{ m.deuda|num }} mm</div><div class="d">{{ (m.deuda - m.deuda_dic23)|signo }} mm desde dic-2023</div></div>
+    <div class="kpi"><div class="t">Bitcoin</div><div class="v">USD {{ m.btc|num(0) }}</div><div class="d">{{ m.btc_dd|signo }}% desde su máximo</div></div>
+  </div>
+
+  <h3>En pocas líneas</h3>
+  <ul class="lista">
+    <li><b>El dólar está quieto y se abarató en términos reales.</b> El blue subió {{ m.blue_12m|num }}% en doce meses y el mayorista {{ m.variaciones[1].m12|num }}%, mientras los precios subieron {{ m.inf_anual|num }}%: con un dólar casi fijo y precios que siguen subiendo, cada dólar compra menos cosas en Argentina que hace un año.</li>
+    <li><b>La brecha cambiaria prácticamente desapareció.</b> Entre el blue y el oficial hay {{ m.brecha_hoy|num }}%, contra {{ m.brecha_max|num(0) }}% en {{ m.brecha_max_fecha|mes }}. Es la señal más clara del fin del cepo: hoy hay, en la práctica, un solo precio del dólar.</li>
+    <li><b>La inflación bajó mucho, pero se estancó.</b> La interanual pasó de {{ m.inf_pico|num }}% ({{ m.inf_pico_mes }}) a {{ m.inf_anual|num }}%, pero la mensual lleva un año cerca de 2%: promedio de {{ m.inf_prom_12|num(2) }}% en los últimos doce meses, con {{ m.inf_mensual|num }}% en {{ m.inf_mensual_mes }}.</li>
+    <li><b>Ahorrar en pesos a plazo fijo hoy pierde contra la inflación.</b> La BADLAR rinde {{ m.badlar|num }}% anual contra {{ m.inf_anual|num }}% de inflación: {{ m.tasa_real|signo }}% real.</li>
+    <li><b>El riesgo país está en la zona más baja desde 2019, pero rebotó.</b> {{ m.rp|num(0) }} puntos, con un mínimo de {{ m.rp_min_reciente|num(0) }} en {{ m.rp_min_reciente_fecha|mes }} y un rango de {{ m.rp_30d_min|num(0) }} a {{ m.rp_30d_max|num(0) }} en el último mes.</li>
+    <li><b>Más deuda del Estado, mucho más crédito privado.</b> La deuda bruta del Tesoro creció USD {{ (m.deuda - m.deuda_dic23)|num }} mil millones desde diciembre de 2023; el crédito a familias y empresas pasó de USD {{ m.prest_dic23|num }} a {{ m.prest_hoy|num }} mil millones, el nivel más alto de la serie.</li>
+    <li><b>Bitcoin, en baja.</b> USD {{ m.btc|num(0) }}, {{ m.btc_12m|signo }}% en doce meses y {{ m.btc_dd|signo }}% desde el máximo de {{ m.btc_ath_fecha|mes }}.</li>
+  </ul>
+  <div class="clave"><b>Cómo leer este informe</b>Cada sección muestra la historia completa del indicador, dónde está hoy y qué significa para una persona o una empresa. Los números salen de las series oficiales y de mercado; las interpretaciones son del autor y no constituyen asesoramiento financiero.</div>
+</section>
+
+<!-- ═══ TIPOS DE CAMBIO ═══ -->
+<section class="pagina">
+  <h2><span class="emoji">💵</span>Tipos de cambio y brecha</h2>
+  <div class="tarjeta"><img src="graficos/{{ g.cambio }}"><div class="pie-grafico">Pesos por dólar, escala logarítmica (cada línea horizontal es diez veces la anterior). En celeste, los períodos con cepo cambiario. Blue: Bluelytics hasta octubre de 2022 y la base del reporte desde entonces.</div></div>
+  <p>En quince años el peso perdió casi todo su valor frente al dólar: el blue pasó de unos $4 en 2011 a <b>$ {{ m.variaciones[0].valor }}</b>. La escala logarítmica muestra que la suba no fue pareja: se aceleró en los dos períodos de cepo, cuando el control de cambios separó el precio oficial del libre, y se frenó cuando esos controles se levantaron.</p>
+  <div class="tarjeta">
+    <table>
+      <tr><th>Cotización</th><th>Hoy</th><th>1 mes</th><th>3 meses</th><th>En el año</th><th>12 meses</th><th>Desde 10/12/2023</th></tr>
+      {% for f in m.variaciones %}
+      <tr><td>{{ f.nombre }}</td><td>$ {{ f.valor }}</td><td>{{ f.m1|signo }}%</td><td>{{ f.m3|signo }}%</td><td>{{ f.anio|signo }}%</td><td>{{ f.m12|signo }}%</td><td>{{ f.gob|signo }}%</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  <p>Desde el cambio de gobierno el oficial subió mucho más que el blue: {{ m.variaciones[1].gob|signo }}% contra {{ m.variaciones[0].gob|signo }}%. No es que el blue haya quedado barato, sino que el oficial partía de un nivel artificialmente bajo y en diciembre de 2023 se devaluó para acercarse al precio libre. En los últimos doce meses, en cambio, todas las cotizaciones se movieron entre {{ m.m12_min|num }}% y {{ m.m12_max|num }}%: el dólar está prácticamente quieto.</p>
+  <div class="tarjeta"><img src="graficos/{{ g.brecha }}"><div class="pie-grafico">Brecha: cuánto más caro está el blue que el oficial mayorista.</div></div>
+  <p>La brecha es el termómetro del cepo: cuanto más difícil es comprar dólares al precio oficial, más caro se paga el libre. Durante el último cepo promedió {{ m.brecha_prom_cepo|num(0) }}% y llegó a {{ m.brecha_max|num(0) }}% en {{ m.brecha_max_fecha|mes }}. Hoy es de <b>{{ m.brecha_hoy|num }}%</b>: en la práctica, un solo tipo de cambio.</p>
+</section>
+
+<!-- ═══ DÓLAR REAL ═══ -->
+<section class="pagina">
+  <h2><span class="emoji">⚖️</span>¿El dólar está caro o barato?</h2>
+  <p>Mirar solo el precio del dólar engaña, porque los precios en pesos también suben. El <b>dólar real</b> corrige eso: toma el oficial mayorista y lo ajusta por la inflación de Argentina y la de Estados Unidos. Si sube, el dólar está más caro en términos de lo que se puede comprar con él; si baja, más barato. Acá vale 100 en {{ m.tcr_ultimo_mes }}.</p>
+  <div class="tarjeta"><img src="graficos/{{ g.tcr }}"><div class="pie-grafico">Tipo de cambio real bilateral con Estados Unidos: A3500 × inflación de EEUU / inflación de Argentina. {{ m.tcr_ultimo_mes|capitalize }} = 100.</div></div>
+  <div class="dos">
+    <div class="clave"><b>Contra su historia</b>Hoy está {{ (100 / m.tcr_mediana * 100 - 100)|signo(0) }}% por encima de la mediana desde 2003 ({{ m.tcr_mediana|num(0) }}): el dólar no está barato en perspectiva larga. Solo el {{ (100 - m.tcr_percentil)|num(0) }}% de los meses desde 2003 tuvieron un dólar real más caro que hoy.</div>
+    <div class="clave"><b>Contra la devaluación de 2023</b>Está {{ (100 / m.tcr_dic23 * 100 - 100)|signo(0) }}% por debajo de diciembre de 2023 ({{ m.tcr_dic23|num(0) }}), cuando la devaluación lo llevó cerca de su máximo ({{ m.tcr_max|num(0) }}, {{ m.tcr_max_mes }}). Desde entonces se viene abaratando mes a mes.</div>
+  </div>
+  <p>Las dos lecturas conviven. Desde la devaluación de diciembre de 2023, con el dólar casi quieto y los precios subiendo, el dólar se abarató en términos reales: viajar al exterior o importar es más conveniente, y exportar o producir en Argentina para competir con importados es más difícil. Pero comparado con los últimos veinte años todavía no está en niveles de atraso: los años de dólar realmente barato fueron 2005 a 2013, con valores cerca de la mitad del actual.</p>
+  <div class="clave"><b>Qué mirar</b>Si la inflación mensual sigue en torno a 2% y el dólar no se mueve, el dólar real va a seguir bajando unos dos puntos por mes. Esa tendencia, y no el precio nominal, es la que define si el dólar está "atrasado".</div>
+</section>
+
+<!-- ═══ INFLACIÓN ═══ -->
+<section class="pagina">
+  <h2><span class="emoji">📈</span>Inflación</h2>
+  <div class="tarjeta"><img src="graficos/{{ g.inflacion }}"><div class="pie-grafico">Inflación mensual (barras: celeste menos de 4%, azul de 4% a 10%, rojo más de 10%) e interanual (línea), desde 2018.</div></div>
+  <p>La inflación tuvo su peor momento reciente entre fines de 2023 y comienzos de 2024: varios meses por encima de 10% mensual y una interanual que tocó <b>{{ m.inf_pico|num }}%</b> en {{ m.inf_pico_mes }}. Desde ahí bajó con fuerza: la interanual está en <b>{{ m.inf_anual|num }}%</b>. Pero la mensual dejó de bajar: lleva un año entre 1,7% y 3,4%, con un promedio de {{ m.inf_prom_12|num(2) }}% en los últimos doce meses y {{ m.inf_6m|num(2) }}% en los últimos seis. A ese ritmo la inflación anual queda en torno a 30%, todavía muy alta para estándares internacionales.</p>
+  <div class="dos">
+    <div class="tarjeta">
+      <table>
+        <tr><th>Año</th><th>Inflación</th></tr>
+        {% for anio, valor, en_curso in m.inf_por_anio %}
+        <tr><td>{{ anio }}{% if en_curso %} (enero a {{ m.inf_mensual_mes.split(' ')[0] }}){% endif %}</td><td>{{ valor|num }}%</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    <div>
+      <div class="clave"><b>Qué significa</b>Con 2% mensual, los precios se duplican en unos tres años. Cualquier ingreso en pesos que no se actualice al menos una vez por trimestre pierde poder de compra de forma notoria.</div>
+      <div class="clave"><b>El dato de {{ m.inf_mensual_mes }}</b>{{ m.inf_mensual|num }}%, contra {{ m.inf_mensual_previa|num }}% el mes anterior: el más bajo del último año, pero un solo dato no alcanza para hablar de una nueva baja.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PRECIOS CONTRA DÓLAR ═══ -->
+<section class="pagina">
+  <h2><span class="emoji">🕰️</span>La inflación en perspectiva</h2>
+  <div class="tarjeta"><img src="graficos/{{ g.inflacion_larga }}"><div class="pie-grafico">Inflación interanual desde 1944, escala logarítmica. Los meses con deflación (fines de los 90) se muestran en 1%.</div></div>
+  <p>En perspectiva larga, la Argentina convivió con inflación alta durante casi ochenta años. El récord fue la hiperinflación de {{ m.inf_hiper_mes }}, con <b>{{ m.inf_hiper|num(0) }}%</b> interanual. Los únicos años de precios estables fueron los de la convertibilidad (1991-2001). El pico de 2024 fue el más alto desde 1991.</p>
+  <h2 style="margin-top:14px"><span class="emoji">🏁</span>La carrera desde noviembre de 2023: precios contra dólar</h2>
+  <div class="tarjeta"><img src="graficos/{{ g.carrera }}"><div class="pie-grafico">Noviembre de 2023 = 100. Precios hasta {{ m.carrera_ipc_hasta }}.</div></div>
+  <p>Desde noviembre de 2023 hasta {{ m.carrera_ipc_hasta }} los precios subieron <b>{{ m.carrera_ipc|num }}%</b>. El dólar oficial subió {{ m.carrera_may|num }}%, casi lo mismo, pero con un recorrido muy distinto: saltó de golpe con la devaluación de diciembre de 2023 y después quedó por detrás de los precios, que lo alcanzaron y lo pasaron. El blue subió apenas {{ m.carrera_blue|num }}%, porque ya en 2023 cotizaba muy por encima del oficial.</p>
+  <div class="clave"><b>La lectura para el bolsillo</b>Quien compró dólares blue en noviembre de 2023 tiene hoy, en pesos, bastante menos poder de compra que quien se quedó con un activo que siguió a la inflación. Quien tiene ingresos en dólares, en cambio, ve que en pesos le alcanzan para menos cosas que hace dos años.</div>
+</section>
+
+<!-- ═══ RIESGO PAÍS ═══ -->
+<section class="pagina">
+  <h2><span class="emoji">🌎</span>Riesgo país</h2>
+  <div class="tarjeta"><img src="graficos/{{ g.riesgo }}"><div class="pie-grafico">Riesgo país (EMBI de JP Morgan), en puntos básicos: 100 puntos = 1% anual de tasa por encima de los bonos de Estados Unidos.</div></div>
+  <p>El riesgo país mide cuánto más tasa le exige el mercado a la Argentina que a los Estados Unidos para prestarle. Hoy está en <b>{{ m.rp|num(0) }} puntos</b>: el país pagaría unos {{ (m.rp / 100)|num }} puntos porcentuales anuales más que el Tesoro norteamericano. Es un nivel bajo para la historia reciente: hace un año estaba en {{ m.rp_hace_1|num(0) }} y en noviembre de 2023 en {{ m.rp_nov23|num(0) }}. Su mínimo desde 2019 fue {{ m.rp_min_reciente|num(0) }}, en {{ m.rp_min_reciente_fecha|mes }}.</p>
+  <div class="dos">
+    <div class="clave"><b>Contra la historia</b>El máximo fue {{ m.rp_max|num(0) }} puntos en {{ m.rp_max_fecha|mes }}, en pleno default; el mínimo, {{ m.rp_min|num(0) }} en {{ m.rp_min_fecha|mes }}. Por debajo de 500 puntos, los países suelen poder volver a emitir deuda en los mercados internacionales.</div>
+    <div class="clave"><b>El último mes</b>Se movió entre {{ m.rp_30d_min|num(0) }} y {{ m.rp_30d_max|num(0) }} puntos: un rebote desde los mínimos que conviene seguir de cerca, porque un riesgo país más alto encarece el crédito para el Estado y para las empresas.</div>
+  </div>
+  <p>Para una persona, el riesgo país importa por sus efectos: cuando baja, el Estado y las empresas consiguen financiamiento más barato, y eso suele traducirse en más crédito, más inversión y un dólar más estable. Cuando sube, ocurre lo contrario.</p>
+</section>
+
+<!-- ═══ DINERO ═══ -->
+<section class="pagina">
+  <h2><span class="emoji">🏦</span>Tasas de interés</h2>
+  <div class="tarjeta"><img src="graficos/{{ g.tasas }}"><div class="pie-grafico">BADLAR (tasa de plazos fijos mayoristas, efectiva anual) contra inflación interanual, desde {{ m.badlar_desde }}. Verde: tasa real positiva; rojo: negativa.</div></div>
+  <p>La tasa real (la que queda después de descontar la inflación) cambió de signo varias veces. En 2024, con la inflación todavía muy alta, fue fuertemente negativa: llegó a <b>{{ m.tasa_real_min|signo }}%</b> en {{ m.tasa_real_min_mes }}, lo que licuó los ahorros en pesos. Hoy la BADLAR rinde {{ m.badlar|num }}% anual, unos {{ m.badlar_mensual|num(2) }}% por mes, contra una inflación de {{ m.inf_anual|num }}%: la tasa real es <b>{{ m.tasa_real|signo }}%</b>. Para comparar, la tasa de la Reserva Federal de Estados Unidos está en {{ m.fed|num(2) }}%.</p>
+  <h2 style="margin-top:14px"><span class="emoji">💰</span>Dinero en la economía</h2>
+  <div class="tarjeta"><img src="graficos/{{ g.dinero }}"><div class="pie-grafico">Variación interanual descontada la inflación: base monetaria (billetes y monedas más los depósitos de los bancos en el BCRA) y M2 (lo que la gente tiene en efectivo, cuentas corrientes y cajas de ahorro).</div></div>
+  <p>Descontada la inflación, la base monetaria cae <b>{{ m.base_real_ult|signo }}%</b> interanual y el M2 <b>{{ m.m2_real_ult|signo }}%</b> ({{ m.dinero_mes }}). Que la cantidad de pesos crezca menos que los precios es una política monetaria contractiva: ayuda a bajar la inflación, pero también deja menos pesos para consumir y prestar, y suele enfriar la actividad. El salto de 2025 refleja la remonetización posterior a la baja de la inflación, que ya se agotó.</p>
+  <div class="clave"><b>Qué sería lo ideal</b>Que la cantidad de pesos crezca al ritmo de los que la gente quiere tener: lo que crece la economía más una inflación baja. Si crece mucho más rápido, presiona sobre los precios y el dólar; si crece mucho menos, la inflación baja, pero a costa de actividad.</div>
+</section>
+
+<!-- ═══ DEUDA Y CRÉDITO ═══ -->
+<section class="pagina">
+  <h2><span class="emoji">💸</span>Deuda y crédito, en dólares</h2>
+  <div class="tarjeta"><img src="graficos/{{ g.deuda }}"><div class="pie-grafico">Deuda bruta del Tesoro nacional a fin de cada mes (Secretaría de Finanzas). En azul oscuro, diciembre de cada año.</div></div>
+  <p>La deuda bruta del Tesoro llegó a <b>USD {{ m.deuda|num }} mil millones</b> en {{ m.deuda_mes }}: USD {{ (m.deuda - m.deuda_hace_1)|num }} mil millones más que un año antes y {{ (m.deuda / m.deuda_dic23 * 100 - 100)|signo }}% desde diciembre de 2023. Parte de esa suba no es endeudamiento nuevo sino un efecto de medición: la deuda en pesos, convertida a dólares, cambia con el tipo de cambio y la inflación. Importa porque se paga con impuestos o con más deuda.</p>
+  <div class="tarjeta"><img src="graficos/{{ g.credito }}"><div class="pie-grafico">Arriba: préstamos de los bancos a familias y empresas. Abajo: letras del BCRA y adelantos transitorios al Tesoro. Todo convertido a dólares con el mayorista de cada día.</div></div>
+  <p>El crédito a familias y empresas es la mejor noticia de la serie: pasó de USD {{ m.prest_dic23|num }} mil millones en diciembre de 2023, su mínimo en dos décadas, a <b>USD {{ m.prest_hoy|num }} mil millones</b>, por encima del máximo previo de {{ m.prest_max_previo|num }} ({{ m.prest_max_previo_fecha|mes }}). Más crédito significa más consumo financiado, hipotecas e inversión; si crece muy rápido, también más riesgo de mora.</p>
+  <p class="chico">Los adelantos del BCRA al Tesoro (financiar al Estado emitiendo pesos) están en USD {{ m.adelantos_hoy|num }} mil millones, lejos de su máximo de {{ m.adelantos_max|num }} ({{ m.adelantos_max_fecha|mes }}). La serie de letras del BCRA incluye LEBAC hasta 2018 y los instrumentos actuales, pero no las Leliq ni los pases de 2019 a 2023, con los que el BCRA absorbía pesos en esos años: el bajo nivel de ese período no significa que no hubiera deuda del BCRA.</p>
+</section>
+
+<!-- ═══ BITCOIN ═══ -->
+<section class="pagina">
+  <h2><span class="emoji">🪙</span>Bitcoin</h2>
+  <div class="tarjeta"><img src="graficos/{{ g.btc }}"><div class="pie-grafico">Arriba: precio en dólares, escala logarítmica. Abajo: caída desde el máximo previo.</div></div>
+  <p>Bitcoin cotiza a <b>USD {{ m.btc|num(0) }}</b>: {{ m.btc_dd|signo }}% desde su máximo histórico de USD {{ m.btc_ath|num(0) }} ({{ m.btc_ath_fecha|mes }}) y {{ m.btc_12m|signo }}% en doce meses. Su historia muestra un patrón repetido: subas muy fuertes seguidas de caídas de 70% a 80% (2018 y 2022). La volatilidad anualizada del último año es de {{ m.btc_vol|num(0) }}%, varias veces la de una acción típica.</p>
+  <div class="dos">
+    <div class="tarjeta">
+      <table>
+        <tr><th>Año</th><th>Rendimiento en USD</th></tr>
+        {% for anio, valor in m.btc_por_anio %}
+        <tr><td>{{ anio }}{% if loop.last %} (en curso){% endif %}</td><td class="{{ 'bien' if valor >= 0 else 'mal' }}">{{ valor|signo(0) }}%</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    <div>
+      <div class="clave"><b>Desde la Argentina</b>En pesos (al blue), Bitcoin rindió {{ m.btc_ars_12m|signo }}% en doce meses, con un dólar que subió {{ m.blue_12m|num }}%: no funcionó como cobertura en el último año.</div>
+      <div class="clave"><b>Para tener en cuenta</b>Es un activo de muy alto riesgo y sin flujo de fondos: su precio depende de la demanda. Los ciclos pasados no garantizan los futuros.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CONCLUSIONES ═══ -->
+<section class="pagina">
+  <h2><span class="emoji">🎯</span>Conclusiones y qué mirar</h2>
+  <p>La Argentina de hoy es muy distinta a la de fines de 2023: la brecha cambiaria desapareció, la inflación bajó de casi 300% a alrededor de 30% anual, el riesgo país cayó a la cuarta parte y el crédito privado se cuadruplicó en dólares. Son cambios de fondo, visibles en todas las series de este informe.</p>
+  <p>Pero varias señales muestran que la etapa fácil de la desinflación terminó. La inflación mensual se estancó en torno a 2%, las tasas en pesos quedaron por debajo de la inflación, el dinero real se contrae y el dólar, casi quieto, se abarata mes a mes en términos reales. La deuda del Tesoro sigue creciendo y el riesgo país rebotó desde sus mínimos.</p>
+  <h3>Qué mirar en los próximos meses</h3>
+  <ul class="lista">
+    <li><b>La inflación mensual:</b> si perfora el 1,5% de forma sostenida, la desinflación retoma; si vuelve a 3%, se complica.</li>
+    <li><b>El dólar real:</b> un dólar que sube menos que los precios ayuda a bajar la inflación, pero mes a mes encarece producir en Argentina.</li>
+    <li><b>La tasa real:</b> volver a tasas positivas protegería el ahorro en pesos, a costa de encarecer el crédito.</li>
+    <li><b>El riesgo país:</b> volver debajo de 500 puntos abriría el financiamiento externo a menor costo.</li>
+    <li><b>El crédito privado:</b> crecer sin que suba la mora es la condición para que siga siendo una buena noticia.</li>
+  </ul>
+  <div class="clave"><b>Sobre este informe</b>Es un análisis de datos con fines informativos y de portafolio. No es asesoramiento financiero ni una recomendación de inversión.</div>
+
+  <h2 style="margin-top:18px"><span class="emoji">📚</span>Metodología, fuentes y calidad de datos</h2>
+  <p class="chico"><b>Fuentes.</b> Cotizaciones diarias, riesgo país y tasas: base del reporte diario (BNA, DolarHoy, Ámbito, ArgentinaDatos, BCRA y FED), guardada en Supabase. Blue antes de octubre de 2022: Bluelytics (api.bluelytics.com.ar), que coincide con la base en los {{ m.blue_superpuestos|num(0) }} días en que ambas se superponen (mediana de diferencia 0%). Inflación, agregados monetarios, préstamos, letras, adelantos y dólar mayorista: API de Estadísticas del BCRA. Deuda bruta: Secretaría de Finanzas. Inflación de Estados Unidos: FRED (CPIAUCSL). Bitcoin: Yahoo Finance.</p>
+  <p class="chico"><b>Cálculos.</b> Las conversiones a dólares usan el mayorista A3500 de cada fecha. El dólar real es bilateral con Estados Unidos. Las variaciones reales descuentan la inflación del mismo período. La tasa real compara la BADLAR efectiva anual con la inflación interanual.</p>
+  <p class="chico"><b>Calidad de datos detectada en la base del reporte.</b> Antes del {{ m.blue_real_desde.strftime('%d/%m/%Y') }}, el blue, el solidario y el euro son un valor fijo de relleno de la carga histórica; por eso el blue previo sale de Bluelytics. {{ m.blue_corregidos }} días del blue propio se apartaban más de 5% de Bluelytics y se tomaron de esa fuente. {{ m.mep_malos|length }} días del MEP están guardados multiplicados por diez (error de coma decimal) y se excluyeron. Corregir estos registros en la base mejoraría el reporte diario y las próximas ediciones.</p>
+  <p class="chico">Generado con Python (pandas, matplotlib, Chromium) a partir de datos al {{ m.fecha }}. Contacto: <a href="mailto:mauro@globalaize.com">mauro@globalaize.com</a> · <a href="https://www.globalaize.com">www.globalaize.com</a></p>
+</section>
+
+</body>
+</html>
