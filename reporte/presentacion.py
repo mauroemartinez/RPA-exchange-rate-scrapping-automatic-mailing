@@ -69,7 +69,7 @@ SIN_ANALISIS = "Sin análisis para este día."
 
 RECURSOS = Path(__file__).resolve().parent / "recursos"
 ALIAS = "mauroemartinezmp"
-MAIL = "martinezmauroezequiel@gmail.com"
+MAIL = "mauro@globalaize.com"
 
 
 def _icono_globalaize() -> Path:
