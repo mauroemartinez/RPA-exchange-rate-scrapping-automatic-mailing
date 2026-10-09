@@ -48,7 +48,7 @@ TEXTO_DEUDA = (
     "Arriba, la deuda bruta del Tesoro nacional: lo que debe el Estado por bonos, letras y préstamos de organismos "
     "como el FMI. Te importa porque se paga con impuestos o con más deuda: cuanto más pesa, menos margen hay para "
     "bajar impuestos y más caro le sale al país (y a sus empresas) conseguir crédito, algo que se ve en el riesgo "
-    "país. Se publica una vez por mes, con unas cinco semanas de atraso, y los últimos meses son provisorios (los círculos naranjas): "
+    "país. Se publica una vez por mes, con unas cinco semanas de atraso, y los últimos meses son provisorios (los círculos grises): "
     "pueden corregirse.\n"
     "En el medio, lo que familias y empresas les deben a los bancos: tarjetas, préstamos personales, hipotecas y "
     "créditos a empresas. Si sube, hay más crédito para consumir, comprar una casa o invertir; si sube demasiado "

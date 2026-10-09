@@ -32,7 +32,7 @@ from reporte.transformations import etiqueta_mes
 log = logging.getLogger(__name__)
 
 RAIZ = Path(__file__).resolve().parent
-# El logo de Globalaize va adjunto inline como los gráficos (cid:logo), no por URL:
+# El logo de GlobalAIze va adjunto inline como los gráficos (cid:logo), no por URL:
 # así se ve aunque el cliente bloquee las imágenes remotas
 LOGO = RAIZ / "recursos" / "globalaize_logo.png"
 CID_LOGO = "logo"
@@ -256,7 +256,7 @@ def armar_mensaje(
 
     logo = MIMEImage(LOGO.read_bytes())
     logo.add_header("Content-ID", f"<{CID_LOGO}>")
-    logo.add_header("Content-Disposition", "inline", filename="Globalaize.png")
+    logo.add_header("Content-Disposition", "inline", filename="GlobalAIze.png")
     em.attach(logo)
 
     if csv is not None:
