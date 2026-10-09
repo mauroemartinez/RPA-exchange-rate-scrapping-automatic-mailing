@@ -1,6 +1,6 @@
 """Presentación ejecutiva en PowerPoint: nueve diapositivas con lo que deja la corrida del día.
 
-1. Portada blanca con el logo de Globalaize, los links del autor y las tecnologías del proyecto.
+1. Portada blanca con el logo de GlobalAIze, los links del autor y las tecnologías del proyecto.
 2. Tablero: blue, MEP, billete, riesgo país, BADLAR y el forward de Fisher.
 3. Tipos de cambio: el análisis de IA del día y los paneles de paralelas y oficiales.
 4. Riesgo país.
@@ -45,11 +45,11 @@ ARCHIVO = "Reporte Ejecutivo.pptx"
 # (last_modified_by, un comentario y fechas de 2013): se reemplazan todos.
 AUTOR = "Seguimiento Macroeconómico"
 
-# Los colores del mail, los de Globalaize
-# Los azules del logo de Globalaize (#081E40) y uno intermedio para los degradés
+# Los colores del mail, los de GlobalAIze
+# Los azules del logo de GlobalAIze (#081E40) y uno intermedio para los degradés
 OSCURO = RGBColor(0x08, 0x1E, 0x40)
 AZUL = RGBColor(0x16, 0x3A, 0x6B)
-# Acentos con los colores de Globalaize, sin naranja: el gris azulado del logo para
+# Acentos con los colores de GlobalAIze, sin naranja: el gris azulado del logo para
 # líneas y bordes, y un celeste claro del mismo tono para los rótulos sobre fondo oscuro
 ACENTO = RGBColor(0x69, 0x7E, 0x91)
 ACENTO_CLARO = RGBColor(0xA8, 0xC3, 0xDB)
@@ -61,7 +61,10 @@ ROJO = RGBColor(0xC0, 0x39, 0x2B)
 BLANCO = RGBColor(0xFF, 0xFF, 0xFF)
 NEGRO = RGBColor(0x00, 0x00, 0x00)
 CELESTE = RGBColor(0x29, 0x80, 0xB9)
-GRIS_LOGO = RGBColor(0x69, 0x7E, 0x91)  # el gris azulado del logo de Globalaize
+FONDO_SLIDE = RGBColor(0xF2, 0xF6, 0xFA)  # gris azulado muy claro, para que resalten las tarjetas blancas
+BORDE_TARJETA = RGBColor(0xDC, 0xE6, 0xEF)
+TARJETA_OSCURA = RGBColor(0x0B, 0x1B, 0x33)  # las tarjetas de la diapositiva negra de BTC
+GRIS_LOGO = RGBColor(0x69, 0x7E, 0x91)  # el gris azulado del logo de GlobalAIze
 
 ANCHO, ALTO = Inches(13.333), Inches(7.5)  # 16:9
 
@@ -73,7 +76,7 @@ MAIL = "mauro@globalaize.com"
 
 
 def _icono_globalaize() -> Path:
-    """El logo de Globalaize si está en recursos/; si no, el ícono provisorio."""
+    """El logo de GlobalAIze si está en recursos/; si no, el ícono provisorio."""
     logo = RECURSOS / "globalaize_logo.png"
     return logo if logo.exists() else RECURSOS / "globalaize.png"
 
@@ -82,8 +85,8 @@ def _icono_globalaize() -> Path:
 LINKS = [
     ("linkedin.png", "LinkedIn", "https://linkedin.com/in/mauroemartinez/"),
     ("github.png", "GitHub", "https://github.com/mauroemartinez/"),
-    (None, "Globalaize", "https://www.globalaize.com"),
-    ("linkedin.png", "Globalaize en LinkedIn", "https://www.linkedin.com/company/globalaize"),
+    (None, "GlobalAIze", "https://www.globalaize.com"),
+    ("linkedin.png", "GlobalAIze en LinkedIn", "https://www.linkedin.com/company/globalaize"),
 ]
 
 # Las tecnologías del pie de la portada: (archivo en recursos/tecnologias, rótulo)
@@ -168,13 +171,20 @@ def _tamanio_que_entra(bloques, ancho, alto, maximo: int = 16, minimo: int = 11)
 
 
 def _bloques(slide, x, y, ancho, alto, bloques, tamanio: int | None = None, color=AZUL, color_titulo=AZUL,
-             maximo: int = 16):
+             maximo: int = 16, tarjeta=BLANCO):
     """Una caja con secciones: [(título, texto), ...]. Cada renglón del texto es un párrafo.
 
-    Los títulos van en mayúsculas y en negrita, en el azul de Globalaize.
+    Los títulos van en mayúsculas y en negrita, en el azul de GlobalAIze.
     Sin `tamanio`, usa el más grande que entra, hasta `maximo`: así la letra es lo más
     grande posible los días con poco texto, sin salirse de la caja los días con mucho.
     """
+    if not any(texto for _, texto in bloques):
+        return None  # sin nada que decir no queda una tarjeta vacía
+    if tarjeta is not None:
+        # La tarjeta ocupa la caja pedida y el texto va adentro, con margen
+        _tarjeta_fondo(slide, x, y, ancho, alto, tarjeta)
+        margen = Inches(0.15)
+        x, y, ancho, alto = x + margen, y + margen, ancho - 2 * margen, alto - 2 * margen
     tamanio = tamanio or _tamanio_que_entra(bloques, ancho, alto, maximo)
     caja = slide.shapes.add_textbox(x, y, ancho, alto)
     marco = caja.text_frame
@@ -209,6 +219,39 @@ def _rectangulo(slide, x, y, ancho, alto, color, forma=1):
     return rect
 
 
+def _sombra(forma, opacidad: float = 0.22) -> None:
+    """Sombra suave hacia abajo, que despega la forma del fondo: python-pptx no la expone, va en el XML.
+
+    _rectangulo ya dejó un <a:effectLst/> vacío (para no heredar la del tema); la sombra va adentro.
+    """
+    spPr = forma.fill._xPr
+    efectos = spPr.find(qn("a:effectLst"))
+    if efectos is None:
+        efectos = spPr.makeelement(qn("a:effectLst"), {})
+        spPr.append(efectos)
+    sombra = efectos.makeelement(qn("a:outerShdw"), {
+        "blurRad": "177800", "dist": "63500", "dir": "5400000", "algn": "t", "rotWithShape": "0",
+    })
+    color = sombra.makeelement(qn("a:srgbClr"), {"val": "081E40"})
+    color.append(color.makeelement(qn("a:alpha"), {"val": str(int(opacidad * 100_000))}))
+    sombra.append(color)
+    efectos.append(sombra)
+
+
+def _tarjeta_fondo(slide, x, y, ancho, alto, color=BLANCO):
+    """Un recuadro de esquinas redondeadas, con borde fino y sombra: el fondo de cada gráfico o texto."""
+    tarjeta = _rectangulo(slide, x, y, ancho, alto, color, forma=5)  # 5 = rectángulo redondeado
+    tarjeta.adjustments[0] = 0.04
+    if color == BLANCO:
+        tarjeta.line.color.rgb = BORDE_TARJETA
+        tarjeta.line.width = Pt(0.75)
+    else:
+        tarjeta.line.color.rgb = ACENTO
+        tarjeta.line.width = Pt(1)
+    _sombra(tarjeta, 0.22 if color == BLANCO else 0.35)
+    return tarjeta
+
+
 def _opacidad(forma, opacidad: float) -> None:
     """Relleno semitransparente: python-pptx no lo expone, va directo en el XML."""
     color = forma.fill._xPr.find(qn("a:solidFill")).find(qn("a:srgbClr"))
@@ -222,14 +265,23 @@ def _degrade(forma, desde: RGBColor, hasta: RGBColor, angulo: float = 0) -> None
     paradas[0].color.rgb, paradas[1].color.rgb = desde, hasta
 
 
-def _imagen(slide, ruta: Path, x, y, ancho_max, alto_max, centrar: bool = True):
-    """La imagen lo más grande posible dentro de la caja, sin deformarla."""
+def _imagen(slide, ruta: Path, x, y, ancho_max, alto_max, centrar: bool = True, tarjeta=BLANCO):
+    """La imagen lo más grande posible dentro de la caja, sin deformarla, sobre su tarjeta con sombra.
+
+    La tarjeta ocupa la caja entera, así todas las de una diapositiva arrancan y terminan
+    a la misma altura; la imagen va centrada adentro, con margen. Con tarjeta=None va sola.
+    """
+    margen = Inches(0.12) if tarjeta is not None else 0
+    if tarjeta is not None:
+        _tarjeta_fondo(slide, x, y, ancho_max, alto_max, tarjeta)
     with Image.open(ruta) as im:
         w, h = im.size
-    escala = min(ancho_max / w, alto_max / h)
+    escala = min((ancho_max - 2 * margen) / w, (alto_max - 2 * margen) / h)
     ancho, alto = int(w * escala), int(h * escala)
     if centrar:
         x, y = x + (ancho_max - ancho) // 2, y + (alto_max - alto) // 2
+    else:
+        x, y = x + margen, y + margen
     return slide.shapes.add_picture(str(ruta), x, y, ancho, alto)
 
 
@@ -238,17 +290,21 @@ def _con_link(forma, url: str):
     return forma
 
 
-def _links(slide, x, y, lado, color_rotulo=CLARO, separacion=None):
-    """La fila de íconos con link (LinkedIn, GitHub, Globalaize), cada uno con su rótulo abajo.
+def _links(slide, x, y, lado, color_rotulo=CLARO, separacion=None, omitir=()):
+    """La fila de íconos con link (LinkedIn, GitHub, GlobalAIze), cada uno con su rótulo abajo.
 
     Cada ícono va centrado en su lugar de ancho `separacion`; con x=None, la fila entera
     va centrada en la diapositiva.
     """
     separacion = separacion or Inches(1.55)
+    links = [link for link in LINKS if link[1] not in omitir]
     if x is None:
-        x = (ANCHO - separacion * len(LINKS)) // 2
-    for i, (icono, rotulo, url) in enumerate(LINKS):
-        ruta = _icono_globalaize() if icono is None else RECURSOS / icono
+        x = (ANCHO - separacion * len(links)) // 2
+    # El logo de GlobalAIze, con las esquinas redondeadas como los demás íconos
+    redondeado = RECURSOS / "globalaize_logo_redondeado.png"
+    ruta_globalaize = redondeado if redondeado.exists() else _icono_globalaize()
+    for i, (icono, rotulo, url) in enumerate(links):
+        ruta = ruta_globalaize if icono is None else RECURSOS / icono
         izquierda = x + i * separacion
         _con_link(slide.shapes.add_picture(str(ruta), izquierda + (separacion - lado) // 2, y, lado, lado), url)
         _texto(slide, izquierda, y + lado + Inches(0.03), separacion, Inches(0.5), rotulo, 11,
@@ -258,17 +314,16 @@ def _links(slide, x, y, lado, color_rotulo=CLARO, separacion=None):
 def _encabezado(prs, titulo: str, fecha: date, numero: int, oscuro: bool = False, icono: Path | None = None,
                 emoji: str | None = None):
     slide = prs.slides.add_slide(prs.slide_layouts[6])  # en blanco
-    if oscuro:
-        slide.background.fill.solid()
-        slide.background.fill.fore_color.rgb = NEGRO
+    slide.background.fill.solid()
+    slide.background.fill.fore_color.rgb = NEGRO if oscuro else FONDO_SLIDE
     franja = _rectangulo(slide, 0, 0, ANCHO, Inches(0.9), OSCURO)
     if not oscuro:
         _degrade(franja, OSCURO, AZUL)
     _rectangulo(slide, 0, Inches(0.9), ANCHO, Inches(0.05), ACENTO)
     izquierda = Inches(0.45)
     if icono is not None:
-        slide.shapes.add_picture(str(icono), Inches(0.4), Inches(0.15), Inches(0.6), Inches(0.6))
-        izquierda = Inches(1.15)
+        slide.shapes.add_picture(str(icono), Inches(0.45), Inches(0.2), Inches(0.5), Inches(0.5))
+        izquierda = Inches(1.05)
     caja = _texto(slide, izquierda, Inches(0.14), Inches(9.5), Inches(0.6), titulo, 26, BLANCO, True)
     if emoji:
         # El emoji en un tramo aparte, con Segoe UI Emoji: con la tipografía del título
@@ -282,19 +337,19 @@ def _encabezado(prs, titulo: str, fecha: date, numero: int, oscuro: bool = False
     _texto(slide, Inches(10.4), Inches(0.25), Inches(2.6), Inches(0.5), f"{fecha:%d/%m/%Y}", 16, BLANCO,
            alinear=PP_ALIGN.RIGHT)
     pie = CLARO if oscuro else GRIS
-    _texto(slide, Inches(0.45), Inches(7.08), Inches(9), Inches(0.3), "Reporte Macroeconómico · Mauro E. Martinez · Globalaize",
+    _texto(slide, Inches(0.45), Inches(7.08), Inches(9), Inches(0.3), "Reporte Macroeconómico · Mauro E. Martinez · GlobalAIze",
            10, pie)
     _texto(slide, Inches(11.9), Inches(7.08), Inches(1), Inches(0.3), str(numero), 10, pie, alinear=PP_ALIGN.RIGHT)
     return slide
 
 
 def _caja_ia(slide, x, y, ancho, alto, texto: str, rotulo: str = "Análisis IA del día"):
-    """La caja oscura con el borde gris azulado del párrafo de IA del mail."""
-    _rectangulo(slide, x, y, ancho, alto, OSCURO)
-    _rectangulo(slide, x, y, Inches(0.07), alto, ACENTO)
+    """La tarjeta oscura del párrafo de IA, como en el mail."""
+    _tarjeta_fondo(slide, x, y, ancho, alto, OSCURO)
     caja = _bloques(slide, x + Inches(0.2), y + Inches(0.08), ancho - Inches(0.35), alto - Inches(0.15),
-                    [(f"🤖 {rotulo}", texto)], None, CLARO, ACENTO_CLARO)
-    caja.text_frame.vertical_anchor = MSO_ANCHOR.TOP
+                    [(f"🤖 {rotulo}", texto)], None, CLARO, ACENTO_CLARO, tarjeta=None)
+    if caja is not None:
+        caja.text_frame.vertical_anchor = MSO_ANCHOR.TOP
     return caja
 
 
@@ -310,8 +365,8 @@ def _variacion(hoy: float, ayer: float) -> tuple[str, RGBColor]:
 
 
 def _tarjeta(slide, x, y, titulo: str, valor: str, detalle: str, color_detalle=GRIS):
-    _rectangulo(slide, x, y, Inches(3.9), Inches(1.6), FONDO_TARJETA)
-    _rectangulo(slide, x, y, Inches(0.07), Inches(1.6), color_detalle if color_detalle != GRIS else AZUL)
+    _tarjeta_fondo(slide, x, y, Inches(3.9), Inches(1.6))
+    _rectangulo(slide, x, y + Inches(0.12), Inches(0.07), Inches(1.36), color_detalle if color_detalle != GRIS else AZUL)
     _texto(slide, x + Inches(0.25), y + Inches(0.1), Inches(3.5), Inches(0.4), titulo.upper(), 13, GRIS, True)
     _texto(slide, x + Inches(0.25), y + Inches(0.42), Inches(3.5), Inches(0.6), valor, 32, AZUL, True)
     _texto(slide, x + Inches(0.25), y + Inches(1.08), Inches(3.5), Inches(0.4), detalle, 14, color_detalle)
@@ -406,6 +461,17 @@ def _metadatos(prs, fecha: date) -> None:
     propiedades.modified = ahora
 
 
+def _colores_de_link(prs) -> None:
+    """Los links en los azules de GlobalAIze: PowerPoint ignora el color del texto y usa el del tema."""
+    import re
+
+    tema = prs.slide_masters[0].part.part_related_by(RELATIONSHIP_TYPE.THEME)
+    xml = tema.blob.decode("utf-8")
+    for etiqueta, color in (("hlink", "1F4E79"), ("folHlink", "081E40")):
+        xml = re.sub(rf"(<a:{etiqueta}>\s*<a:srgbClr val=\")[0-9A-Fa-f]{{6}}", rf"\g<1>{color}", xml)
+    tema._blob = xml.encode("utf-8")
+
+
 def _propiedades_de_aplicacion(prs) -> None:
     """docProps/app.xml con los datos de este archivo.
 
@@ -465,33 +531,35 @@ def armar(
     _metadatos(prs, fecha)
     numero = iter(range(2, 100))  # la portada es la 1 y no lleva número
 
-    # 1. Portada: blanca, con el logo de Globalaize y sus azules, los links y las tecnologías
+    # 1. Portada: blanca, con el logo de GlobalAIze y sus azules, los links y las tecnologías
     portada = prs.slides.add_slide(prs.slide_layouts[6])
     portada.background.fill.solid()
     portada.background.fill.fore_color.rgb = BLANCO
     for x, y, lado, opacidad in [(-1.6, -1.9, 4.6, 0.9), (10.9, -1.4, 3.8, 0.7), (11.6, 3.6, 2.6, 0.5)]:
         _opacidad(_rectangulo(portada, Inches(x), Inches(y), Inches(lado), Inches(lado), FONDO_TARJETA, forma=9), opacidad)
     lado_logo = Inches(1.45)
-    portada.shapes.add_picture(str(_icono_globalaize()), (ANCHO - lado_logo) // 2, Inches(0.3), lado_logo, lado_logo)
+    # El logo grande es el link al sitio: por eso la fila de links de abajo no lo repite
+    _con_link(portada.shapes.add_picture(str(_icono_globalaize()), (ANCHO - lado_logo) // 2, Inches(0.3), lado_logo, lado_logo),
+              "https://www.globalaize.com")
     centrado = {"alinear": PP_ALIGN.CENTER}
     _texto(portada, 0, Inches(1.85), ANCHO, Inches(0.4), "ARGENTINA · INFORME DIARIO", 14, GRIS_LOGO, True, **centrado)
     _texto(portada, 0, Inches(2.2), ANCHO, Inches(1.0), "Reporte Macroeconómico", 50, OSCURO, True, **centrado)
     _texto(portada, 0, Inches(3.15), ANCHO, Inches(0.5),
            "Dólar · Riesgo país · Tasas · Inflación · Agregados monetarios · Deuda · Bitcoin", 18, GRIS_LOGO, **centrado)
     _texto(portada, 0, Inches(3.65), ANCHO, Inches(0.5), f"{fecha:%d/%m/%Y}", 24, AZUL, True, **centrado)
-    _texto(portada, 0, Inches(4.25), ANCHO, Inches(0.4), "por Mauro E. Martinez · Globalaize", 13, GRIS_LOGO, **centrado)
-    _links(portada, None, Inches(4.7), Inches(0.5), color_rotulo=OSCURO, separacion=Inches(1.6))
+    _texto(portada, 0, Inches(4.25), ANCHO, Inches(0.4), "por Mauro E. Martinez · GlobalAIze", 15, GRIS_LOGO, **centrado)
+    _links(portada, None, Inches(4.7), Inches(0.5), color_rotulo=OSCURO, separacion=Inches(1.8), omitir=("GlobalAIze",))
 
     # Pie: las tecnologías que intervienen, sobre una franja celeste
     _rectangulo(portada, 0, Inches(6.05), ANCHO, Inches(1.45), FONDO_TARJETA)
-    _texto(portada, 0, Inches(6.1), ANCHO, Inches(0.3), "HECHO CON", 10, GRIS_LOGO, True, **centrado)
+    _texto(portada, 0, Inches(6.1), ANCHO, Inches(0.3), "STACK", 10, GRIS_LOGO, True, **centrado)
     lugar, icono = Inches(0.78), Inches(0.42)
     inicio = (ANCHO - lugar * len(TECNOLOGIAS)) // 2
     for i, (archivo, rotulo) in enumerate(TECNOLOGIAS):
         x = inicio + i * lugar
         portada.shapes.add_picture(str(RECURSOS / "tecnologias" / f"{archivo}.png"), x + (lugar - icono) // 2,
-                                   Inches(6.45), icono, icono)
-        _texto(portada, x - Inches(0.05), Inches(6.9), lugar + Inches(0.1), Inches(0.3), rotulo, 8, OSCURO, **centrado)
+                                   Inches(6.4), icono, icono)
+        _texto(portada, x - Inches(0.05), Inches(6.9), lugar + Inches(0.1), Inches(0.3), rotulo, 9, OSCURO, **centrado)
 
     # 2. Tablero
     tablero = _encabezado(prs, "Tablero del día", fecha, next(numero), emoji="📋")
@@ -509,12 +577,13 @@ def armar(
         _tarjeta(tablero, Inches(0.45 + (i % 3) * 4.2), Inches(1.4 + (i // 3) * 2.0), titulo, valor, detalle, color)
     diferencia = abs(resumen["ahorro_valor"])
     sentido = "más barato" if resumen["ahorro_valor"] > 0 else "más caro"
-    _texto(tablero, Inches(0.45), Inches(5.6), Inches(12.4), Inches(1.0),
+    _tarjeta_fondo(tablero, Inches(0.45), Inches(5.35), Inches(12.4), Inches(1.4))
+    _texto(tablero, Inches(0.65), Inches(5.45), Inches(12.0), Inches(1.2),
            f"Comprar USD {resumen['cantidad_usd']} al oficial con impuestos (solidario) sale $ {_num(diferencia)} "
            f"{sentido} que en el blue: el solidario está {_num(abs(resumen['brecha_solidario']))}% "
            f"{'por debajo' if resumen['brecha_solidario'] > 0 else 'por encima'} del blue.\n"
            "Verde: bajó contra la rueda anterior; rojo: subió. Desde la macro, que el dólar y el riesgo país bajen "
-           "es la buena noticia.", 16, GRIS)
+           "es la buena noticia.", 15, GRIS)
 
     # 3 y 4. Tipos de cambio y riesgo país, con los paneles por separado
     paneles = []
@@ -525,8 +594,8 @@ def armar(
             except Exception:
                 paneles = []  # sin paneles, va el gráfico entero como en el mail
 
-        cambio = _encabezado(prs, "Tipos de cambio", fecha, next(numero), emoji="💱")
-        _caja_ia(cambio, Inches(0.45), Inches(1.12), Inches(12.43), Inches(1.6), parrafo)
+        cambio = _encabezado(prs, "Tipos de cambio", fecha, next(numero), emoji="💵")
+        _caja_ia(cambio, Inches(0.45), Inches(1.12), Inches(12.43), Inches(1.25), parrafo)
         cambio.notes_slide.notes_text_frame.text = parrafo
         if paneles:
             for j, (ruta, clave, frase) in enumerate([
@@ -534,12 +603,12 @@ def armar(
                 (paneles[1], "oficial", frase_oficiales(hoy, ayer)),
             ]):
                 x = Inches(0.45) + j * Inches(6.33)
-                _imagen(cambio, ruta, x, Inches(2.85), Inches(6.1), Inches(2.4))
+                _imagen(cambio, ruta, x, Inches(2.5), Inches(6.1), Inches(2.35))
                 texto = _comentario(comentarios, charts.cid(charts.TIPOS_DE_CAMBIO), clave)
-                _bloques(cambio, x, Inches(5.3), Inches(6.1), Inches(1.75),
+                _bloques(cambio, x, Inches(4.95), Inches(6.1), Inches(2.0),
                          [("🤖 Análisis IA" if texto else "Resumen del día", texto or frase)], maximo=15)
         elif charts.TIPOS_DE_CAMBIO in imagenes:
-            _imagen(cambio, imagenes[charts.TIPOS_DE_CAMBIO], Inches(0.45), Inches(2.85), Inches(12.43), Inches(4.1))
+            _imagen(cambio, imagenes[charts.TIPOS_DE_CAMBIO], Inches(0.45), Inches(2.5), Inches(12.43), Inches(4.45))
         else:
             _texto(cambio, Inches(0.6), Inches(4), Inches(12), Inches(1), "Gráfico no disponible para este día.", 18, GRIS)
 
@@ -552,7 +621,7 @@ def armar(
                  [("Resumen del día", frase_riesgo(df)), ("🤖 Análisis IA", _comentario(comentarios, charts.cid(charts.TIPOS_DE_CAMBIO), "riesgo"))])
 
     # 5. Inflación
-    inflacion_slide = _encabezado(prs, "Inflación y variaciones acumuladas", fecha, next(numero), emoji="🛒")
+    inflacion_slide = _encabezado(prs, "Inflación y variaciones acumuladas", fecha, next(numero), emoji="📈")
     for j, nombre in enumerate([charts.INFLACION, charts.VARIACIONES]):
         x = Inches(0.45) + j * Inches(6.33)
         if nombre in imagenes:
@@ -564,7 +633,7 @@ def armar(
         _bloques(inflacion_slide, Inches(0.45), Inches(5.2), Inches(12.43), Inches(1.85), [("Resumen del día", frase)])
 
     # 6 y 7. Agregados y deuda: el resumen del día y lo ideal; el texto completo, en las notas
-    for titulo, emoji, nombre, cid in [("Agregados monetarios", "🏦", charts.AGREGADOS, indicadores.CID_AGREGADOS),
+    for titulo, emoji, nombre, cid in [("Agregados monetarios", "💰", charts.AGREGADOS, indicadores.CID_AGREGADOS),
                                        ("Endeudamiento, en dólares", "💸", charts.DEUDA, indicadores.CID_DEUDA)]:
         slide = _encabezado(prs, titulo, fecha, next(numero), emoji=emoji)
         if nombre in imagenes:
@@ -582,42 +651,45 @@ def armar(
     # 8. Bitcoin, en negro como su gráfico
     bitcoin = _encabezado(prs, "Bitcoin", fecha, next(numero), oscuro=True, icono=RECURSOS / "bitcoin.png")
     if charts.BTC in imagenes:
-        _imagen(bitcoin, imagenes[charts.BTC], Inches(0.45), Inches(1.15), Inches(7.9), Inches(5.8))
+        _imagen(bitcoin, imagenes[charts.BTC], Inches(0.45), Inches(1.15), Inches(7.9), Inches(5.8), tarjeta=TARJETA_OSCURA)
     else:
         _texto(bitcoin, Inches(0.6), Inches(3), Inches(8), Inches(1), "Gráfico no disponible para este día.", 18, CLARO)
     _bloques(bitcoin, Inches(8.6), Inches(1.2), Inches(4.35), Inches(5.75),
-             [("Resumen del día", frase_btc(btc)), ("🤖 Análisis IA", _comentario(comentarios, charts.cid(charts.BTC), "bitcoin"))], None, CLARO, ACENTO_CLARO)
+             [("Resumen del día", frase_btc(btc)), ("🤖 Análisis IA", _comentario(comentarios, charts.cid(charts.BTC), "bitcoin"))], None, CLARO, ACENTO_CLARO, tarjeta=TARJETA_OSCURA)
 
     # 9. Fuentes y contacto
     cierre = _encabezado(prs, "Fuentes y contacto", fecha, next(numero), emoji="📚")
-    _texto(cierre, Inches(0.45), Inches(1.2), Inches(7.5), Inches(0.4), "FUENTES CONSULTADAS", 14, AZUL, True)
-    caja = cierre.shapes.add_textbox(Inches(0.45), Inches(1.65), Inches(7.6), Inches(5.3))
+    _tarjeta_fondo(cierre, Inches(0.35), Inches(1.1), Inches(7.85), Inches(5.55))
+    _texto(cierre, Inches(0.55), Inches(1.25), Inches(7.5), Inches(0.4), "FUENTES CONSULTADAS", 14, AZUL, True)
+    caja = cierre.shapes.add_textbox(Inches(0.55), Inches(1.7), Inches(7.5), Inches(4.9))
     marco = caja.text_frame
     marco.word_wrap = True
     for i, (nombre, url) in enumerate(FUENTES):
         p = marco.paragraphs[0] if i == 0 else marco.add_paragraph()
-        p.space_after = Pt(6)
+        p.space_after = Pt(9)
         run = p.add_run()
         run.text = f"{nombre}: "
-        run.font.size, run.font.bold, run.font.color.rgb = Pt(14), True, AZUL
+        run.font.size, run.font.bold, run.font.color.rgb = Pt(15), True, AZUL
         run = p.add_run()
         run.text = url
         run.hyperlink.address = url
-        run.font.size, run.font.color.rgb = Pt(13), CELESTE
-    _rectangulo(cierre, Inches(8.45), Inches(1.2), Inches(4.43), Inches(5.7), OSCURO)
+        run.font.size, run.font.color.rgb = Pt(14), CELESTE
+    _tarjeta_fondo(cierre, Inches(8.45), Inches(1.1), Inches(4.43), Inches(5.55), OSCURO)
     _texto(cierre, Inches(8.75), Inches(1.4), Inches(4), Inches(0.4), "CONTACTO", 14, ACENTO_CLARO, True)
     _texto(cierre, Inches(8.75), Inches(1.85), Inches(4), Inches(0.9),
-           "Reporte hecho íntegramente en Python por Mauro E. Martinez, de Globalaize (sitio en construcción).", 14, CLARO)
+           "Reporte hecho íntegramente en Python por Mauro E. Martinez, de GlobalAIze (sitio en construcción).", 14, CLARO)
     _links(cierre, Inches(8.65), Inches(3.0), Inches(0.5), separacion=Inches(1.03))
     _texto(cierre, Inches(8.75), Inches(4.45), Inches(4), Inches(0.8),
            f"☕ ¿Te sirvió el reporte? Podés apoyar el proyecto al alias {ALIAS}", 15, BLANCO, True)
     _texto(cierre, Inches(8.75), Inches(5.4), Inches(4), Inches(0.9),
            f"📧 Consultas, desuscripciones o propuestas:\n{MAIL}", 14, CLARO, link=f"mailto:{MAIL}")
-    _texto(cierre, Inches(0.45), Inches(6.7), Inches(7.6), Inches(0.35),
-           "Análisis generado con Gemini a partir de los datos del día. No es asesoramiento financiero.", 10, GRIS)
+    _texto(cierre, 0, Inches(6.72), ANCHO, Inches(0.35),
+           "Análisis generado con Gemini a partir de los datos del día. No es asesoramiento financiero.", 10, GRIS,
+           alinear=PP_ALIGN.CENTER)
 
     salida = Path(salida)
     salida.mkdir(parents=True, exist_ok=True)
+    _colores_de_link(prs)
     _propiedades_de_aplicacion(prs)
     ruta = salida / ARCHIVO
     # Primero a un temporal y después se reemplaza: si el guardado falla a mitad de

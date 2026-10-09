@@ -529,7 +529,7 @@ def grafico_btc(btc_df: pd.DataFrame, carpeta: Path) -> Path:
         ax1.set_xlim(btc_df.index[0], btc_df.index[-1])
         ax1.set_ylim(bottom=0)
 
-        ax1.set_title("BTC/USD - Últimos 12 Meses con Seaborn Style", fontsize=20, fontweight="bold", color="#00ff41", pad=20)
+        ax1.set_title("BTC/USD, últimos 12 meses", fontsize=20, fontweight="bold", color="#00ff41", pad=20)
         ax1.set_ylabel("USD/BTC", fontsize=13, color="#00ff41", fontweight="bold")
 
         legend1 = ax1.legend(
@@ -763,7 +763,7 @@ def grafico_deuda(datos: dict, carpeta: Path) -> Path:
             ax[0].plot(firmes["Mes"], firmes["miles_de_millones"], linestyle="none", marker="o", markersize=6, color=color)
             if not prov.empty:
                 ax[0].plot(prov["Mes"], prov["miles_de_millones"], linestyle="none", marker="o", markersize=10,
-                           markerfacecolor="white", markeredgecolor="#e67e22", markeredgewidth=2.2,
+                           markerfacecolor="white", markeredgecolor="#697E91", markeredgewidth=2.2,
                            label="Provisorio (puede corregirse)", zorder=5)
             _anotar_ultimo(ax[0], tesoro["Mes"], tesoro["miles_de_millones"], color)
             ax[0].xaxis.set_major_locator(mdates.MonthLocator(interval=2))

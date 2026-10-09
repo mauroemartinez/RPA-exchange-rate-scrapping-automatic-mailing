@@ -6,7 +6,7 @@ falta para cambiar un ícono.
 
 Uso: python iconos_presentacion.py
 
-El de Globalaize es provisorio (una G sobre el degradé de la marca) hasta tener
+El de GlobalAIze es provisorio (una G sobre el degradé de la marca) hasta tener
 el logo: si existe reporte/recursos/globalaize_logo.png, la presentación usa ese.
 """
 
@@ -39,11 +39,11 @@ ICONOS = {
     ),
     "globalaize.png": (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs>'
-        '<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F39C12"/>'
-        '<stop offset="1" stop-color="#E67E22"/></linearGradient></defs>'
+        '<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#163A6B"/>'
+        '<stop offset="1" stop-color="#081E40"/></linearGradient></defs>'
         '<circle cx="50" cy="50" r="50" fill="url(#g)"/>'
         '<text x="50" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" '
-        'font-size="58" fill="#1A252F">G</text></svg>'
+        'font-size="58" fill="#FFFFFF">G</text></svg>'
     ),
     "bitcoin.png": (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
@@ -70,10 +70,27 @@ def _tecnologias() -> dict[str, str]:
     }
 
 
+def _logo_redondeado() -> None:
+    """El logo de GlobalAIze con las esquinas redondeadas, como los íconos de LinkedIn, para la fila de links."""
+    from PIL import Image, ImageDraw
+
+    origen = DESTINO / "globalaize_logo.png"
+    if not origen.exists():
+        return
+    with Image.open(origen) as im:
+        logo = im.convert("RGBA").resize((LADO, LADO), Image.LANCZOS)
+    mascara = Image.new("L", (LADO, LADO), 0)
+    ImageDraw.Draw(mascara).rounded_rectangle((0, 0, LADO - 1, LADO - 1), radius=int(LADO * 0.18), fill=255)
+    logo.putalpha(mascara)
+    logo.save(DESTINO / "globalaize_logo_redondeado.png")
+    print("globalaize_logo_redondeado.png")
+
+
 def main() -> None:
     from playwright.sync_api import sync_playwright
 
     DESTINO.mkdir(parents=True, exist_ok=True)
+    _logo_redondeado()
     with sync_playwright() as p:
         navegador = p.chromium.launch()
         try:

@@ -15,7 +15,7 @@ python scripts/presentacion_ejecutiva.py --salida DIR
 
 Arma nueve diapositivas en 16:9 con lo que la corrida ya dejó (diseño del 8 de octubre):
 
-- portada con los temas del día, la moneda de BTC y los links del autor y de Globalaize;
+- portada con los temas del día, la moneda de BTC y los links del autor y de GlobalAIze;
 - un tablero con blue, MEP, billete, riesgo país, BADLAR y el forward de Fisher, cada uno con su variación: subir es rojo y bajar, verde, como en el mail;
 - tipos de cambio: el análisis de IA arriba y los paneles de paralelas y oficiales por separado, cada uno con su frase;
 - riesgo país, con su frase;
