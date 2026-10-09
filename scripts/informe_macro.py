@@ -48,6 +48,9 @@ NARANJA_BTC = "#F7931A"  # el único naranja: el color de marca de Bitcoin
 
 URL_BLUELYTICS = "https://api.bluelytics.com.ar/v2/evolution.json"
 INICIO_GOBIERNO = pd.Timestamp("2023-12-10")
+# El dólar real se compara desde 2016: entre 2007 y 2015 el IPC oficial (INDEC intervenido)
+# subestimaba la inflación y deprime artificialmente el índice de esos años
+INICIO_TCR = "2016"
 # Los días del blue propio que no coinciden con Bluelytics por más de esto se toman de Bluelytics
 TOLERANCIA_BLUE = 0.05
 
@@ -201,6 +204,9 @@ def calcular(d: dict) -> dict:
     m["carrera_ipc_hasta"] = mes_anio(im.index[-1])
     m["carrera_may"] = _var(may, "2023-11-30", im.index[-1])
     m["carrera_blue"] = _var(blue, "2023-11-30", im.index[-1])
+    m["poder_blue"] = ((1 + m["carrera_blue"] / 100) / (1 + m["carrera_ipc"] / 100) - 1) * 100
+    m["poder_may"] = ((1 + m["carrera_may"] / 100) / (1 + m["carrera_ipc"] / 100) - 1) * 100
+    m["carrera_hasta"] = im.index[-1]
 
     # Dólar real: A3500 por inflación de EEUU sobre inflación argentina, mes contra mes
     usa = d["cpi_usa"].copy()
@@ -210,13 +216,15 @@ def calcular(d: dict) -> dict:
     tcr = (may_m * usa / ipc).dropna()
     tcr = tcr / tcr.iloc[-1] * 100
     m["tcr_serie"], m["tcr_ultimo_mes"] = tcr, mes_anio(tcr.index[-1].to_timestamp())
-    m["tcr_mediana"] = tcr.loc["2003":].median()
+    m["tcr_mediana"] = tcr.loc[INICIO_TCR:].median()
     m["tcr_dic23"] = tcr[pd.Period("2023-12", "M")]
     m["tcr_nov23"] = tcr[pd.Period("2023-11", "M")]
     m["tcr_2017"] = tcr.loc["2017"].mean()
-    m["tcr_2015"] = tcr.loc["2015"].mean()
-    m["tcr_max"], m["tcr_max_mes"] = tcr.loc["2003":].max(), mes_anio(tcr.loc["2003":].idxmax().to_timestamp())
-    m["tcr_percentil"] = (tcr.loc["2003":] < 100).mean() * 100
+    m["tcr_max"], m["tcr_max_mes"] = tcr.loc[INICIO_TCR:].max(), mes_anio(tcr.loc[INICIO_TCR:].idxmax().to_timestamp())
+    m["tcr_min"], m["tcr_min_mes"] = tcr.loc[INICIO_TCR:].min(), mes_anio(tcr.loc[INICIO_TCR:].idxmin().to_timestamp())
+    m["tcr_percentil"] = (tcr.loc[INICIO_TCR:] < 100).mean() * 100
+    rebote = tcr.loc["2025":]
+    m["tcr_rebote"], m["tcr_rebote_mes"] = rebote.max(), mes_anio(rebote.idxmax().to_timestamp())
 
     # Tasas
     bad = d["badlar"]
@@ -226,6 +234,9 @@ def calcular(d: dict) -> dict:
     m["badlar"], m["badlar_mensual"] = bad.iloc[-1], ((1 + bad.iloc[-1] / 100) ** (1 / 12) - 1) * 100
     m["tasa_real"], m["tasa_real_mes"] = badm["real"].iloc[-1], mes_anio(badm.index[-1])
     m["tasa_real_min"], m["tasa_real_min_mes"] = badm["real"].min(), mes_anio(badm["real"].idxmin())
+    m["tasa_real_hoy"] = ((1 + bad.iloc[-1] / 100) / (1 + ia.iloc[-1] / 100) - 1) * 100
+    m["inf_6m_anual"] = ((1 + m["inf_6m"] / 100) ** 12 - 1) * 100
+    m["tasa_real_adelante"] = ((1 + bad.iloc[-1] / 100) / (1 + m["inf_6m_anual"] / 100) - 1) * 100
     m["fed"] = d["fed"].iloc[-1]
     m["badlar_desde"] = mes_anio(bad.index[0])
 
@@ -259,6 +270,11 @@ def calcular(d: dict) -> dict:
     m["prest_max_previo_fecha"] = pu.loc[:"2023-12-31"].idxmax()
     m["letras_max"], m["letras_max_fecha"], m["letras_hoy"] = m["letras_usd"].max(), m["letras_usd"].idxmax(), m["letras_usd"].iloc[-1]
     m["adelantos_max"], m["adelantos_max_fecha"], m["adelantos_hoy"] = m["adelantos_usd"].max(), m["adelantos_usd"].idxmax(), m["adelantos_usd"].iloc[-1]
+    prest_m = S["prestamos_sector_privado"].resample("ME").last()
+    prest_m.index = prest_m.index.to_period("M")
+    prest_real = (prest_m / ipc).dropna()
+    m["prest_real_vs_dic23"] = prest_real.iloc[-1] / prest_real[pd.Period("2023-12", "M")]
+    m["prest_real_vs_2017"] = (prest_real.iloc[-1] / prest_real[pd.Period("2017-12", "M")] - 1) * 100
     m["base_real_ult"], m["m2_real_ult"], m["prest_real_ult"] = m["base_real"].iloc[-1], m["m2_real"].iloc[-1], m["prest_real"].iloc[-1]
     m["dinero_mes"] = mes_anio(m["m2_real"].index[-1].to_timestamp())
 
@@ -343,9 +359,9 @@ def graficos(d: dict, m: dict, carpeta: Path) -> dict:
     ax.set_yscale("log")
     ax.yaxis.set_major_formatter(FuncFormatter(_miles))
     ax.set_ylabel("Pesos por dólar (escala log.)", fontsize=8, color="#3A4A5C")
-    ax.legend(frameon=False, fontsize=8, loc="upper left")
-    ax.text(pd.Timestamp("2013-06-01"), ax.get_ylim()[1] * 0.55, "cepo", color=GRIS, fontsize=8, ha="center")
-    ax.text(pd.Timestamp("2022-01-01"), ax.get_ylim()[1] * 0.55, "cepo", color=GRIS, fontsize=8, ha="center")
+    ax.legend(frameon=False, fontsize=8, loc="lower right")
+    ax.text(pd.Timestamp("2013-11-01"), ax.get_ylim()[1] * 0.6, "cepo", color=GRIS, fontsize=8, ha="center")
+    ax.text(pd.Timestamp("2022-06-01"), ax.get_ylim()[1] * 0.6, "cepo", color=GRIS, fontsize=8, ha="center")
     g["cambio"] = _guardar(fig, carpeta / "cambio.png")
 
     # 2. Brecha
@@ -360,12 +376,12 @@ def graficos(d: dict, m: dict, carpeta: Path) -> dict:
     g["brecha"] = _guardar(fig, carpeta / "brecha.png")
 
     # 3. Dólar real
-    t = m["tcr_serie"].loc["2003":]
+    t = m["tcr_serie"].loc[INICIO_TCR:]
     x = t.index.to_timestamp()
     fig, ax = _figura(3.0)
     ax.plot(x, t.values, color=MARINO, lw=1.5)
     ax.axhline(m["tcr_mediana"], color=GRIS, lw=1, ls="--")
-    ax.text(x[3], m["tcr_mediana"] * 1.04, f"mediana 2003-hoy: {num(m['tcr_mediana'], 0)}", color=GRIS, fontsize=7.5)
+    ax.text(x[3], m["tcr_mediana"] * 1.02, f"mediana 2016-hoy: {num(m['tcr_mediana'], 0)}", color=GRIS, fontsize=7.5)
     ax.axhline(100, color=AZUL, lw=0.8, ls=":")
     ax.set_ylabel(f"Dólar real ({m['tcr_ultimo_mes']} = 100)", fontsize=8, color="#3A4A5C")
     ax.annotate("dic-2023", (pd.Timestamp("2023-12-01"), m["tcr_dic23"]), xytext=(-55, 5), textcoords="offset points",
@@ -397,10 +413,12 @@ def graficos(d: dict, m: dict, carpeta: Path) -> dict:
     ax.set_yscale("log")
     ax.yaxis.set_major_formatter(FuncFormatter(_pct))
     ax.set_ylabel("Interanual (escala log.)", fontsize=8, color="#3A4A5C")
-    for fecha, texto in [("1975-07-01", "Rodrigazo"), ("1989-07-01", "Hiperinflación"), ("2002-04-01", "Fin de la\nconvertibilidad"),
-                         ("2024-04-01", "Pico 2024")]:
+    for fecha, texto, dx, dy in [("1976-03-01", "Rodrigazo", -30, 14), ("1990-03-01", "Hiperinflación", 42, -2),
+                                 ("2002-04-01", "Fin de la\nconvertibilidad", 10, 24), ("2024-04-01", "Pico 2024", -26, 10)]:
         f = pd.Timestamp(fecha)
-        ax.annotate(texto, (f, _valor_al(il, f)), xytext=(0, 10), textcoords="offset points", fontsize=7, color=AZUL, ha="center")
+        ax.annotate(texto, (f, il.loc[:f].max() if texto == "Hiperinflación" else _valor_al(il, f)), xytext=(dx, dy),
+                    textcoords="offset points", fontsize=7, color=AZUL, ha="center",
+                    arrowprops={"arrowstyle": "-", "color": CELESTE, "lw": 0.6})
     g["inflacion_larga"] = _guardar(fig, carpeta / "inflacion_larga.png")
 
     # 6. Carrera desde noviembre de 2023: precios, mayorista y blue
@@ -408,7 +426,7 @@ def graficos(d: dict, m: dict, carpeta: Path) -> dict:
     ipcs = ipc.loc[pd.Period("2023-11", "M"):]
     ipcs = ipcs / ipcs.iloc[0] * 100
     def base100(serie):
-        x = serie.resample("ME").last().loc["2023-11":]
+        x = serie.resample("ME").last().loc["2023-11": m["carrera_hasta"]]
         return x / x.iloc[0] * 100
     fig, ax = _figura(2.7)
     ax.plot(ipcs.index.to_timestamp(how="end"), ipcs.values, color=ROJO, lw=1.8, label="Precios (IPC)")
@@ -438,12 +456,12 @@ def graficos(d: dict, m: dict, carpeta: Path) -> dict:
     ax.plot(rp.index, rp, color=MARINO, lw=1)
     ax.yaxis.set_major_formatter(FuncFormatter(_miles))
     ax.set_ylabel("Puntos básicos", fontsize=8, color="#3A4A5C")
-    for fecha, texto, dy in [("2002-08-07", "Default 2001-02", -12), ("2008-12-01", "Crisis global", 8), ("2014-08-01", "Holdouts", 22),
-                             ("2018-09-01", "Crisis 2018", 30), ("2020-03-23", "Pandemia y\nreestructuración", 8),
-                             ("2023-11-17", "Elecciones 2023", 8)]:
+    for fecha, texto, dx, dy in [("2002-08-07", "Default 2001-02", 62, -6), ("2008-12-01", "Crisis global", 0, 26),
+                                 ("2014-08-01", "Holdouts", 0, 30), ("2018-09-01", "Crisis 2018", -28, 38),
+                                 ("2020-03-23", "Pandemia y\nreestructuración", -52, 6), ("2023-11-17", "Elecciones 2023", 30, 30)]:
         f = pd.Timestamp(fecha)
-        ax.annotate(texto, (f, _valor_al(rp, f)), xytext=(0 if dy > 0 else 40, dy), textcoords="offset points", fontsize=6.8,
-                    color=AZUL, ha="center")
+        ax.annotate(texto, (f, _valor_al(rp, f)), xytext=(dx, dy), textcoords="offset points", fontsize=6.8,
+                    color=AZUL, ha="center", arrowprops={"arrowstyle": "-", "color": CELESTE, "lw": 0.6})
     g["riesgo"] = _guardar(fig, carpeta / "riesgo.png")
 
     # 9. Dinero real
@@ -459,15 +477,15 @@ def graficos(d: dict, m: dict, carpeta: Path) -> dict:
 
     # 10. Deuda bruta del Tesoro
     db = m["deuda_serie"]
-    fig, ax = _figura(2.8)
+    fig, ax = _figura(2.3)
     ax.bar(db.index, db, width=24, color=[MARINO if f.month == 12 else CELESTE for f in db.index])
-    ax.set_ylim(db.min() * 0.85, db.max() * 1.05)
+    ax.set_ylim(0, db.max() * 1.08)
     ax.yaxis.set_major_formatter(FuncFormatter(_miles))
     ax.set_ylabel("Miles de millones de USD", fontsize=8, color="#3A4A5C")
     g["deuda"] = _guardar(fig, carpeta / "deuda.png")
 
     # 11. Crédito privado y deuda del BCRA, en dólares
-    fig, ejes = _figura(4.2, filas=2, sharex=True)
+    fig, ejes = _figura(3.6, filas=2, sharex=True)
     pu = m["prest_usd"].loc["2003":]
     ejes[0].fill_between(pu.index, pu, 0, color=VERDE, alpha=0.15, lw=0)
     ejes[0].plot(pu.index, pu, color=VERDE, lw=1.3)
