@@ -11,9 +11,11 @@ el logo: si existe reporte/recursos/globalaize_logo.png, la presentación usa es
 """
 
 import re
+import sys
 from pathlib import Path
 
 DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(DIR))  # para importar construir.py, el del diagrama
 DESTINO = DIR.parent.parent / "reporte" / "recursos"
 LADO = 256
 
@@ -43,19 +45,6 @@ ICONOS = {
         '<text x="50" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" '
         'font-size="58" fill="#1A252F">G</text></svg>'
     ),
-    # Comercio exterior: un globo con una ruta entre dos puertos, en los colores de Globalaize
-    "comex.png": (
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
-        '<circle cx="50" cy="50" r="48" fill="#FFFFFF"/>'
-        '<g fill="none" stroke="#081E40" stroke-width="2.6" stroke-linecap="round">'
-        '<circle cx="50" cy="50" r="34"/><ellipse cx="50" cy="50" rx="14" ry="34"/>'
-        '<path d="M16 50H84M21 33H79M21 67H79"/></g>'
-        '<path d="M24 64 C 34 22, 66 22, 77 38" fill="none" stroke="#F39C12" stroke-width="4" '
-        'stroke-dasharray="6 4" stroke-linecap="round"/>'
-        '<path d="M70 33 L79 39 L69 42 Z" fill="#F39C12"/>'
-        '<circle cx="24" cy="64" r="5" fill="#F39C12" stroke="#FFFFFF" stroke-width="2"/>'
-        '<circle cx="79" cy="40" r="3" fill="#081E40"/></svg>'
-    ),
     "bitcoin.png": (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
         '<circle cx="50" cy="50" r="48" fill="#F7931A"/><circle cx="50" cy="50" r="42" fill="none" '
@@ -64,6 +53,21 @@ ICONOS = {
         'font-weight="700" font-size="58" fill="#FFFFFF" transform="rotate(14 50 50)">₿</text></svg>'
     ),
 }
+
+
+# Las tecnologías del proyecto, para el pie de la portada: los mismos logos del diagrama
+# de arquitectura (construir.py). Quedan en reporte/recursos/tecnologias/.
+def _tecnologias() -> dict[str, str]:
+    import construir as c
+
+    return {
+        "python": c.dev("python"), "playwright": c.dev("playwright"), "pandas": c.dev("pandas"),
+        "pydantic": c.si("pydantic", "#E92063"), "sqlalchemy": c.dev("sqlalchemy"),
+        "postgresql": c.dev("postgresql"), "supabase": c.dev("supabase"), "gemini": c.GEMINI,
+        "matplotlib": c.dev("matplotlib"), "seaborn": c.SEABORN, "jinja": c.si("jinja", "#081E40"),
+        "powerpoint": c.si("microsoftpowerpoint", "#B7472A"), "githubactions": c.dev("githubactions"),
+        "pytest": c.dev("pytest"), "fastapi": c.dev("fastapi"), "docker": c.dev("docker"),
+    }
 
 
 def main() -> None:
@@ -80,6 +84,17 @@ def main() -> None:
                 pagina.screenshot(path=str(DESTINO / nombre), omit_background=True,
                                   clip={"x": 0, "y": 0, "width": LADO, "height": LADO})
                 print(nombre)
+            carpeta = DESTINO / "tecnologias"
+            carpeta.mkdir(exist_ok=True)
+            for nombre, uri in _tecnologias().items():
+                pagina.set_content(
+                    f'<html><body style="margin:0;background:transparent"><img src="{uri}" '
+                    f'style="width:{LADO}px;height:{LADO}px;object-fit:contain;display:block"></body></html>'
+                )
+                pagina.wait_for_timeout(50)
+                pagina.screenshot(path=str(carpeta / f"{nombre}.png"), omit_background=True,
+                                  clip={"x": 0, "y": 0, "width": LADO, "height": LADO})
+                print("tecnologias/" + nombre)
         finally:
             navegador.close()
 
