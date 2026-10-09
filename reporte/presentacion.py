@@ -49,8 +49,10 @@ AUTOR = "Seguimiento Macroeconómico"
 # Los azules del logo de Globalaize (#081E40) y uno intermedio para los degradés
 OSCURO = RGBColor(0x08, 0x1E, 0x40)
 AZUL = RGBColor(0x16, 0x3A, 0x6B)
-NARANJA = RGBColor(0xF3, 0x9C, 0x12)
-NARANJA_TEXTO = RGBColor(0xC0, 0x56, 0x0E)  # el naranja de los títulos sobre fondo claro, legible
+# Acentos con los colores de Globalaize, sin naranja: el gris azulado del logo para
+# líneas y bordes, y un celeste claro del mismo tono para los rótulos sobre fondo oscuro
+ACENTO = RGBColor(0x69, 0x7E, 0x91)
+ACENTO_CLARO = RGBColor(0xA8, 0xC3, 0xDB)
 GRIS = RGBColor(0x5D, 0x6D, 0x7E)
 CLARO = RGBColor(0xEC, 0xF0, 0xF1)
 FONDO_TARJETA = RGBColor(0xE7, 0xF2, 0xF8)  # el celeste claro del logo
@@ -144,11 +146,36 @@ def _texto(slide, x, y, ancho, alto, texto, tamanio=14, color=AZUL, negrita=Fals
     return caja
 
 
-def _bloques(slide, x, y, ancho, alto, bloques, tamanio=13, color=AZUL, color_titulo=NARANJA_TEXTO):
+def _tamanio_que_entra(bloques, ancho, alto, maximo: int = 16, minimo: int = 11) -> int:
+    """El tamaño de letra más grande con el que las secciones entran en la caja.
+
+    Es una estimación: el ancho promedio de una letra de Calibri es cerca de media
+    vez su tamaño, y cada renglón ocupa 1,2 veces el tamaño más el espacio entre
+    párrafos. Se queda un poco corta a propósito, para que nada se salga de la caja.
+    """
+    util_ancho = ancho / 12700 - 14.4  # EMU a puntos, menos los márgenes internos de la caja
+    util_alto = alto / 12700 - 7.2
+    for tamanio in range(maximo, minimo - 1, -1):
+        por_renglon = max(1, int(util_ancho / (tamanio * 0.5) * 0.92))
+        total = 0.0
+        for i, (_, texto) in enumerate(b for b in bloques if b[1]):
+            total += (12 if i else 0) + (tamanio + 1) * 1.2 + 4
+            for linea in texto.split("\n"):
+                total += -(-max(len(linea), 1) // por_renglon) * tamanio * 1.2 + 5
+        if total <= util_alto:
+            return tamanio
+    return minimo
+
+
+def _bloques(slide, x, y, ancho, alto, bloques, tamanio: int | None = None, color=AZUL, color_titulo=AZUL,
+             maximo: int = 16):
     """Una caja con secciones: [(título, texto), ...]. Cada renglón del texto es un párrafo.
 
-    Los títulos van en mayúsculas, en negrita y en naranja, como los rótulos del mail.
+    Los títulos van en mayúsculas y en negrita, en el azul de Globalaize.
+    Sin `tamanio`, usa el más grande que entra, hasta `maximo`: así la letra es lo más
+    grande posible los días con poco texto, sin salirse de la caja los días con mucho.
     """
+    tamanio = tamanio or _tamanio_que_entra(bloques, ancho, alto, maximo)
     caja = slide.shapes.add_textbox(x, y, ancho, alto)
     marco = caja.text_frame
     marco.word_wrap = True
@@ -224,7 +251,7 @@ def _links(slide, x, y, lado, color_rotulo=CLARO, separacion=None):
         ruta = _icono_globalaize() if icono is None else RECURSOS / icono
         izquierda = x + i * separacion
         _con_link(slide.shapes.add_picture(str(ruta), izquierda + (separacion - lado) // 2, y, lado, lado), url)
-        _texto(slide, izquierda, y + lado + Inches(0.03), separacion, Inches(0.5), rotulo, 10,
+        _texto(slide, izquierda, y + lado + Inches(0.03), separacion, Inches(0.5), rotulo, 11,
                color_rotulo, alinear=PP_ALIGN.CENTER, link=url)
 
 
@@ -237,7 +264,7 @@ def _encabezado(prs, titulo: str, fecha: date, numero: int, oscuro: bool = False
     franja = _rectangulo(slide, 0, 0, ANCHO, Inches(0.9), OSCURO)
     if not oscuro:
         _degrade(franja, OSCURO, AZUL)
-    _rectangulo(slide, 0, Inches(0.9), ANCHO, Inches(0.05), NARANJA)
+    _rectangulo(slide, 0, Inches(0.9), ANCHO, Inches(0.05), ACENTO)
     izquierda = Inches(0.45)
     if icono is not None:
         slide.shapes.add_picture(str(icono), Inches(0.4), Inches(0.15), Inches(0.6), Inches(0.6))
@@ -256,18 +283,17 @@ def _encabezado(prs, titulo: str, fecha: date, numero: int, oscuro: bool = False
            alinear=PP_ALIGN.RIGHT)
     pie = CLARO if oscuro else GRIS
     _texto(slide, Inches(0.45), Inches(7.08), Inches(9), Inches(0.3), "Reporte Macroeconómico · Mauro E. Martinez · Globalaize",
-           9, pie)
-    _texto(slide, Inches(11.9), Inches(7.08), Inches(1), Inches(0.3), str(numero), 9, pie, alinear=PP_ALIGN.RIGHT)
+           10, pie)
+    _texto(slide, Inches(11.9), Inches(7.08), Inches(1), Inches(0.3), str(numero), 10, pie, alinear=PP_ALIGN.RIGHT)
     return slide
 
 
 def _caja_ia(slide, x, y, ancho, alto, texto: str, rotulo: str = "Análisis IA del día"):
-    """La caja oscura con borde naranja del párrafo de IA del mail."""
+    """La caja oscura con el borde gris azulado del párrafo de IA del mail."""
     _rectangulo(slide, x, y, ancho, alto, OSCURO)
-    _rectangulo(slide, x, y, Inches(0.07), alto, NARANJA)
-    tamanio = 12 if len(texto) < 650 else 11 if len(texto) < 900 else 10
+    _rectangulo(slide, x, y, Inches(0.07), alto, ACENTO)
     caja = _bloques(slide, x + Inches(0.2), y + Inches(0.08), ancho - Inches(0.35), alto - Inches(0.15),
-                    [(f"🤖 {rotulo}", texto)], tamanio, CLARO, NARANJA)
+                    [(f"🤖 {rotulo}", texto)], None, CLARO, ACENTO_CLARO)
     caja.text_frame.vertical_anchor = MSO_ANCHOR.TOP
     return caja
 
@@ -286,9 +312,9 @@ def _variacion(hoy: float, ayer: float) -> tuple[str, RGBColor]:
 def _tarjeta(slide, x, y, titulo: str, valor: str, detalle: str, color_detalle=GRIS):
     _rectangulo(slide, x, y, Inches(3.9), Inches(1.6), FONDO_TARJETA)
     _rectangulo(slide, x, y, Inches(0.07), Inches(1.6), color_detalle if color_detalle != GRIS else AZUL)
-    _texto(slide, x + Inches(0.25), y + Inches(0.1), Inches(3.5), Inches(0.4), titulo.upper(), 11, GRIS, True)
-    _texto(slide, x + Inches(0.25), y + Inches(0.45), Inches(3.5), Inches(0.6), valor, 28, AZUL, True)
-    _texto(slide, x + Inches(0.25), y + Inches(1.1), Inches(3.5), Inches(0.4), detalle, 12, color_detalle)
+    _texto(slide, x + Inches(0.25), y + Inches(0.1), Inches(3.5), Inches(0.4), titulo.upper(), 13, GRIS, True)
+    _texto(slide, x + Inches(0.25), y + Inches(0.42), Inches(3.5), Inches(0.6), valor, 32, AZUL, True)
+    _texto(slide, x + Inches(0.25), y + Inches(1.08), Inches(3.5), Inches(0.4), detalle, 14, color_detalle)
 
 
 # ── Frases calculadas (cuando Gemini no comenta, o no hay comentario para ese gráfico) ──
@@ -465,7 +491,7 @@ def armar(
         x = inicio + i * lugar
         portada.shapes.add_picture(str(RECURSOS / "tecnologias" / f"{archivo}.png"), x + (lugar - icono) // 2,
                                    Inches(6.45), icono, icono)
-        _texto(portada, x - Inches(0.05), Inches(6.9), lugar + Inches(0.1), Inches(0.3), rotulo, 7, OSCURO, **centrado)
+        _texto(portada, x - Inches(0.05), Inches(6.9), lugar + Inches(0.1), Inches(0.3), rotulo, 8, OSCURO, **centrado)
 
     # 2. Tablero
     tablero = _encabezado(prs, "Tablero del día", fecha, next(numero), emoji="📋")
@@ -488,7 +514,7 @@ def armar(
            f"{sentido} que en el blue: el solidario está {_num(abs(resumen['brecha_solidario']))}% "
            f"{'por debajo' if resumen['brecha_solidario'] > 0 else 'por encima'} del blue.\n"
            "Verde: bajó contra la rueda anterior; rojo: subió. Desde la macro, que el dólar y el riesgo país bajen "
-           "es la buena noticia.", 13, GRIS)
+           "es la buena noticia.", 16, GRIS)
 
     # 3 y 4. Tipos de cambio y riesgo país, con los paneles por separado
     paneles = []
@@ -508,10 +534,10 @@ def armar(
                 (paneles[1], "oficial", frase_oficiales(hoy, ayer)),
             ]):
                 x = Inches(0.45) + j * Inches(6.33)
-                _imagen(cambio, ruta, x, Inches(2.85), Inches(6.1), Inches(2.75))
+                _imagen(cambio, ruta, x, Inches(2.85), Inches(6.1), Inches(2.4))
                 texto = _comentario(comentarios, charts.cid(charts.TIPOS_DE_CAMBIO), clave)
-                _bloques(cambio, x, Inches(5.65), Inches(6.1), Inches(1.4),
-                         [("🤖 Análisis IA" if texto else "Resumen del día", texto or frase)], 11)
+                _bloques(cambio, x, Inches(5.3), Inches(6.1), Inches(1.75),
+                         [("🤖 Análisis IA" if texto else "Resumen del día", texto or frase)], maximo=15)
         elif charts.TIPOS_DE_CAMBIO in imagenes:
             _imagen(cambio, imagenes[charts.TIPOS_DE_CAMBIO], Inches(0.45), Inches(2.85), Inches(12.43), Inches(4.1))
         else:
@@ -519,52 +545,52 @@ def armar(
 
         riesgo = _encabezado(prs, "Riesgo país", fecha, next(numero), emoji="🌎")
         if paneles:
-            _imagen(riesgo, paneles[2], Inches(0.45), Inches(1.25), Inches(8.5), Inches(5.6))
+            _imagen(riesgo, paneles[2], Inches(0.45), Inches(1.25), Inches(7.9), Inches(5.6))
         else:
             _texto(riesgo, Inches(0.6), Inches(3), Inches(8), Inches(1), "Gráfico no disponible para este día.", 18, GRIS)
-        _bloques(riesgo, Inches(9.25), Inches(1.3), Inches(3.65), Inches(5.6),
-                 [("Resumen del día", frase_riesgo(df)), ("🤖 Análisis IA", _comentario(comentarios, charts.cid(charts.TIPOS_DE_CAMBIO), "riesgo"))], 13)
+        _bloques(riesgo, Inches(8.6), Inches(1.2), Inches(4.35), Inches(5.75),
+                 [("Resumen del día", frase_riesgo(df)), ("🤖 Análisis IA", _comentario(comentarios, charts.cid(charts.TIPOS_DE_CAMBIO), "riesgo"))])
 
     # 5. Inflación
     inflacion_slide = _encabezado(prs, "Inflación y variaciones acumuladas", fecha, next(numero), emoji="🛒")
     for j, nombre in enumerate([charts.INFLACION, charts.VARIACIONES]):
         x = Inches(0.45) + j * Inches(6.33)
         if nombre in imagenes:
-            _imagen(inflacion_slide, imagenes[nombre], x, Inches(1.15), Inches(6.1), Inches(4.3))
+            _imagen(inflacion_slide, imagenes[nombre], x, Inches(1.1), Inches(6.1), Inches(4.0))
         else:
             _texto(inflacion_slide, x, Inches(3), Inches(6), Inches(1), "Gráfico no disponible para este día.", 18, GRIS)
     frase = frase_inflacion(inflacion, df)
     if frase:
-        _bloques(inflacion_slide, Inches(0.45), Inches(5.6), Inches(12.43), Inches(1.45), [("Resumen del día", frase)], 13)
+        _bloques(inflacion_slide, Inches(0.45), Inches(5.2), Inches(12.43), Inches(1.85), [("Resumen del día", frase)])
 
     # 6 y 7. Agregados y deuda: el resumen del día y lo ideal; el texto completo, en las notas
     for titulo, emoji, nombre, cid in [("Agregados monetarios", "🏦", charts.AGREGADOS, indicadores.CID_AGREGADOS),
                                        ("Endeudamiento, en dólares", "💸", charts.DEUDA, indicadores.CID_DEUDA)]:
         slide = _encabezado(prs, titulo, fecha, next(numero), emoji=emoji)
         if nombre in imagenes:
-            _imagen(slide, imagenes[nombre], Inches(0.45), Inches(1.1), Inches(7.4), Inches(5.9))
+            _imagen(slide, imagenes[nombre], Inches(0.45), Inches(1.1), Inches(6.7), Inches(5.9))
         else:
             _texto(slide, Inches(0.6), Inches(3), Inches(7), Inches(1), "Gráfico no disponible para este día.", 18, GRIS)
         explicacion = explicaciones.get(cid)
         if explicacion:
             parrafos = explicacion["texto"].split("\n")
             ideal = parrafos[-1].removeprefix("¿Qué sería lo ideal?").strip()
-            _bloques(slide, Inches(8.1), Inches(1.2), Inches(4.8), Inches(5.8),
-                     [("Resumen del día", explicacion["dato"]), ("¿Qué sería lo ideal?", ideal)], 12)
+            _bloques(slide, Inches(7.35), Inches(1.15), Inches(5.6), Inches(5.85),
+                     [("Resumen del día", explicacion["dato"]), ("¿Qué sería lo ideal?", ideal)])
             slide.notes_slide.notes_text_frame.text = "\n\n".join(filter(None, [*parrafos, explicacion["dato"]]))
 
     # 8. Bitcoin, en negro como su gráfico
     bitcoin = _encabezado(prs, "Bitcoin", fecha, next(numero), oscuro=True, icono=RECURSOS / "bitcoin.png")
     if charts.BTC in imagenes:
-        _imagen(bitcoin, imagenes[charts.BTC], Inches(0.45), Inches(1.15), Inches(8.5), Inches(5.8))
+        _imagen(bitcoin, imagenes[charts.BTC], Inches(0.45), Inches(1.15), Inches(7.9), Inches(5.8))
     else:
         _texto(bitcoin, Inches(0.6), Inches(3), Inches(8), Inches(1), "Gráfico no disponible para este día.", 18, CLARO)
-    _bloques(bitcoin, Inches(9.25), Inches(1.3), Inches(3.65), Inches(5.6),
-             [("Resumen del día", frase_btc(btc)), ("🤖 Análisis IA", _comentario(comentarios, charts.cid(charts.BTC), "bitcoin"))], 13, CLARO, NARANJA)
+    _bloques(bitcoin, Inches(8.6), Inches(1.2), Inches(4.35), Inches(5.75),
+             [("Resumen del día", frase_btc(btc)), ("🤖 Análisis IA", _comentario(comentarios, charts.cid(charts.BTC), "bitcoin"))], None, CLARO, ACENTO_CLARO)
 
     # 9. Fuentes y contacto
     cierre = _encabezado(prs, "Fuentes y contacto", fecha, next(numero), emoji="📚")
-    _texto(cierre, Inches(0.45), Inches(1.2), Inches(7.5), Inches(0.4), "FUENTES CONSULTADAS", 14, NARANJA_TEXTO, True)
+    _texto(cierre, Inches(0.45), Inches(1.2), Inches(7.5), Inches(0.4), "FUENTES CONSULTADAS", 14, AZUL, True)
     caja = cierre.shapes.add_textbox(Inches(0.45), Inches(1.65), Inches(7.6), Inches(5.3))
     marco = caja.text_frame
     marco.word_wrap = True
@@ -573,20 +599,20 @@ def armar(
         p.space_after = Pt(6)
         run = p.add_run()
         run.text = f"{nombre}: "
-        run.font.size, run.font.bold, run.font.color.rgb = Pt(12), True, AZUL
+        run.font.size, run.font.bold, run.font.color.rgb = Pt(14), True, AZUL
         run = p.add_run()
         run.text = url
         run.hyperlink.address = url
-        run.font.size, run.font.color.rgb = Pt(11), CELESTE
+        run.font.size, run.font.color.rgb = Pt(13), CELESTE
     _rectangulo(cierre, Inches(8.45), Inches(1.2), Inches(4.43), Inches(5.7), OSCURO)
-    _texto(cierre, Inches(8.75), Inches(1.4), Inches(4), Inches(0.4), "CONTACTO", 14, NARANJA, True)
+    _texto(cierre, Inches(8.75), Inches(1.4), Inches(4), Inches(0.4), "CONTACTO", 14, ACENTO_CLARO, True)
     _texto(cierre, Inches(8.75), Inches(1.85), Inches(4), Inches(0.9),
-           "Reporte hecho íntegramente en Python por Mauro E. Martinez, de Globalaize (sitio en construcción).", 12, CLARO)
+           "Reporte hecho íntegramente en Python por Mauro E. Martinez, de Globalaize (sitio en construcción).", 14, CLARO)
     _links(cierre, Inches(8.65), Inches(3.0), Inches(0.5), separacion=Inches(1.03))
     _texto(cierre, Inches(8.75), Inches(4.45), Inches(4), Inches(0.8),
-           f"☕ ¿Te sirvió el reporte? Podés apoyar el proyecto al alias {ALIAS}", 13, BLANCO, True)
+           f"☕ ¿Te sirvió el reporte? Podés apoyar el proyecto al alias {ALIAS}", 15, BLANCO, True)
     _texto(cierre, Inches(8.75), Inches(5.4), Inches(4), Inches(0.9),
-           f"📧 Consultas, desuscripciones o propuestas:\n{MAIL}", 12, CLARO, link=f"mailto:{MAIL}")
+           f"📧 Consultas, desuscripciones o propuestas:\n{MAIL}", 14, CLARO, link=f"mailto:{MAIL}")
     _texto(cierre, Inches(0.45), Inches(6.7), Inches(7.6), Inches(0.35),
            "Análisis generado con Gemini a partir de los datos del día. No es asesoramiento financiero.", 10, GRIS)
 

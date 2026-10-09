@@ -183,14 +183,14 @@ def test_sin_explicaciones_el_html_no_cambia(df, inflacion_12):
 
 
 def test_las_tarjetas_de_ia_y_explicaciones_tienen_el_mismo_look(df, inflacion_12):
-    """El párrafo de IA, los comentarios y las explicaciones: el mismo fondo oscuro y borde naranja."""
+    """El párrafo de IA, los comentarios y las explicaciones: el mismo fondo oscuro y borde gris azulado."""
     explicaciones = {"image5": {"titulo": "Agregados", "texto": "Uno\nDos", "dato": "Dato A\nDato B"}}
     comentarios = {"image1": [("Paralelas", "Comentario")]}
     html = er.renderizar(df, inflacion_12, 2000.0, 2100.0, "x", 1.0, graficos=["image1", "image5"],
                          comentarios=comentarios, explicaciones=explicaciones)
     for clase in ('class="ai-box"', 'class="comentario-ia"', 'class="explicacion"'):
         caja = html[html.index(clase):html.index(clase) + 400]
-        assert "#081e40" in caja and "border-left:4px solid #f39c12" in caja
+        assert "#081e40" in caja and "border-left:4px solid #697e91" in caja
     # Cada renglón del texto y del dato, en su propio párrafo
     assert ">Uno</p>" in html and ">Dos</p>" in html and "📌 Dato A</p>" in html and "📌 Dato B</p>" in html
 
