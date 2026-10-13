@@ -54,6 +54,19 @@ INICIO_TCR = "2016"
 # Los días del blue propio que no coinciden con Bluelytics por más de esto se toman de Bluelytics
 TOLERANCIA_BLUE = 0.05
 
+# Comercio exterior (INDEC, por la API de series de tiempo del Estado), en millones de USD:
+# bienes mensual (exportaciones FOB, importaciones y saldo) y servicios trimestral del balance de pagos
+URL_SERIES = "https://apis.datos.gob.ar/series/api/series/"
+SERIES_BIENES = {"expo": "77.3_IET_0_A_25", "impo": "78.3_IIT_0_A_25", "saldo": "79.3_ISCT_0_A_27"}
+SERIES_SERVICIOS = {"ingresos": "160.2_CTA_CORIOS_0_T_52", "egresos": "160.2_CTA_CORIOS_0_T_51", "saldo": "160.2_CTA_CORIOS_0_T_49"}
+
+# Bitcoin: los halvings (cada 210.000 bloques la recompensa por bloque se reduce a la mitad)
+HALVINGS = [("2012-11-28", 210_000), ("2016-07-09", 420_000), ("2020-05-11", 630_000), ("2024-04-20", 840_000)]
+URL_ALTURA = "https://mempool.space/api/blocks/tip/height"
+MINUTOS_POR_BLOQUE = 10
+
+COMPARACIONES_ANIOS = (4, 8, 12)
+
 
 def num(valor: float, decimales: int = 1) -> str:
     return indicadores.numero(valor, decimales)
@@ -98,6 +111,18 @@ def bajar(destino: Path) -> None:
     if isinstance(btc.columns, pd.MultiIndex):
         btc.columns = btc.columns.get_level_values(0)
     btc[["Close"]].to_pickle(destino / "btc.pkl")
+    for nombre, ids in (("bienes", SERIES_BIENES), ("servicios", SERIES_SERVICIOS)):
+        r = httpx.get(URL_SERIES, params={"ids": ",".join(ids.values()), "limit": 5000, "format": "json"}, timeout=60)
+        r.raise_for_status()
+        pd.DataFrame(r.json()["data"], columns=["Fecha", *ids]).to_pickle(destino / f"{nombre}.pkl")
+    altura = int(httpx.get(URL_ALTURA, timeout=30).text)
+    (destino / "bloque.json").write_text(json.dumps({"altura": altura}), encoding="utf-8")
+
+
+def _por_fecha(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df["Fecha"] = pd.to_datetime(df["Fecha"])
+    return df.set_index("Fecha").sort_index().astype(float)
 
 
 def cargar(carpeta: Path) -> dict:
@@ -133,6 +158,9 @@ def cargar(carpeta: Path) -> dict:
         "mep": mep, "mep_malos": mep_malos, "mayorista": S["tipo_cambio_mayorista"],
         "riesgo": diario["riesgo_pais"].dropna(), "badlar": diario["bcra_tea"].dropna(), "fed": diario["fed_tea"].dropna(),
         "cpi_usa": pd.read_pickle(carpeta / "cpi_usa.pkl"), "btc": pd.read_pickle(carpeta / "btc.pkl")["Close"].dropna(),
+        "bienes": _por_fecha(pd.read_pickle(carpeta / "bienes.pkl")),
+        "servicios": _por_fecha(pd.read_pickle(carpeta / "servicios.pkl")),
+        "altura": json.loads((carpeta / "bloque.json").read_text(encoding="utf-8"))["altura"],
     }
 
 
@@ -301,6 +329,121 @@ def calcular(d: dict) -> dict:
     btc_ars = (btc.to_frame("b").join(blue.rename("bl"), how="inner"))
     m["btc_ars_12m"] = _var(btc_ars["b"] * btc_ars["bl"], btc_ars.index[-1] - pd.DateOffset(years=1))
     m["blue_12m"] = _var(blue, hoy - pd.DateOffset(years=1))
+
+    # Comercio exterior: bienes en sumas de 12 meses, servicios en sumas de 4 trimestres (miles de millones de USD)
+    bienes, serv = d["bienes"], d["servicios"]
+    b12 = bienes.rolling(12).sum().dropna() / 1e3
+    s4 = serv.rolling(4).sum().dropna() / 1e3
+    m["bienes12"], m["serv4"] = b12, s4
+    m["bienes_mes"] = mes_anio(bienes.index[-1])
+    m["serv_trim"] = f"{(serv.index[-1].month - 1) // 3 + 1}.º trimestre de {serv.index[-1].year}"
+    m["expo12"], m["impo12"], m["saldo_bienes12"] = b12["expo"].iloc[-1], b12["impo"].iloc[-1], b12["saldo"].iloc[-1]
+    hace1 = b12.loc[: b12.index[-1] - pd.DateOffset(years=1)].iloc[-1]
+    m["expo12_var"] = (m["expo12"] / hace1["expo"] - 1) * 100
+    m["impo12_var"] = (m["impo12"] / hace1["impo"] - 1) * 100
+    m["saldo_bienes12_previo"] = hace1["saldo"]
+    m["serv_ing4"], m["serv_egr4"], m["saldo_serv4"] = s4["ingresos"].iloc[-1], s4["egresos"].iloc[-1], s4["saldo"].iloc[-1]
+    m["saldo_total"] = m["saldo_bienes12"] + m["saldo_serv4"]
+    m["expo_record"], m["expo_record_fecha"] = b12["expo"].max(), b12["expo"].idxmax()
+
+    # Hoy contra hace 4, 8 y 12 años
+    ia, im_ = S["inflacion_interanual"], S["inflacion_mensual"]
+    tcr_d = m["tcr_serie"].copy()
+    tcr_d.index = tcr_d.index.to_timestamp(how="end")
+    def al(serie, f, desde=None):
+        if desde is not None and f < pd.Timestamp(desde):
+            return None
+        v = _valor_al(serie, f)
+        return None if np.isnan(v) else v
+    fechas = [hoy] + [hoy - pd.DateOffset(years=a) for a in COMPARACIONES_ANIOS]
+    m["comp_fechas"] = ["Hoy"] + [f"Hace {a} años ({f:%m/%Y})" for a, f in zip(COMPARACIONES_ANIOS, fechas[1:])]
+    filas_c = [
+        ("Dólar oficial mayorista ($)", may, None, 2, "$"),
+        ("Dólar blue ($)", blue, None, 2, "$"),
+        ("Brecha blue contra oficial (%)", brecha, None, 1, "%"),
+        ("Dólar real (índice, ago-2026 = 100)", tcr_d, INICIO_TCR, 0, ""),
+        ("Inflación interanual (%) *", ia, None, 1, "%"),
+        ("Inflación mensual (%)", im_, None, 1, "%"),
+        ("Riesgo país (pb)", rp, None, 0, ""),
+        ("Crédito privado (USD mil M)", m["prest_usd"], None, 1, ""),
+        ("Base monetaria (USD mil M)", m["base_usd"], None, 1, ""),
+        ("Deuda bruta del Tesoro (USD mil M)", db, None, 1, ""),
+        ("Exportaciones de bienes, 12 meses (USD mil M)", b12["expo"], None, 1, ""),
+        ("Importaciones de bienes, 12 meses (USD mil M)", b12["impo"], None, 1, ""),
+        ("Saldo de bienes, 12 meses (USD mil M)", b12["saldo"], None, 1, ""),
+        ("Bitcoin (USD)", d["btc"], None, 0, ""),
+    ]
+    m["comparaciones"] = [
+        {"nombre": nombre, "valores": [None if (v := al(serie, f, desde)) is None else num(v, dec) for f in fechas]}
+        for nombre, serie, desde, dec, _ in filas_c
+    ]
+
+    # Bitcoin: ciclos de halving y el próximo
+    ciclos = []
+    for i, (fecha, bloque) in enumerate(HALVINGS):
+        f = pd.Timestamp(fecha)
+        siguiente = pd.Timestamp(HALVINGS[i + 1][0]) if i + 1 < len(HALVINGS) else btc.index[-1]
+        if f < btc.index[0]:
+            ciclos.append({"fecha": f, "bloque": bloque, "con_datos": False})
+            continue
+        precio = _valor_al(btc, f)
+        # El pico del ciclo: el máximo de los 24 meses posteriores (en los ciclos pasados llegó a los 17 o 18 meses)
+        tramo = btc.loc[f:min(siguiente, f + pd.DateOffset(months=24))]
+        pico, pico_f = tramo.max(), tramo.idxmax()
+        un_anio = _valor_al(btc, f + pd.DateOffset(years=1)) if f + pd.DateOffset(years=1) <= btc.index[-1] else None
+        ciclos.append({
+            "fecha": f, "bloque": bloque, "con_datos": True, "precio": precio, "pico": pico, "pico_fecha": pico_f,
+            "suba_pico": (pico / precio - 1) * 100, "meses_pico": (pico_f - f).days / 30.44,
+            "suba_1": None if un_anio is None else (un_anio / precio - 1) * 100,
+            "en_curso": i + 1 == len(HALVINGS),
+        })
+    m["halvings"] = ciclos
+    ultimo = ciclos[-1]
+    m["halving_actual_var"] = (btc.iloc[-1] / ultimo["precio"] - 1) * 100
+    proximo_bloque = HALVINGS[-1][1] + 210_000
+    faltan = proximo_bloque - d["altura"]
+    m["altura"], m["proximo_bloque"], m["bloques_faltan"] = d["altura"], proximo_bloque, faltan
+    m["dias_faltan"] = faltan * MINUTOS_POR_BLOQUE / 60 / 24
+    m["proximo_halving"] = hoy + pd.Timedelta(days=m["dias_faltan"])
+
+    # Tablero final: cada métrica con su estado, su tendencia a un año y el ideal
+    def estado(valor, bien, regular, mayor_es_mejor=False):
+        if mayor_es_mejor:
+            return "bien" if valor >= bien else "regular" if valor >= regular else "mal"
+        return "bien" if valor <= bien else "regular" if valor <= regular else "mal"
+    tcr_desvio = (100 / m["tcr_mediana"] - 1) * 100
+    deuda_var = (m["deuda"] / m["deuda_hace_1"] - 1) * 100
+    hace_un_anio = hoy - pd.DateOffset(years=1)
+    def tendencia(actual, previo, mayor_es_mejor=False):
+        if previo is None or np.isnan(previo):
+            return "="
+        mejora = actual > previo if mayor_es_mejor else actual < previo
+        return "▲ mejora" if mejora else "▼ empeora"
+    m["tablero"] = [
+        ("Brecha cambiaria", f"{num(m['brecha_hoy'])}%", estado(m["brecha_hoy"], 10, 30),
+         tendencia(m["brecha_hoy"], _valor_al(brecha, hace_un_anio)), "Menos de 10%: un solo precio del dólar"),
+        ("Inflación mensual", f"{num(m['inf_mensual'])}%", estado(m["inf_mensual"], 1, 2.5),
+         tendencia(m["inf_mensual"], _valor_al(im_, hace_un_anio)), "Menos de 1% por mes (menos de 12% anual)"),
+        ("Inflación interanual", f"{num(m['inf_anual'])}%", estado(m["inf_anual"], 15, 40),
+         tendencia(m["inf_anual"], _valor_al(ia, hace_un_anio)), "Un dígito, como los países vecinos"),
+        ("Tasa real (BADLAR)", f"{signo(m['tasa_real_hoy'])}%", estado(m["tasa_real_hoy"], 0, -5, mayor_es_mejor=True),
+         tendencia(m["tasa_real_hoy"], m["tasas_serie"]["real"].iloc[-13] if len(m["tasas_serie"]) > 12 else None, True),
+         "Levemente positiva: que ahorrar en pesos no pierda"),
+        ("Riesgo país", f"{num(m['rp'], 0)} pb", estado(m["rp"], 500, 1000),
+         tendencia(m["rp"], m["rp_hace_1"]), "Menos de 500 puntos"),
+        ("Dólar real", f"{signo(tcr_desvio, 0)}% contra su mediana", estado(abs(tcr_desvio), 10, 25),
+         "▼ se abarata" if m["tcr_serie"].iloc[-1] < m["tcr_serie"].iloc[-13] else "▲ se encarece", "Estable, cerca de su promedio"),
+        ("Dinero real (M2)", f"{signo(m['m2_real_ult'])}% anual", estado(abs(m["m2_real_ult"]), 5, 15),
+         tendencia(abs(m["m2_real_ult"]), abs(m["m2_real"].iloc[-13])), "Crecer al ritmo de la economía"),
+        ("Crédito privado real", f"{signo(m['prest_real_ult'])}% anual", "bien" if 0 < m["prest_real_ult"] < 30 else "regular",
+         tendencia(m["prest_real_ult"], m["prest_real"].iloc[-13], True), "Crecer sin que suba la mora"),
+        ("Deuda bruta del Tesoro", f"{signo(deuda_var)}% en un año", estado(deuda_var, 0, 5),
+         tendencia(m["deuda"], m["deuda_hace_1"]), "Crecer menos que la economía, o bajar"),
+        ("Saldo comercial de bienes", f"USD {signo(m['saldo_bienes12'])} mil M", estado(m["saldo_bienes12"], 5, 0, mayor_es_mejor=True),
+         tendencia(m["saldo_bienes12"], m["saldo_bienes12_previo"], True), "Positivo: entran más dólares de los que salen"),
+        ("Saldo de servicios", f"USD {signo(m['saldo_serv4'])} mil M", estado(m["saldo_serv4"], 0, -5, mayor_es_mejor=True),
+         tendencia(m["saldo_serv4"], s4["saldo"].iloc[-5] if len(s4) > 4 else None, True), "Cerca del equilibrio"),
+    ]
 
     # Calidad de datos
     m["blue_real_desde"] = d["blue_real_desde"]
@@ -502,6 +645,18 @@ def graficos(d: dict, m: dict, carpeta: Path) -> dict:
     fig, ejes = _figura(4.0, filas=2, sharex=True, gridspec_kw={"height_ratios": [2.2, 1]})
     ejes[0].plot(btc.index, btc, color=NARANJA_BTC, lw=1.1)
     ejes[0].set_yscale("log")
+    # Los halvings, marcados en los dos paneles
+    for fecha, _ in HALVINGS:
+        f = pd.Timestamp(fecha)
+        if f >= btc.index[0]:
+            for eje in ejes:
+                eje.axvline(f, color=MARINO, lw=0.9, ls="--", alpha=0.7)
+            ejes[0].text(f, btc.max() * 1.15, f" halving\n {f:%m/%Y}", fontsize=7, color=MARINO, va="top")
+    proximo = m["proximo_halving"]
+    for eje in ejes:
+        eje.axvline(proximo, color=GRIS, lw=0.9, ls=":")
+    ejes[0].text(proximo, btc.max() * 1.15, f" próximo\n ~{proximo:%m/%Y}", fontsize=7, color=GRIS, va="top")
+    ejes[0].set_xlim(btc.index[0], proximo + pd.Timedelta(days=120))
     ejes[0].yaxis.set_major_formatter(FuncFormatter(_miles))
     ejes[0].set_ylabel("USD (escala log.)", fontsize=8, color="#3A4A5C")
     caida = (btc / btc.cummax() - 1) * 100
@@ -509,6 +664,24 @@ def graficos(d: dict, m: dict, carpeta: Path) -> dict:
     ejes[1].yaxis.set_major_formatter(FuncFormatter(_pct))
     ejes[1].set_ylabel("Caída desde\nel máximo", fontsize=8, color="#3A4A5C")
     g["btc"] = _guardar(fig, carpeta / "btc.png")
+
+    # 13. Comercio exterior: bienes (12 meses) y servicios (4 trimestres)
+    b12, s4 = m["bienes12"].loc["2004":], m["serv4"]
+    fig, ejes = _figura(4.4, filas=2, sharex=True)
+    ejes[0].plot(b12.index, b12["expo"], color=VERDE, lw=1.6, label="Exportaciones de bienes")
+    ejes[0].plot(b12.index, b12["impo"], color=ROJO, lw=1.6, label="Importaciones de bienes")
+    ejes[0].bar(b12.index, b12["saldo"], width=25, color=[AZUL if v >= 0 else GRIS for v in b12["saldo"]], alpha=0.45,
+                label="Saldo")
+    ejes[0].axhline(0, color=GRIS, lw=0.6)
+    ejes[0].set_ylabel("Bienes, suma de 12 meses\n(miles de mill. USD)", fontsize=7.5, color="#3A4A5C")
+    ejes[0].legend(frameon=False, fontsize=7.5, loc="upper left", ncol=3)
+    ejes[1].plot(s4.index, s4["ingresos"], color=VERDE, lw=1.6, label="Ingresos por servicios")
+    ejes[1].plot(s4.index, s4["egresos"], color=ROJO, lw=1.6, label="Egresos por servicios")
+    ejes[1].bar(s4.index, s4["saldo"], width=70, color=[AZUL if v >= 0 else GRIS for v in s4["saldo"]], alpha=0.45, label="Saldo")
+    ejes[1].axhline(0, color=GRIS, lw=0.6)
+    ejes[1].set_ylabel("Servicios, suma de 4 trim.\n(miles de mill. USD)", fontsize=7.5, color="#3A4A5C")
+    ejes[1].legend(frameon=False, fontsize=7.5, loc="upper left", ncol=3)
+    g["comercio"] = _guardar(fig, carpeta / "comercio.png")
     return g
 
 

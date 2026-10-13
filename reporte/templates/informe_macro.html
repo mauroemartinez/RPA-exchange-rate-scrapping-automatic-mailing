@@ -60,6 +60,10 @@
   .circulo { position:absolute; border-radius:50%; background:var(--celeste); z-index:-1; }
   .marca { font-family:'IBM Plex Serif', Georgia, serif; }
   .chico { font-size:8.5pt; color:var(--gris); }
+  .estado { display:inline-block; padding:1px 8px; border-radius:10px; font-size:8pt; font-weight:600; color:#fff; }
+  .estado.bien { background:var(--verde); color:#fff !important; } .estado.regular { background:#B7950B; } .estado.mal { background:var(--rojo); color:#fff !important; }
+  table.compacta td, table.compacta th { padding:4px 5px; font-size:8.6pt; }
+  td.nd { color:var(--gris); }
 </style>
 </head>
 <body>
@@ -102,9 +106,31 @@
     <li><b>Ahorrar en pesos a plazo fijo hoy pierde contra la inflación.</b> La BADLAR rinde {{ m.badlar|num }}% anual contra {{ m.inf_anual|num }}% de inflación interanual: {{ m.tasa_real_hoy|signo }}% real.</li>
     <li><b>El riesgo país está en la zona más baja desde 2019, pero rebotó.</b> {{ m.rp|num(0) }} puntos, con un mínimo de {{ m.rp_min_reciente|num(0) }} en {{ m.rp_min_reciente_fecha|mes }} y un rango de {{ m.rp_30d_min|num(0) }} a {{ m.rp_30d_max|num(0) }} en el último mes.</li>
     <li><b>Más deuda del Estado, mucho más crédito privado.</b> La deuda bruta del Tesoro creció USD {{ (m.deuda - m.deuda_dic23)|num }} mil millones desde diciembre de 2023; el crédito a familias y empresas pasó de USD {{ m.prest_dic23|num }} a {{ m.prest_hoy|num }} mil millones, el más alto de la serie en dólares (en términos reales se multiplicó por {{ m.prest_real_vs_dic23|num }}).</li>
+    <li><b>Exportaciones récord.</b> En los últimos doce meses se exportaron USD {{ m.expo12|num }} mil millones en bienes ({{ m.expo12_var|signo }}%), con un superávit de {{ m.saldo_bienes12|num }} mil millones; los servicios restan {{ (-m.saldo_serv4)|num }} mil millones.</li>
     <li><b>Bitcoin, en baja.</b> USD {{ m.btc|num(0) }}, {{ m.btc_12m|signo }}% en doce meses y {{ m.btc_dd|signo }}% desde el máximo de {{ m.btc_ath_fecha|mes }}.</li>
   </ul>
   <div class="clave"><b>Cómo leer este informe</b>Cada sección muestra la historia completa del indicador, dónde está hoy y qué significa para una persona o una empresa. Los números salen de las series oficiales y de mercado; las interpretaciones son del autor y no constituyen asesoramiento financiero.</div>
+</section>
+
+<!-- ═══ COMPARACIÓN EN EL TIEMPO ═══ -->
+<section class="pagina">
+  <h2><span class="emoji">🕰️</span>Hoy contra hace 4, 8 y 12 años</h2>
+  <p>Una foto de cada indicador hoy y en el mismo momento de hace cuatro, ocho y doce años: en 2022, con cepo e inflación en alza; en 2018, en plena crisis cambiaria; y en 2014, con el primer cepo.</p>
+  <div class="tarjeta">
+    <table class="compacta">
+      <tr><th>Indicador</th>{% for f in m.comp_fechas %}<th>{{ f }}</th>{% endfor %}</tr>
+      {% for fila in m.comparaciones %}
+      <tr><td>{{ fila.nombre }}</td>{% for v in fila.valores %}<td class="{{ 'nd' if v is none }}">{{ v if v is not none else 'n/d' }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </table>
+    <div class="pie-grafico">n/d: sin dato para esa fecha (la deuda bruta mensual empieza en 2019; el dólar real se compara desde 2016). * La inflación de 2014 es la del IPC oficial de esa época, cuestionado por subestimar la inflación real. Montos en dólares convertidos con el mayorista de cada fecha.</div>
+  </div>
+  {% set c = m.comparaciones %}
+  <div class="dos">
+    <div class="clave"><b>Contra hace 4 años</b>La inflación interanual pasó de {{ c[4].valores[1] }}% a {{ c[4].valores[0] }}%, el riesgo país de {{ c[6].valores[1] }} a {{ c[6].valores[0] }} puntos y la brecha de {{ c[2].valores[1] }}% a {{ c[2].valores[0] }}%. El crédito privado en dólares se duplicó y el saldo comercial de bienes pasó de {{ c[12].valores[1] }} a {{ c[12].valores[0] }} mil millones. La deuda del Tesoro, en cambio, subió de {{ c[9].valores[1] }} a {{ c[9].valores[0] }}.</div>
+    <div class="clave"><b>Contra hace 8 y 12 años</b>En 2018 el país estaba en crisis: inflación mensual de {{ c[5].valores[2] }}%, déficit comercial y un dólar real muy caro tras la devaluación. En 2014, con cepo, la brecha era de {{ c[2].valores[3] }}%. La constante de los doce años: el peso perdió casi todo su valor, de {{ c[0].valores[3] }} a {{ c[0].valores[0] }} pesos por dólar oficial.</div>
+  </div>
+  <div class="clave"><b>Qué sería lo ideal</b>Que en la próxima comparación a cuatro años la inflación esté en un dígito, el riesgo país debajo de 500 puntos, el crédito siga creciendo en términos reales y la deuda pública crezca menos que la economía.</div>
 </section>
 
 <!-- ═══ TIPOS DE CAMBIO ═══ -->
@@ -203,14 +229,48 @@
   <p class="chico">Los adelantos del BCRA al Tesoro (financiar al Estado emitiendo pesos) están en USD {{ m.adelantos_hoy|num }} mil millones, lejos de su máximo de {{ m.adelantos_max|num }} ({{ m.adelantos_max_fecha|mes }}). La serie de letras del BCRA incluye LEBAC hasta 2018 y los instrumentos actuales, pero no las Leliq ni los pases pasivos (2018 a 2024), con los que el BCRA absorbía pesos en esos años: el bajo nivel de ese período no significa que no hubiera deuda del BCRA.</p>
 </section>
 
+<!-- ═══ COMERCIO EXTERIOR ═══ -->
+<section class="pagina">
+  <h2><span class="emoji">🚢</span>Comercio exterior: bienes y servicios</h2>
+  <div class="tarjeta"><img src="graficos/{{ g.comercio }}"><div class="pie-grafico">Arriba: exportaciones e importaciones de bienes y su saldo, sumas de doce meses hasta {{ m.bienes_mes }} (INDEC). Abajo: ingresos y egresos por servicios del balance de pagos y su saldo, sumas de cuatro trimestres hasta el {{ m.serv_trim }}.</div></div>
+  <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi"><div class="t">Exportaciones de bienes (12 meses)</div><div class="v">USD {{ m.expo12|num }} mil M</div><div class="d">{{ m.expo12_var|signo }}% interanual</div></div>
+    <div class="kpi"><div class="t">Importaciones de bienes (12 meses)</div><div class="v">USD {{ m.impo12|num }} mil M</div><div class="d">{{ m.impo12_var|signo }}% interanual</div></div>
+    <div class="kpi"><div class="t">Saldo de bienes y servicios</div><div class="v {{ 'bien' if m.saldo_total >= 0 else 'mal' }}">USD {{ m.saldo_total|signo }} mil M</div><div class="d">bienes {{ m.saldo_bienes12|signo }}, servicios {{ m.saldo_serv4|signo }}</div></div>
+  </div>
+  <p>En los últimos doce meses la Argentina exportó <b>USD {{ m.expo12|num }} mil millones</b> en bienes, {{ m.expo12_var|signo }}% más que un año antes{% if m.expo12 >= m.expo_record %} y el máximo de la serie{% endif %}. Las importaciones crecieron apenas {{ m.impo12_var|num }}%, hasta {{ m.impo12|num }} mil millones, y el superávit de bienes subió de {{ m.saldo_bienes12_previo|num }} a <b>{{ m.saldo_bienes12|num }} mil millones</b>. Para el país es una buena noticia: el comercio de bienes trae los dólares que la economía necesita.</p>
+  <p>Los servicios van en sentido contrario: ingresaron {{ m.serv_ing4|num }} mil millones (turismo receptivo, servicios profesionales y de software, entre otros) y salieron {{ m.serv_egr4|num }} mil millones, un déficit de <b>{{ (-m.saldo_serv4)|num }} mil millones</b> en cuatro trimestres. Con un dólar barato en términos reales, viajar y comprar servicios afuera es más conveniente, y ese rubro suele ser el que más pesa en el déficit. Sumando todo, el saldo de bienes y servicios es de {{ m.saldo_total|signo }} mil millones.</p>
+  <div class="clave"><b>Qué sería lo ideal</b>Un superávit de bienes sostenido que venga de exportar más volumen (no solo de mejores precios internacionales), importaciones que crezcan con la inversión, y un déficit de servicios acotado. Si el dólar sigue abaratándose, la presión va a venir por el lado de los servicios y las importaciones.</div>
+</section>
+
 <!-- ═══ BITCOIN ═══ -->
 <section class="pagina">
   <h2><span class="emoji">🪙</span>Bitcoin</h2>
-  <div class="tarjeta"><img src="graficos/{{ g.btc }}"><div class="pie-grafico">Arriba: precio en dólares, escala logarítmica. Abajo: caída desde el máximo previo.</div></div>
+  <div class="tarjeta"><img src="graficos/{{ g.btc }}"><div class="pie-grafico">Arriba: precio en dólares, escala logarítmica. Abajo: caída desde el máximo previo. Líneas punteadas: los halvings y el próximo, estimado.</div></div>
   <p>Bitcoin cotiza a <b>USD {{ m.btc|num(0) }}</b>: {{ m.btc_dd|signo }}% desde su máximo histórico de USD {{ m.btc_ath|num(0) }} ({{ m.btc_ath_fecha|mes }}) y {{ m.btc_12m|signo }}% en doce meses. Su historia muestra un patrón repetido: subas muy fuertes seguidas de caídas de 75% a 85% (2018 y 2022). La volatilidad anualizada del último año es de {{ m.btc_vol|num(0) }}%, unas tres veces la del índice S&P 500.</p>
+  <h3>Los halvings</h3>
+  <p>Cada 210.000 bloques (unos cuatro años) la cantidad de bitcoins nuevos que recibe la red por bloque se reduce a la mitad: es el <b>halving</b>. Menos emisión con la misma demanda empujó el precio en todos los ciclos pasados.</p>
+  <div class="tarjeta">
+    <table class="compacta">
+      <tr><th>Halving</th><th>Precio ese día</th><th>Pico del ciclo</th><th>Suba al pico</th><th>Meses al pico</th><th>Suba a 1 año</th></tr>
+      {% for c in m.halvings %}
+      {% if c.con_datos %}
+      <tr><td>{{ c.fecha.strftime('%d/%m/%Y') }} (bloque {{ c.bloque|num(0) }})</td><td>USD {{ c.precio|num(0) }}</td><td>USD {{ c.pico|num(0) }} ({{ c.pico_fecha.strftime('%m/%Y') }}){% if c.en_curso %} *{% endif %}</td><td class="bien">{{ c.suba_pico|signo(0) }}%</td><td>{{ c.meses_pico|num(0) }}</td><td>{% if c.suba_1 is not none %}{{ c.suba_1|signo(0) }}%{% else %}n/d{% endif %}</td></tr>
+      {% else %}
+      <tr><td>{{ c.fecha.strftime('%d/%m/%Y') }} (bloque {{ c.bloque|num(0) }})</td><td class="nd" colspan="5">sin datos diarios en la fuente (empieza en 2014)</td></tr>
+      {% endif %}
+      {% endfor %}
+    </table>
+    <div class="pie-grafico">Pico del ciclo: el máximo de los 24 meses posteriores al halving. * Ciclo en curso: el máximo hasta hoy.</div>
+  </div>
+  {% set h3 = m.halvings[-1] %}
+  <div class="dos">
+    <div class="clave"><b>El próximo halving</b>Será en el bloque {{ m.proximo_bloque|num(0) }}. La red va por el {{ m.altura|num(0) }}: faltan {{ m.bloques_faltan|num(0) }} bloques, unos {{ m.dias_faltan|num(0) }} días a un bloque cada diez minutos. Fecha estimada: <b>{{ m.proximo_halving.strftime('%m/%Y') }}</b>.</div>
+    <div class="clave"><b>Lo que muestran los ciclos</b>Cada ciclo subió menos que el anterior, y el pico llegó entre 17 y 18 meses después del halving. En el actual el máximo fue en {{ h3.pico_fecha|mes }}, a los {{ h3.meses_pico|num(0) }} meses; hoy está {{ m.halving_actual_var|signo }}% sobre el precio del halving de 2024.</div>
+  </div>
   <div class="dos">
     <div class="tarjeta">
-      <table>
+      <table class="compacta">
         <tr><th>Año</th><th>Rendimiento en USD</th></tr>
         {% for anio, valor in m.btc_por_anio %}
         <tr><td>{{ anio }}{% if loop.last %} (en curso){% endif %}</td><td class="{{ 'bien' if valor >= 0 else 'mal' }}">{{ valor|signo(0) }}%</td></tr>
@@ -222,6 +282,26 @@
       <div class="clave"><b>Para tener en cuenta</b>Es un activo de muy alto riesgo y sin flujo de fondos: su precio depende de la demanda. Los ciclos pasados no garantizan los futuros.</div>
     </div>
   </div>
+</section>
+
+<!-- ═══ TABLERO ═══ -->
+<section class="pagina">
+  <h2><span class="emoji">🚦</span>Tablero: dónde estamos bien y dónde mal</h2>
+  <p>Cada indicador con su valor de hoy, su estado frente a un valor razonable, cómo se movió en el último año y cuál sería el ideal.</p>
+  <div class="tarjeta">
+    <table class="compacta">
+      <tr><th>Indicador</th><th>Hoy</th><th>Estado</th><th>En un año</th><th>Lo ideal</th></tr>
+      {% for nombre, valor, estado, tendencia, ideal in m.tablero %}
+      <tr><td><b>{{ nombre }}</b></td><td>{{ valor }}</td><td style="text-align:center"><span class="estado {{ estado }}">{{ estado|capitalize }}</span></td><td>{{ tendencia }}</td><td style="text-align:left">{{ ideal }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  <div class="dos">
+    <div class="clave" style="border-left-color:var(--verde)"><b>Dónde estamos bien</b>{% for nombre, valor, estado, t, i in m.tablero if estado == 'bien' %}{{ nombre }} ({{ valor }}){{ ', ' if not loop.last else '.' }}{% endfor %}</div>
+    <div class="clave" style="border-left-color:var(--rojo)"><b>Dónde estamos mal</b>{% for nombre, valor, estado, t, i in m.tablero if estado == 'mal' %}{{ nombre }} ({{ valor }}){{ ', ' if not loop.last else '.' }}{% endfor %}</div>
+  </div>
+  <div class="clave" style="border-left-color:#B7950B"><b>En el medio</b>{% for nombre, valor, estado, t, i in m.tablero if estado == 'regular' %}{{ nombre }} ({{ valor }}){{ ', ' if not loop.last else '.' }}{% endfor %}</div>
+  <p class="chico">Criterios: brecha bien debajo de 10%; inflación mensual bien debajo de 1% y mal arriba de 2,5%; interanual bien debajo de 15%; tasa real bien si es positiva y mal debajo de -5%; riesgo país bien debajo de 500 puntos; dólar real bien a menos de 10% de su mediana desde 2016; dinero real bien con variaciones menores a 5%; deuda bien si no crece; saldos comerciales bien si son positivos. Son umbrales de referencia del autor, no metas oficiales.</p>
 </section>
 
 <!-- ═══ CONCLUSIONES ═══ -->
@@ -236,11 +316,13 @@
     <li><b>La tasa real:</b> volver a tasas positivas protegería el ahorro en pesos, a costa de encarecer el crédito.</li>
     <li><b>El riesgo país:</b> volver a quedarse debajo de 500 puntos haría más fluido y barato el financiamiento externo.</li>
     <li><b>El crédito privado:</b> crecer sin que suba la mora es la condición para que siga siendo una buena noticia.</li>
+    <li><b>El comercio exterior:</b> sostener el superávit de bienes mientras el dólar barato empuja las importaciones y el déficit de servicios.</li>
+    <li><b>El próximo halving de Bitcoin:</b> estimado para {{ m.proximo_halving.strftime('%m/%Y') }}.</li>
   </ul>
   <div class="clave"><b>Sobre este informe</b>Es un análisis de datos con fines informativos y de portafolio. No es asesoramiento financiero ni una recomendación de inversión.</div>
 
   <h2 style="margin-top:18px"><span class="emoji">📚</span>Metodología, fuentes y calidad de datos</h2>
-  <p class="chico"><b>Fuentes.</b> Cotizaciones diarias, riesgo país y tasas: base del reporte diario (BNA, DolarHoy, Ámbito, ArgentinaDatos, BCRA y FED), guardada en Supabase. Blue antes de octubre de 2022: Bluelytics (api.bluelytics.com.ar), que coincide con la base en los {{ m.blue_superpuestos|num(0) }} días en que ambas se superponen (mediana de diferencia 0%). Inflación, agregados monetarios, préstamos, letras, adelantos y dólar mayorista: API de Estadísticas del BCRA. Deuda bruta: Secretaría de Finanzas. Inflación de Estados Unidos: FRED (CPIAUCSL). Bitcoin: Yahoo Finance.</p>
+  <p class="chico"><b>Fuentes.</b> Cotizaciones diarias, riesgo país y tasas: base del reporte diario (BNA, DolarHoy, Ámbito, ArgentinaDatos, BCRA y FED), guardada en Supabase. Blue antes de octubre de 2022: Bluelytics (api.bluelytics.com.ar), que coincide con la base en los {{ m.blue_superpuestos|num(0) }} días en que ambas se superponen (mediana de diferencia 0%). Inflación, agregados monetarios, préstamos, letras, adelantos y dólar mayorista: API de Estadísticas del BCRA. Deuda bruta: Secretaría de Finanzas. Comercio exterior: INDEC (intercambio comercial mensual y balance de pagos trimestral), por la API de series de tiempo del Estado (datos.gob.ar). Altura de la cadena de Bitcoin: mempool.space. Inflación de Estados Unidos: FRED (CPIAUCSL). Bitcoin: Yahoo Finance.</p>
   <p class="chico"><b>Cálculos.</b> Las conversiones a dólares usan el mayorista A3500 de cada fecha. El dólar real es bilateral con Estados Unidos. Las variaciones reales descuentan la inflación del mismo período. El dólar real se compara desde 2016 porque entre 2007 y 2015 el IPC oficial estaba intervenido. La tasa real compara la BADLAR efectiva anual con la inflación interanual.</p>
   <p class="chico"><b>Calidad de datos detectada en la base del reporte.</b> Antes del {{ m.blue_real_desde.strftime('%d/%m/%Y') }}, el blue, el solidario y el euro son un valor fijo de relleno de la carga histórica; por eso el blue previo sale de Bluelytics. Hay {{ m.blue_corregidos }} días del blue propio que se apartaban más de 5% de Bluelytics; se tomaron de esa fuente. Se excluyeron {{ m.mep_malos|length }} días del MEP guardados multiplicados por diez (un error de coma decimal). Corregir estos registros en la base mejoraría el reporte diario y las próximas ediciones.</p>
   <p class="chico">Generado con Python (pandas, matplotlib, Chromium) a partir de datos al {{ m.fecha }}. Contacto: <a href="mailto:mauro@globalaize.com">mauro@globalaize.com</a> · <a href="https://www.globalaize.com">www.globalaize.com</a></p>

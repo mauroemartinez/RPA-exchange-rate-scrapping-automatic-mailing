@@ -118,7 +118,7 @@ The pipeline is a faithful port of the notebook: fed the same inputs, the four J
 | `reporte/scrapers/agregados.py` | Catalog of the stored series (key, source id, frequency, unit, source): BCRA aggregates, inflation, debt-related series and the A3500 rate, plus the Treasury's gross debt; paginated BCRA download |
 | `docs/` | Roadmap notes in Spanish: the cache evaluation, phase 3 (aggregates and debt, with the debt definition chosen), the PowerPoint and Streamlit evaluation, and the scheduling and monitoring guide (GitHub Actions setup) |
 | `Assets/` | The README architecture diagrams; `Assets/arquitectura/construir.py` regenerates both from HTML with Chromium, keeping the style |
-| `sql/` | SQL scripts applied by hand in Supabase: DB setup, historical data cleaning, and the migrations `06_series_macro.sql` and `07_ai_secciones.sql`, each with a plain-Spanish header (what it does, how to apply, verify and undo it) |
+| `sql/` | SQL scripts applied by hand in Supabase: DB setup, historical data cleaning, and the migrations `06_series_macro.sql` and `07_ai_paragraphs.sql` (the `ai_secciones` column), both idempotent and already applied; `docs/programacion-y-monitoreo.md` explains how to apply, verify and undo them |
 | `tests/` | Offline test suite; `tests/datos/` holds the golden HTML of the mail |
 | `pyproject.toml` | pytest and ruff configuration |
 
@@ -147,7 +147,7 @@ The dashboard does not read `reporte/config.py`. It takes `DASHBOARD_DB_URL`, a 
 
 ## Supabase table: `Fact_Mercado_Macro`
 
-Primary key: `Fecha` (date). Columns: `TCC_Blue`, `TCV_Blue`, `TCC_Billete`, `TCV_Billete`, `TCC_Divisas`, `TCV_Divisas`, `Solidario`, `TCV_MEP`, `riesgo_pais`, `TCC_Euro`, `TCV_Euro`, `fed_tea`, `bcra_tea`, `ai_paragraph`, `ai_model`, and once `sql/07_ai_secciones.sql` is applied, `ai_secciones` (jsonb with the per-chart comments and the model). New columns go at the end of the table: the email takes the first 14 by position. Applying `sql/07_ai_secciones.sql` while the notebook is still in daily use is safe: the notebook reads `SELECT *` but builds the email table from those first 14 columns, and its insert sends a fixed column list that does not include `ai_secciones`.
+Primary key: `Fecha` (date). Columns: `TCC_Blue`, `TCV_Blue`, `TCC_Billete`, `TCV_Billete`, `TCC_Divisas`, `TCV_Divisas`, `Solidario`, `TCV_MEP`, `riesgo_pais`, `TCC_Euro`, `TCV_Euro`, `fed_tea`, `bcra_tea`, `ai_paragraph`, `ai_model`, and once `sql/07_ai_paragraphs.sql` is applied, `ai_secciones` (jsonb with the per-chart comments and the model). New columns go at the end of the table: the email takes the first 14 by position. Applying `sql/07_ai_paragraphs.sql` while the notebook is still in daily use is safe: the notebook reads `SELECT *` but builds the email table from those first 14 columns, and its insert sends a fixed column list that does not include `ai_secciones`.
 
 ## Supabase table: `Fact_Series_Macro`
 
