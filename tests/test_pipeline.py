@@ -4,7 +4,7 @@ import contextlib
 import smtplib
 import subprocess
 from dataclasses import replace
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
 
 import pytest
@@ -429,6 +429,38 @@ def test_dry_run_un_feriado_corre_igual(entorno):
     deps, hechos, salida = entorno
     r = pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida), replace(deps, feriado=lambda fecha: "Día de prueba"))
     assert r.estado == "ok"
+
+
+def test_un_horario_atrasado_que_cruzo_la_medianoche_no_corre(entorno):
+    # El 12/10/2026 el disparo programado de las 19:12 llegó a las 00:01 del 13 y mandó
+    # el reporte del 13 a medianoche, con los valores del cierre anterior
+    deps, hechos, salida = entorno
+    madrugada = datetime(HOY.year, HOY.month, HOY.day, 0, 1)
+    r = pipeline.correr(pipeline.Opciones(salida=salida, desde=time(14, 0)), replace(deps, ahora=lambda: madrugada))
+    assert r.estado == "omitida"
+    assert "son las 00:01" in r.etapas[0].detalle and "antes de las 14:00" in r.etapas[0].detalle
+    assert hechos["filas"] == [] and hechos["mails"] == []
+
+
+def test_desde_deja_pasar_la_corrida_de_la_tarde(entorno):
+    deps, hechos, salida = entorno  # ahora() del entorno: 16:43
+    r = pipeline.correr(pipeline.Opciones(salida=salida, desde=time(14, 0)), deps)
+    assert r.estado == "ok" and len(hechos["mails"]) == 2
+
+
+def test_forzar_corre_aunque_sea_temprano(entorno):
+    deps, hechos, salida = entorno
+    madrugada = datetime(HOY.year, HOY.month, HOY.day, 0, 1)
+    r = pipeline.correr(pipeline.Opciones(salida=salida, forzar=True, desde=time(14, 0)), replace(deps, ahora=lambda: madrugada))
+    assert r.estado == "ok" and len(hechos["mails"]) == 2
+
+
+def test_desde_en_la_linea_de_comandos():
+    import argparse
+
+    assert pipeline._hora("14:00") == time(14, 0)
+    with pytest.raises(argparse.ArgumentTypeError):
+        pipeline._hora("14h")
 
 
 def test_el_log_no_lleva_secretos_ni_destinatarios(tmp_path):

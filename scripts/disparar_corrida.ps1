@@ -4,7 +4,7 @@
 # gratis: en horas de carga llega con horas de atraso o no llega (el 08 y el
 # 09/10/2026 no corrió a horario). La orden manual (workflow_dispatch), en
 # cambio, arranca en segundos. Este script la manda; lo ejecuta el Programador
-# de tareas de Windows de lunes a viernes a las 16:19. La corrida es la de
+# de tareas de Windows de lunes a viernes a las 15:19. La corrida es la de
 # siempre, en la nube de GitHub: la compu solo da la orden.
 #
 # Es seguro repetirlo: si el día ya salió, la corrida encuentra la fila y

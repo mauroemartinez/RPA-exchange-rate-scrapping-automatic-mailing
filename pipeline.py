@@ -2,8 +2,9 @@
 
 Etapas, en el mismo orden que el notebook:
 
-  control       fin de semana o feriado: no se corre (salvo --forzar); otra corrida en curso o
-                la fila de hoy ya guardada: tampoco
+  control       fin de semana o feriado: no se corre (salvo --forzar); antes de la hora de
+                --desde (un horario programado que llegó tan tarde que cruzó la medianoche):
+                tampoco; otra corrida en curso o la fila de hoy ya guardada: tampoco
   historico     lee Fact_Mercado_Macro (o el CSV de contingencia si Supabase no responde)
   scraping      las seis fuentes en paralelo; si una cae, alerta y corta
   validacion    arma la fila del día y la pasa por models.FilaMacro; si no cumple, alerta y corta
@@ -43,7 +44,8 @@ import time
 from collections.abc import Callable
 from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass, field, replace
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from datetime import time as hora_del_dia
 from pathlib import Path
 
 from pydantic import EmailStr, TypeAdapter, ValidationError
@@ -151,6 +153,11 @@ class Opciones:
     origen: str = "cli"
     # En dry-run, pedirle a Gemini los comentarios por gráfico (una llamada, sin guardarlos)
     probar_ia: bool = False
+    # Hora de Argentina antes de la cual una corrida no corresponde. La pasa solo el
+    # horario programado de GitHub, que puede llegar con horas de atraso: el 12/10/2026
+    # el disparo de las 19:12 llegó a las 00:01 del 13 y mandó el reporte del día
+    # siguiente a medianoche, con los valores del cierre anterior.
+    desde: hora_del_dia | None = None
 
 
 @dataclass
@@ -407,21 +414,27 @@ def _no_es_dia_habil(opciones: Opciones, deps: Dependencias, registro: _Registro
     responde, se sigue: es preferible un mail de más que un día sin reporte.
     """
     if fecha.weekday() >= 5:
-        motivo = "fin de semana"
+        motivo = f"el {fecha} es fin de semana"
     else:
         try:
             nombre = deps.feriado(fecha)
         except Exception as exc:
             log.warning("No se pudo consultar el calendario de feriados (%s); se sigue como día hábil", exc)
             nombre = None
-        motivo = f"feriado ({nombre})" if nombre else None
+        motivo = f"el {fecha} es feriado ({nombre})" if nombre else None
+
+    if not motivo and opciones.desde:
+        ahora: datetime = deps.ahora()
+        if ahora.time() < opciones.desde:
+            motivo = (f"son las {ahora:%H:%M} del {fecha}, antes de las {opciones.desde:%H:%M}: un disparo "
+                      "programado que llegó tan tarde que cruzó la medianoche")
 
     if not motivo or opciones.forzar:
         return False
     if opciones.dry_run:
-        log.warning("El %s es %s: una corrida real no se haría (dry-run sigue igual)", fecha, motivo)
+        log.warning("%s: una corrida real no se haría (dry-run sigue igual)", motivo)
         return False
-    registro.omitir("control", f"el {fecha} es {motivo}; para correr igual: --forzar")
+    registro.omitir("control", f"{motivo}; para correr igual: --forzar")
     registro.resultado.estado = OMITIDA
     return True
 
@@ -885,6 +898,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--salida", type=Path, help="Carpeta para los gráficos y la vista previa")
     parser.add_argument("--log-archivo", type=Path, help="Además de la consola, escribe el log en este archivo")
     parser.add_argument("--json", type=Path, help="Escribe el resultado de la corrida como JSON en este archivo")
+    parser.add_argument("--desde", type=_hora, metavar="HH:MM",
+                        help="No corre antes de esta hora de Argentina (termina como omitida). Para el horario "
+                             "programado, que si llega muy atrasado puede caer en el día siguiente")
     parser.add_argument("--origen", default="cli", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
@@ -917,6 +933,7 @@ def main(argv: list[str] | None = None) -> int:
             salida=args.salida.resolve() if args.salida else None,
             origen=args.origen,
             probar_ia=args.con_ia,
+            desde=args.desde,
         )
     )
     if args.json:
@@ -924,6 +941,13 @@ def main(argv: list[str] | None = None) -> int:
     if os.environ.get("GITHUB_ACTIONS") == "true":
         _avisar_en_github(resultado)
     return 0 if resultado.exitosa else 1
+
+
+def _hora(texto: str) -> hora_del_dia:
+    try:
+        return datetime.strptime(texto, "%H:%M").time()
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"hora inválida: {texto!r} (se espera HH:MM, por ejemplo 14:00)") from None
 
 
 def _escapar_anotacion(texto: str) -> str:
