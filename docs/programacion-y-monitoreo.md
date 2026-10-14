@@ -89,6 +89,10 @@ Hace falta Node.js (trae `npx`) y una cuenta de Cloudflare, gratis y sin tarjeta
 4. **Cargar el token:** `npx wrangler@4 secret put GITHUB_TOKEN` lo pide por consola, sin mostrarlo, y lo guarda cifrado en Cloudflare. También se puede desde el panel: Workers & Pages > reporte-macro-disparador > Settings > Variables and Secrets. El token no va en ningún archivo.
 5. **Verificar, sin efectos.** Un día hábil con el reporte ya salido, el disparo de las 17:07 tiene que aparecer en Actions > Corrida diaria como una corrida `workflow_dispatch` que termina en `omitida`. En Cloudflare, Workers & Pages > reporte-macro-disparador > Logs muestra cada invocación con "disparado" o con el error.
 
+**Si Cloudflare muestra la invocación con error "HTTP 403 Resource not accessible by personal access token"**, el token existe pero no tiene el repo ni el permiso: pasó el 14/10/2026 con el primer token sin vencimiento, que se creó sin marcar nada. Se arregla editando el token en GitHub (Repository access: Only select repositories, este repo; Permissions: Actions Read and write) y apretando Update: el valor del token no cambia, así que el secreto del Worker queda como está. Ese día el reporte salió con `gh workflow run corrida-diaria.yml --ref main -f modo=real` a mano, y el disparo de las 17:07 ya entró con el token corregido (corrida `workflow_dispatch`, `omitida` en 8 segundos).
+
+El Worker tiene tests sin red en `cloudflare/disparador.test.js` (los dos workflows, el reintento ante un 5xx, el 401 que no se reintenta, el secreto ausente): `node --test` desde `cloudflare/`, o `npm test`; el CI los corre en cada push.
+
 Si el token tuviera vencimiento y venciera (GitHub avisa por mail una semana antes), GitHub respondería 401, ninguna orden entraría y el control tampoco: el Worker figura fallido en el panel de Cloudflare y el día queda sin reporte hasta que alguien lo dispare a mano (`gh workflow run corrida-diaria.yml --ref main -f modo=real`). Se renueva con un token nuevo y `npx wrangler@4 secret put GITHUB_TOKEN`. Para apagar el Worker del todo: `npx wrangler@4 delete`.
 
 ### Por qué tres disparos de la corrida

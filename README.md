@@ -79,6 +79,22 @@ Below is the end-to-end blueprint of the production data life cycle.
 
 The diagram is generated from `Assets/arquitectura/construir.py`, so it can be updated without redrawing it.
 
+Two closer views, drawn with the [diagram-design](https://github.com/cathrynlavery/diagram-design) conventions (sources in `Assets/diagramas/`, one HTML per diagram, light and dark):
+
+<p align="center">
+  <picture>
+    <source srcset="Assets/diagramas/arquitectura-dark.png" media="(prefers-color-scheme: dark)">
+    <img src="Assets/diagramas/arquitectura.png" width="900" alt="One business day, end to end: the Cloudflare order, the GitHub Actions run, Supabase, Gemini, Gmail and the repository">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source srcset="Assets/diagramas/control-de-la-corrida-dark.png" media="(prefers-color-scheme: dark)">
+    <img src="Assets/diagramas/control-de-la-corrida.png" width="900" alt="The control stage: lock, calendar, existing row and the half-done day, so a second order never mails the list twice">
+  </picture>
+</p>
+
 ---
 
 ## ⚙️ How a day runs
