@@ -1,7 +1,7 @@
 # El despertador de la corrida diaria: un Worker de Cloudflare (plan Free) que a
 # cada horario le manda a GitHub la orden workflow_dispatch, la misma que manda
-# scripts/disparar_corrida.ps1 desde la PC. La corrida sigue siendo la de siempre,
-# en GitHub Actions; acá solo vive quien aprieta el botón.
+# `gh workflow run corrida-diaria.yml -f modo=real`. La corrida sigue siendo la de
+# siempre, en GitHub Actions; acá solo vive quien aprieta el botón.
 #
 # Cómo se despliega y se prueba: docs/programacion-y-monitoreo.md, "El disparo
 # confiable". En resumen, desde esta carpeta:

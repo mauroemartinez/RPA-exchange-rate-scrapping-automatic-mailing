@@ -9,9 +9,8 @@
 # evita dos corridas el mismo día. Pasos completos: docs/programacion-y-monitoreo.md.
 #
 # QUIÉN DA LA ORDEN: desde el 14/10/2026, el Worker de Cloudflare de cloudflare/
-# manda workflow_dispatch en modo real a las 16:00, 17:07 y 19:12 de Argentina,
-# y la tarea de Windows de la PC del mantenedor a las 16:00, de respaldo. El
-# horario de abajo es el último respaldo y está apagado.
+# manda workflow_dispatch en modo real a las 16:00, 17:07 y 19:12 de Argentina.
+# El horario de abajo es el respaldo y está apagado.
 #
 # El horario está en UTC, no en hora argentina: 19:19 UTC son las 16:19 en
 # Argentina. GitHub avisa que al comienzo de cada hora las corridas programadas

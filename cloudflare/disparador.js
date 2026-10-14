@@ -3,10 +3,10 @@
  *
  * POR QUÉ: el horario propio de GitHub (schedule) es "best effort" en el plan
  * gratis y llegó con horas de atraso o no llegó (08, 09, 10 y 12/10/2026). La
- * orden manual (workflow_dispatch) arranca en segundos. Hasta ahora la mandaba la
- * tarea de Windows de la PC del mantenedor, que no sirve con la PC apagada. Los
- * horarios (Cron Triggers) de Cloudflare son puntuales y gratis, y no dependen de
- * ninguna máquina propia.
+ * orden manual (workflow_dispatch) arranca en segundos. Del 09 al 14/10/2026 la
+ * mandaba una tarea de Windows de la PC del mantenedor, que no servía con la PC
+ * apagada. Los horarios (Cron Triggers) de Cloudflare son puntuales y gratis, y no
+ * dependen de ninguna máquina propia.
  *
  * QUÉ HACE: en cada horario de wrangler.toml, un POST a la API de GitHub con la
  * orden. Tres de los horarios piden la corrida en modo real (la misma corrida,
