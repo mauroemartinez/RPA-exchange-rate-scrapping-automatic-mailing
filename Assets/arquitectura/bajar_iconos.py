@@ -20,8 +20,6 @@ pedidos = {
     "dev_supabase": [DEVICON.format(n="supabase", v="original")],
     "dev_sqlalchemy": [DEVICON.format(n="sqlalchemy", v="original"), DEVICON.format(n="sqlalchemy", v="plain")],
     "dev_githubactions": [DEVICON.format(n="githubactions", v="original")],
-    "dev_docker": [DEVICON.format(n="docker", v="original")],
-    "dev_fastapi": [DEVICON.format(n="fastapi", v="original")],
     "dev_pandas": [DEVICON.format(n="pandas", v="original")],
     "dev_pytest": [DEVICON.format(n="pytest", v="original")],
     # simple-icons: monocromos, se colorean al armar la página
@@ -35,8 +33,6 @@ pedidos = {
     "si_supabase": [SIMPLE.format(s="supabase")],
     "si_postgresql": [SIMPLE.format(s="postgresql")],
     "si_playwright": [SIMPLE.format(s="playwright")],
-    "si_docker": [SIMPLE.format(s="docker")],
-    "si_fastapi": [SIMPLE.format(s="fastapi")],
     "si_sqlalchemy": [SIMPLE.format(s="sqlalchemy")],
     "si_pandas": [SIMPLE.format(s="pandas")],
     "si_microsoftpowerpoint": [SIMPLE.format(s="microsoftpowerpoint")],

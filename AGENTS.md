@@ -4,7 +4,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## What this project does
 
-Daily automated pipeline that scrapes Argentine FX rates and macroeconomic indicators, stores them in Supabase, generates charts (monetary aggregates and public debt in USD among them), an AI-written narrative via Gemini and an executive PowerPoint deck, and emails a styled HTML report to a subscriber list. The daily run lives in `pipeline.py`, a plain Python entry point with no Jupyter dependency, scheduled on GitHub Actions (free plan). A FastAPI wrapper (`app.py`) exposes a `/run` endpoint that executes the same pipeline, for the day the report runs on a server.
+Daily automated pipeline that scrapes Argentine FX rates and macroeconomic indicators, stores them in Supabase, generates charts (monetary aggregates and public debt in USD among them), an AI-written narrative via Gemini and an executive PowerPoint deck, and emails a styled HTML report to a subscriber list. The daily run lives in `pipeline.py`, a plain Python entry point with no Jupyter dependency, run on GitHub Actions (free plan) and triggered from the maintainer's PC. There is no server, API or container: the FastAPI wrapper and the Dockerfile were removed in October 2026 because nothing ever ran them; if the report ever moves to a server, a cron calling `python pipeline.py` is enough.
 
 ## Running the project
 
@@ -21,19 +21,7 @@ A real run has side effects: it writes to Supabase, emails the whole subscriber 
 
 **Notebook (retired):** `notebooks/Argentinian_Macroeconomic_Automatic_Mailing.ipynb` is retired: GitHub Actions runs the daily report, and running the notebook as well would mail the list twice. It stays only as a historical reference and no longer runs as is: it imports the modules from the root, where they lived before they moved into `reporte/`. The kernel must use the venv Python, configured in `venv/share/jupyter/kernels/python3/kernel.json` with the full path to `venv/Scripts/python.exe`.
 
-**Via Docker (optional, only if the report ever runs on a server):**
-```bash
-docker build -t macro-mailing .
-docker run --env-file .env -p 8000:8000 macro-mailing
-# trigger execution:
-curl -X POST http://localhost:8000/run -H "x-api-key: <API_KEY_EASY_PANEL>"
-# end-to-end check of a deployment, with no side effects:
-curl -X POST "http://localhost:8000/run?dry_run=true" -H "x-api-key: <API_KEY_EASY_PANEL>"
-```
-
-`/run` executes `pipeline.py` in a child process, so a hung run can be killed by the timeout and every run starts from a clean interpreter. The response carries the state and duration of each stage but no error details, which stay in the container log. There is no server today: the daily run is meant for GitHub Actions or the Windows Task Scheduler (see "Scheduling and monitoring"), and `API_KEY_EASY_PANEL` is only the `/run` key, with a historical name.
-
-Scraping runs on Playwright (Chromium) in both environments, with no Edge/Chrome branching. The Dockerfile installs the browser via `playwright install --with-deps chromium` at build time; locally you need to run that once yourself (see below).
+Scraping runs on Playwright (Chromium) everywhere, with no Edge/Chrome branching. The workflow installs the browser with `playwright install --with-deps chromium`; locally you need to run that once yourself (see below).
 
 **Install dependencies:**
 ```bash
@@ -43,7 +31,7 @@ pip install -r requirements-dev.txt    # production dependencies plus notebook, 
 playwright install chromium            # required once, for the scrapers
 ```
 
-`requirements.txt` holds only what production imports, and it is what the Docker image installs. The three lock files (`requirements.txt`, `requirements-dev.txt` and `dashboard/requirements.txt`) are generated from their `.in` with `uv pip compile` (the command is in the header of each `.in`); the dashboard's is constrained by the other two, so one venv can hold all three. Do not regenerate them with `pip freeze > requirements.txt` from PowerShell 5: it writes UTF-16 and pins whatever happens to be installed.
+`requirements.txt` holds only what production imports, and it is what the daily workflow installs. The three lock files (`requirements.txt`, `requirements-dev.txt` and `dashboard/requirements.txt`) are generated from their `.in` with `uv pip compile` (the command is in the header of each `.in`); the dashboard's is constrained by the other two, so one venv can hold all three. Do not regenerate them with `pip freeze > requirements.txt` from PowerShell 5: it writes UTF-16 and pins whatever happens to be installed.
 
 **Tests and lint:**
 ```bash
@@ -88,7 +76,7 @@ The pipeline is a faithful port of the notebook: fed the same inputs, the four J
 | File | Purpose |
 |---|---|
 | `pipeline.py` | Daily run and its CLI: stage orchestration, result per stage, alerts |
-| `reporte/` | The package with every module the run uses (below); `pipeline.py` and `app.py` are the only Python files at the root. Imports are absolute: `from reporte import charts`, `from reporte.config import settings` |
+| `reporte/` | The package with every module the run uses (below); `pipeline.py` is the only Python file at the root. Imports are absolute: `from reporte import charts`, `from reporte.config import settings` |
 | `reporte/data_access.py` | Supabase engine, historical read (with the CSV fallback), idempotent insert of today's row, run lock |
 | `reporte/transformations.py` | Today's row, validation, spreads and daily changes, Fisher forwards, inflation series |
 | `reporte/charts.py` | Data preparation and drawing of the six charts |
@@ -101,8 +89,6 @@ The pipeline is a faithful port of the notebook: fed the same inputs, the four J
 | `reporte/models.py` | The row's columns in table order (`COLUMNAS_*`), its Pydantic schema (the validation contract before persistence) and `SeccionesIA`, which validates Gemini's structured answer. It does not import `config`, so the calculation modules load without a `.env` |
 | `reporte/ia_generator.py` | Gemini integration: queries Supabase, builds the prompts, calls the API with key and model failover, saves the paragraph or the per-chart sections |
 | `reporte/mailer.py` | The only SMTP code: `enviar_smtp`, which the report uses too, and the plain-text failure alerts, sent to `EMAIL_ALERTAS` |
-| `app.py` | FastAPI wrapper whose `/run` executes `pipeline.py` |
-| `Dockerfile` | Linux/Chromium image for containerized execution |
 | `reporte/scrapers/` | Playwright scrapers (`bna.py`, `dolarhoy.py`, `ambito.py`), async REST clients (`bcra.py`, `fed.py`, `riesgo_pais.py`), `btc.py` (Yahoo Finance), `finanzas.py` (the Secretaría de Finanzas debt Excel), `utils.py` (retry, `ScraperError`, event-loop helper) and `__init__.py` (`run_all_sync()`, which runs the first six concurrently) |
 | `reporte/templates/report_email.html` | Jinja2 template for the HTML email report: CSS plus markup, rendered by `reporte/email_report.py` |
 | `notebooks/Argentinian_Macroeconomic_Automatic_Mailing.ipynb` | The original pipeline, kept as a reference during the transition |
@@ -134,7 +120,6 @@ RUTA_REPO                # Path to repo root (for the git push step)
 FED_API_KEY              # St. Louis FRED API key
 GEMINI_API_KEY_1         # Primary Gemini key
 GEMINI_API_KEY_2         # Failover Gemini key (rotated on HTTP 429)
-API_KEY_EASY_PANEL       # Key for POST /run in app.py, only if the API runs on a server (blank: /run answers 503)
 ```
 
 `EMAIL_RECEIVER` and `EMAIL_RECEIVER_CSV` are comma-separated lists, each address validated individually. The git step only runs when `RUTA_REPO` is the folder that holds the code, so a checkout elsewhere never commits into another repo. Alerts carry tracebacks, so `EMAIL_ALERTAS` is best set to the maintainer alone; the log redaction covers it like the report's recipients.
@@ -170,8 +155,8 @@ Three guardrails worth knowing: it aborts if the newest row has no `ai_paragraph
 
 - **Scrapers depend on each site's HTML structure.** BNA, DolarHoy, and Ambito (`reporte/scrapers/`) use short CSS and id-based Playwright selectors, but still break if a site changes its markup. A broken selector raises a `ScraperError` carrying site and step context instead of silently leaving NaN columns in the new row.
 - **Validation gate before persistence.** If the newly built row does not satisfy the Pydantic schema, the run fails fast and notifies the developer instead of saving a bad record.
-- **Today's date comes from `fechas.hoy()`,** computed in America/Argentina/Buenos_Aires. Never use `datetime.today()` or `date.today()` for the row date: the container runs in UTC, and a run after 21:00 would stamp the next day.
-- **No `locale.setlocale()`.** Spanish month names come from `fechas.MESES_ABREV`. The slim Docker image has no Spanish locale (the call raises there), and the locale is process-wide state.
+- **Today's date comes from `fechas.hoy()`,** computed in America/Argentina/Buenos_Aires. Never use `datetime.today()` or `date.today()` for the row date: the GitHub runner is in UTC, and a run after 21:00 would stamp the next day.
+- **No `locale.setlocale()`.** Spanish month names come from `fechas.MESES_ABREV`. The GitHub runner has no Spanish locale (the call raises there), and the locale is process-wide state.
 - **Charts never use pyplot's global state.** Each one is drawn on its own `matplotlib.figure.Figure` inside an `rc_context` that starts from the same base style, so a chart cannot leak its style into the next one or into the next run.
 - **`charts.FECHA_INICIO_VARIACIONES`,** the start of the variaciones acumuladas chart, is hardcoded to `"2025-07-01"`. Update it when the reference period changes. The chart must receive the full inflation series, not the 12 months of the table: with only 12 months, the inflation line starts later than the dollar lines once the period is longer than a year.
 - **`ia_generator` requires at least 26 rows** in Supabase to compute 25-session rolling variations; it raises an exception otherwise.

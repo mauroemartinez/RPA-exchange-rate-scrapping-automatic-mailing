@@ -53,7 +53,7 @@ jobs:
 
       - name: Imports
         run: >
-          python -c "import pipeline, app; from reporte import data_access, transformations, charts,
+          python -c "import pipeline; from reporte import data_access, transformations, charts,
           email_report, preview_git, ia_generator, mailer, models, fechas, indicadores, presentacion;
           from reporte.scrapers import agregados, btc, feriados, finanzas"
 

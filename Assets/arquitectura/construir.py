@@ -373,7 +373,7 @@ def opcion_1() -> str:
         f'<img class="gh" src="{si("github", "#FFFFFF")}"><img class="gha" src="{dev("githubactions")}"></div>'
         '<div><div class="t1">Orchestration · GitHub Actions</div>'
         '<div class="t2"><b>Free plan:</b> business days at 16:00, triggered by a Windows task on the maintainer PC; skips holidays.'
-        '<br>Backup schedules at 16:19, 17:07 and 19:12, off today. Tests every push in CI. FastAPI + Docker stay optional.</div></div></div>'
+        '<br>Backup schedules at 16:19, 17:07 and 19:12, off today. Tests every push in CI.</div></div></div>'
     )
 
     return (

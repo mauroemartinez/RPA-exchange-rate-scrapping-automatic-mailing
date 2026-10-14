@@ -26,7 +26,7 @@ MAX_INTENTOS = 3
 MENSAJE_FALLA = "No se pudo generar el análisis automatizado de mercado."
 
 # Por defecto google-genai espera sin límite: un Gemini colgado dejaba la corrida
-# esperando hasta que app.py la mataba a la hora, con la fila guardada y sin mail.
+# esperando hasta que el timeout del workflow la mataba, con la fila guardada y sin mail.
 TIMEOUT_MS = 120_000
 
 # 25 ruedas hacia atrás más la de hoy

@@ -13,14 +13,14 @@ Hoy la corrida se lanza a mano desde el notebook. En los últimos 90 días queda
 | Corridas que mueren a mitad de camino | Si una corrida insertó la fila y murió antes del párrafo y del mail (timeout, reinicio, la PC suspendida), la siguiente no la toma como día hecho: termina en error, con una alerta que dice cómo rehacer el día (`--forzar`). Cada llamada a Gemini tiene un timeout de 120 s, para que una respuesta colgada no se coma la hora de la corrida. |
 | Registrar duración y resultado de cada etapa | Cada etapa queda con estado y segundos en el log (`--log-archivo`) y en un JSON (`--json`). El código de salida es 1 si alguna etapa terminó en error. |
 | Alertas útiles | Un error en cualquier etapa manda un único mail con el resumen. `scripts/control_diario.py` cubre la corrida que nunca arrancó: si a la hora del control no está la fila de hoy, falla y alerta. Corriendo en GitHub Actions, cada falla además dispara el aviso por mail de GitHub, que no depende de la contraseña de Gmail del reporte. Las alertas van a `EMAIL_ALERTAS` (si está vacía, a `EMAIL_RECEIVER_CSV`); como llevan tracebacks, conviene que sea solo quien mantiene el proyecto. |
-| Endpoints y credenciales | `/run` compara la key con `secrets.compare_digest` y no se habilita sin key. Los logs tapan cada secreto del `.env` y cada dirección de destinatario (ver "Logs públicos", abajo). |
+| Credenciales | Los logs tapan cada secreto del `.env` y cada dirección de destinatario (ver "Logs públicos", abajo). |
 | CI sin efectos externos | `.github/workflows/ci.yml`: `ruff check` (incluye el orden de los imports), importa todos los módulos y corre los tests, que fallan si intentan salir a la red, abrir una conexión SMTP, bajar datos de Yahoo o lanzar un navegador. Corre en cada push a `main` (salvo los commits de `Previews/`) y en cada PR. |
 
 Sobre "formato": el CI verifica el estilo con las reglas de `ruff check`, no con un formateador. Aplicar `ruff format` hoy cambiaría unas 800 líneas en 26 archivos, también en código que esta rama no tocó; conviene hacerlo en un commit aparte, solo de formato, y recién ahí sumar `ruff format --check` al CI.
 
 ## Elegir el programador
 
-Hay dos opciones reales. No hace falta ningún servidor (ni EasyPanel ni otro): el `Dockerfile` y la API `/run` de `app.py` quedan para el día que haya uno (ver al final).
+Hay dos opciones reales. No hace falta ningún servidor: la API y el `Dockerfile` que el repo traía para ese caso se sacaron en octubre de 2026, porque no había servidor y no iba a haberlo. Si algún día hace falta, alcanza con un cron que llame a `python pipeline.py`.
 
 | | GitHub Actions | Programador de tareas de Windows |
 |---|---|---|
@@ -68,10 +68,6 @@ venv\Scripts\python.exe pipeline.py --log-archivo logs\pipeline.log
 ```
 
 Y otra a las 19:30 con `venv\Scripts\python.exe scripts\control_diario.py`.
-
-### Docker y `/run`, solo si algún día hay un servidor
-
-El repo trae un `Dockerfile` y una API (`app.py`, `POST /run`) para correr el reporte en un servidor propio y dispararlo desde afuera. Sin servidor no se usan, y no hace falta tocarlos. `API_KEY_EASY_PANEL` es solo la clave de esa API (el nombre es histórico): sin ella, `/run` no se habilita.
 
 ## Dos reglas para cualquier programador
 

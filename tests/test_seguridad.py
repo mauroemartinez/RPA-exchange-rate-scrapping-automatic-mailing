@@ -5,32 +5,11 @@ import smtplib
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
-from pydantic import SecretStr
 
-import app
 import pipeline
 from reporte import config, email_report, mailer
 from reporte.scrapers import fed
 from reporte.scrapers.utils import ScraperError, run_async
-
-
-def test_una_key_vacia_cuenta_como_no_configurada():
-    assert config.Settings(api_key_easy_panel="").api_key_easy_panel is None
-    assert config.Settings(api_key_easy_panel="   ").api_key_easy_panel is None
-    assert config.Settings(api_key_easy_panel="una-key").api_key_easy_panel.get_secret_value() == "una-key"
-
-
-def test_run_con_key_vacia_no_se_habilita(monkeypatch):
-    monkeypatch.setattr(app.settings, "api_key_easy_panel", SecretStr(""))
-    respuesta = TestClient(app.app).post("/run", headers={"x-api-key": ""})
-    assert respuesta.status_code == 503
-
-
-def test_sin_documentacion_publica():
-    cliente = TestClient(app.app)
-    assert cliente.get("/docs").status_code == 404
-    assert cliente.get("/openapi.json").status_code == 404
 
 
 def test_el_error_de_fred_no_lleva_la_api_key():
@@ -132,6 +111,7 @@ def test_la_direccion_de_alertas_tambien_se_tapa(monkeypatch):
 
 def test_una_segunda_key_de_gemini_vacia_no_entra_a_la_rotacion():
     assert config.Settings(gemini_api_key_2="").gemini_keys == ["gemini-falsa-1"]
+    assert config.Settings(gemini_api_key_2="   ").gemini_keys == ["gemini-falsa-1"]
 
 
 def test_se_tapan_el_usuario_y_el_host_de_la_base(monkeypatch):

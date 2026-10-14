@@ -1,8 +1,8 @@
 """Orquestación de pipeline.correr() con todos los efectos externos reemplazados."""
 
 import contextlib
+import json
 import smtplib
-import subprocess
 from dataclasses import replace
 from datetime import datetime, time, timedelta
 from pathlib import Path
@@ -687,13 +687,8 @@ def test_secciones_guardadas_en_cero_filas_caen_al_parrafo_unico(entorno):
     assert _estados(r)["ia"] == "advertencia" and hechos["parrafos"] == [HOY]
 
 
-def test_el_json_de_la_corrida_tiene_lo_que_lee_app(entorno, tmp_path, monkeypatch):
-    """El contrato entre pipeline.py y app.py: --json con estado y etapas[nombre, estado, segundos]."""
-
-    from fastapi.testclient import TestClient
-
-    import app
-
+def test_el_json_de_la_corrida_tiene_estado_y_etapas(entorno, tmp_path, monkeypatch):
+    """El contrato de --json para quien dispare la corrida desde afuera: estado y etapas con nombre, estado y segundos."""
     deps, _, salida = entorno
     resultado = pipeline.correr(pipeline.Opciones(salida=salida), deps)
     monkeypatch.setattr(pipeline, "correr", lambda opciones: resultado)
@@ -701,17 +696,10 @@ def test_el_json_de_la_corrida_tiene_lo_que_lee_app(entorno, tmp_path, monkeypat
     escrito = tmp_path / "resultado.json"
     pipeline.main(["--dry-run", "--json", str(escrito)])
 
-    def run(comando, **kwargs):
-        destino = comando[comando.index("--json") + 1]
-        Path(destino).write_text(escrito.read_text(encoding="utf-8"), encoding="utf-8")
-        return subprocess.CompletedProcess(comando, 0)
-
-    monkeypatch.setattr(app.subprocess, "run", run)
-    datos = TestClient(app.app).post("/run", headers={"x-api-key": "clave-de-test"}).json()
-
-    assert datos["estado"] == "ok"
+    datos = json.loads(escrito.read_text(encoding="utf-8"))
+    assert datos["estado"] == "ok" and datos["fecha"] == HOY.isoformat()
     assert [e["nombre"] for e in datos["etapas"]] == [e.nombre for e in resultado.etapas]
-    assert all(set(e) == {"nombre", "estado", "segundos"} for e in datos["etapas"])
+    assert all({"nombre", "estado", "segundos"} <= set(e) for e in datos["etapas"])
 
 
 def test_historico_desde_el_csv_es_una_advertencia(entorno, historico):

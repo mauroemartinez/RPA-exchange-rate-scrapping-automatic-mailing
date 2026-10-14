@@ -66,7 +66,7 @@ def _tecnologias() -> dict[str, str]:
         "postgresql": c.dev("postgresql"), "supabase": c.dev("supabase"), "gemini": c.GEMINI,
         "matplotlib": c.dev("matplotlib"), "seaborn": c.SEABORN, "jinja": c.si("jinja", "#081E40"),
         "powerpoint": c.si("microsoftpowerpoint", "#B7472A"), "githubactions": c.dev("githubactions"),
-        "pytest": c.dev("pytest"), "fastapi": c.dev("fastapi"), "docker": c.dev("docker"),
+        "pytest": c.dev("pytest"),
     }
 
 

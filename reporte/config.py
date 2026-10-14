@@ -52,10 +52,6 @@ class Settings(BaseSettings):
     ruta_bbdd: Path
     ruta_repo: Path
 
-    # ── Servicio / despliegue ────────────────────────────────────────────────
-    # Solo la lee app.py; su ausencia no frena una corrida
-    api_key_easy_panel: SecretStr | None = None
-
     @field_validator("ruta_bbdd", "ruta_repo")
     @classmethod
     def _resolver_relativa(cls, v: Path) -> Path:
@@ -67,13 +63,13 @@ class Settings(BaseSettings):
         """
         return v if v.is_absolute() else (RAIZ_PROYECTO / v).resolve()
 
-    @field_validator("api_key_easy_panel", "gemini_api_key_2", mode="before")
+    @field_validator("gemini_api_key_2", mode="before")
     @classmethod
     def _key_vacia_es_sin_key(cls, v):
-        """API_KEY_EASY_PANEL= (vacía) cuenta como no configurada.
+        """GEMINI_API_KEY_2= (vacía) cuenta como no configurada.
 
-        pydantic-settings la leía como SecretStr(""), y compare_digest(b"", b"")
-        da True: un header x-api-key vacío pasaba la autenticación de /run.
+        pydantic-settings la leería como SecretStr(""), y una key vacía
+        entraría a la rotación de Gemini como si fuera una key más.
         """
         if v is None:
             return None
@@ -122,7 +118,7 @@ def reemplazos_sensibles() -> list[tuple[str, str]]:
     """
     secretos = [
         settings.email_password, settings.gemini_api_key_1, settings.gemini_api_key_2,
-        settings.fed_api_key, settings.supabase_db_url, settings.api_key_easy_panel,
+        settings.fed_api_key, settings.supabase_db_url,
     ]
     pares = [(s.get_secret_value(), "***") for s in secretos if s is not None]
     url = urlparse(settings.supabase_db_url.get_secret_value())

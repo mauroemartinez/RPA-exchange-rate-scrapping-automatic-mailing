@@ -1,4 +1,4 @@
-# Dependencias para desarrollar, sobre las de producción. No van a la imagen.
+# Dependencias para desarrollar, sobre las de producción. La corrida diaria no las instala.
 #
 #     pip install -r requirements-dev.txt
 #

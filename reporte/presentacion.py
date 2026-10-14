@@ -94,7 +94,7 @@ TECNOLOGIAS = [
     ("python", "Python"), ("playwright", "Playwright"), ("pandas", "pandas"), ("pydantic", "Pydantic"),
     ("sqlalchemy", "SQLAlchemy"), ("postgresql", "PostgreSQL"), ("supabase", "Supabase"), ("gemini", "Gemini"),
     ("matplotlib", "Matplotlib"), ("seaborn", "seaborn"), ("jinja", "Jinja"), ("powerpoint", "PowerPoint"),
-    ("githubactions", "GitHub Actions"), ("pytest", "pytest"), ("fastapi", "FastAPI"), ("docker", "Docker"),
+    ("githubactions", "GitHub Actions"), ("pytest", "pytest"),
 ]
 
 FUENTES = [

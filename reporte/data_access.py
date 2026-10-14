@@ -118,9 +118,9 @@ def guardar_fila(engine: Engine, fila: pd.DataFrame, sobrescribir: bool = False)
 def candado_corrida(engine: Engine):
     """Advisory lock de Postgres mientras dura la corrida. Cede True si lo obtuvo.
 
-    El lock de app.py solo cubre los POST que llegan al mismo proceso. Este cubre
-    cualquier combinación de disparadores (API, cron, GitHub Actions, alguien a mano)
-    porque vive en la base. Se libera solo si el proceso muere, ya que es de sesión.
+    Cubre cualquier combinación de disparadores (el programador de Windows, GitHub
+    Actions, alguien a mano) porque vive en la base. Se libera solo si el proceso
+    muere, ya que es de sesión.
     """
     # AUTOCOMMIT: el lock es de sesión, así que no hace falta una transacción, y una
     # conexión "idle in transaction" durante toda la corrida es candidata a que la corten.

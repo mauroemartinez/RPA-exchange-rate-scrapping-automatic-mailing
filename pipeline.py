@@ -131,7 +131,7 @@ class ResultadoCorrida:
         return "\n".join(lineas)
 
     def como_dict(self) -> dict:
-        """Serializable a JSON (--json). app.py lee de acá estado y etapas, sin el detalle."""
+        """Serializable a JSON (--json): estado, fecha y etapas, para quien dispare la corrida desde afuera."""
         datos = asdict(self)
         datos["fecha"] = self.fecha.isoformat()
         datos["salida"] = str(self.salida) if self.salida else None

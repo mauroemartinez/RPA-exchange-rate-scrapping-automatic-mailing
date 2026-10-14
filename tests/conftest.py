@@ -22,7 +22,6 @@ _FALSAS = {
     "SUPABASE_DB_URL": "postgresql://usuario:clave@127.0.0.1:1/inexistente",
     "RUTA_BBDD": "tests/no-existe.csv",
     "RUTA_REPO": ".",
-    "API_KEY_EASY_PANEL": "clave-de-test",
 }
 os.environ.update(_FALSAS)
 os.environ.setdefault("MPLBACKEND", "Agg")

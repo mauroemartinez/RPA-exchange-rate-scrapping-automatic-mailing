@@ -8,8 +8,6 @@
 [![Supabase](https://img.shields.io/badge/Supabase_PostgreSQL-3FCF8E?style=flat&logo=supabase&logoColor=white)](https://supabase.com)
 [![Gemini API](https://img.shields.io/badge/Gemini_API-1A73E8?style=flat&logo=google&logoColor=white)](https://ai.google.dev/)
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)](https://docs.docker.com/)
 [![Pydantic](https://img.shields.io/badge/Pydantic-validated-E92063?style=flat&logo=pydantic&logoColor=white)](https://docs.pydantic.dev)
 [![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-D71F00?style=flat&logo=sqlalchemy&logoColor=white)](https://www.sqlalchemy.org)
 [![python-pptx](https://img.shields.io/badge/python--pptx-executive_deck-B7472A?style=flat)](https://python-pptx.readthedocs.io)
@@ -142,7 +140,6 @@ The system automates the ingestion of highly volatile financial variables, ensur
 
 ```
 ├── pipeline.py              Entry point: the daily run and its CLI (stages, per-stage results, alerts)
-├── app.py                   FastAPI entry point: POST /run executes pipeline.py
 ├── reporte/                 The report itself, as a Python package
 │   ├── config.py            Typed environment configuration (Pydantic-Settings)
 │   ├── models.py            Row-level validation schema (Pydantic) and the AI answer's schema
@@ -167,7 +164,6 @@ The system automates the ingestion of highly volatile financial variables, ensur
 ├── Assets/                  Architecture diagram, README images and their generators
 ├── Previews/                Daily charts, auto-committed by the pipeline
 ├── .github/workflows/       CI, plus the daily run and daily control
-├── Dockerfile               Optional container image, for running the API on a server
 ├── pyproject.toml           pytest and ruff configuration
 └── requirements*.in / .txt  Direct dependencies, locked into the matching .txt
 ```
@@ -176,7 +172,7 @@ The system automates the ingestion of highly volatile financial variables, ensur
 
 ## 🛟 Operational Tooling
 
-**Daily run.** `pipeline.py` is the whole report end to end, the same code the `/run` endpoint executes:
+**Daily run.** `pipeline.py` is the whole report end to end, the same code GitHub Actions runs:
 
 ```bash
 python pipeline.py --dry-run                          # live scraping, nothing written or sent
@@ -222,7 +218,7 @@ The six-phase roadmap is complete. What each phase left in production, and what 
 
 | Phase | Status | In production |
 |---|:-:|---|
-| 1. Pipeline without the notebook | ✅ | `pipeline.py` with its CLI, the `reporte/` package, `app.py` running the same code; the notebook retired |
+| 1. Pipeline without the notebook | ✅ | `pipeline.py` with its CLI and the `reporte/` package; the notebook retired |
 | 2. Reliability and diagnostics | ✅ | Per-stage state and duration, failed sends turn the run red, 280+ offline tests, golden HTML, secrets scrubbed from public logs. API caching evaluated and declined: nothing is heavy enough |
 | 3. Monetary aggregates and debt | ✅ | `Fact_Series_Macro` with 14 series, two charts in the mail with plain-language explanations, debt always in USD |
 | 4. Per-chart AI commentary | ✅ | One structured Gemini call, validated with Pydantic, stored as JSON; falls back to the single paragraph |

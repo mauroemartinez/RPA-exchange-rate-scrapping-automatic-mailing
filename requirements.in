@@ -1,11 +1,11 @@
-# Dependencias DIRECTAS de producción: las que importa el pipeline o la API.
+# Dependencias DIRECTAS de producción: las que importa el pipeline.
 #
 # requirements.txt, en cambio, es la lista COMPLETA con versiones exactas,
-# incluye también las dependencias de estas dependencias (h11, anyio, starlette,
-# protobuf y unas cuantas más). Ese archivo es el que se instala en la imagen.
+# incluye también las dependencias de estas dependencias (h11, anyio, protobuf
+# y unas cuantas más). Ese archivo es el que instala la corrida en GitHub Actions.
 #
 # Lo que solo hace falta para desarrollar (notebook, tests, lint) está en
-# requirements-dev.in, así no termina dentro del contenedor.
+# requirements-dev.in, así la corrida no lo instala.
 #
 # Para regenerar requirements.txt desde este archivo:
 #     uv pip compile requirements.in --universal --python-version 3.14 -o requirements.txt
@@ -47,7 +47,3 @@ Jinja2           # plantilla del mail
 matplotlib
 seaborn
 python-pptx      # presentación ejecutiva diaria (presentacion.py)
-
-# ── Servicio HTTP (app.py) ──
-fastapi
-uvicorn
