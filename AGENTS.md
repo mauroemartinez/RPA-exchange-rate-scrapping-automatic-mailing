@@ -103,7 +103,7 @@ The pipeline is a faithful port of the notebook: fed the same inputs, the four J
 | `notebooks/laboratorio_sql.ipynb` | Read-only SQL lab: every query run through its `consulta()` goes inside a `READ ONLY` transaction |
 | `reporte/scrapers/agregados.py` | Catalog of the stored series (key, source id, frequency, unit, source): BCRA aggregates, inflation, debt-related series and the A3500 rate, plus the Treasury's gross debt; paginated BCRA download |
 | `docs/` | Roadmap notes in Spanish: the cache evaluation, phase 3 (aggregates and debt, with the debt definition chosen), the PowerPoint and Streamlit evaluation, and the scheduling and monitoring guide (GitHub Actions setup) |
-| `Assets/` | The README architecture diagrams; `Assets/arquitectura/construir.py` regenerates both from HTML with Chromium, keeping the style |
+| `Assets/` | The README architecture diagram (`Assets/arquitectura/construir.py` regenerates it from HTML with Chromium, keeping the style) and `Assets/diagramas/`: editorial diagrams (architecture, sequence, control flowchart, deployment) as self-contained HTML plus PNG, drawn with the diagram-design skill's conventions, candidates for the README |
 | `sql/` | SQL scripts applied by hand in Supabase: DB setup, historical data cleaning, and the migrations `06_series_macro.sql` and `07_ai_paragraphs.sql` (the `ai_secciones` column), both idempotent and already applied; `docs/programacion-y-monitoreo.md` explains how to apply, verify and undo them |
 | `tests/` | Offline test suite; `tests/datos/` holds the golden HTML of the mail |
 | `pyproject.toml` | pytest and ruff configuration |
