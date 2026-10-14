@@ -44,7 +44,7 @@ class SeccionesIA(BaseModel):
 
     Un párrafo general, el de la caja de arriba del mail, y un comentario por
     bloque de gráficos. Valida la respuesta: si un campo falta, está vacío o se
-    desborda, no se usa y el pipeline vuelve al párrafo único. A la API va
+    desborda, no se usa y el mail lleva el mensaje de reemplazo. A la API va
     ia_generator._esquema_respuesta(), que solo lleva tipos y campos obligatorios.
     """
 
