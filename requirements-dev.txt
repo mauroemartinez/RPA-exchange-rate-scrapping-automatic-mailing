@@ -8,7 +8,7 @@ annotated-types==0.7.0
     # via
     #   -c requirements.txt
     #   pydantic
-anyio==4.13.0
+anyio==4.14.2
     # via
     #   -c requirements.txt
     #   google-genai
@@ -59,7 +59,7 @@ contourpy==1.3.3
     # via
     #   -c requirements.txt
     #   matplotlib
-cryptography==48.0.0
+cryptography==50.0.2
     # via
     #   -c requirements.txt
     #   google-auth
@@ -130,7 +130,7 @@ httpx==0.28.1
     #   -c requirements.txt
     #   -r requirements.in
     #   google-genai
-idna==3.13
+idna==3.20
     # via
     #   -c requirements.txt
     #   anyio
@@ -236,7 +236,7 @@ peewee==4.0.6
     #   yfinance
 pexpect==4.9.0 ; sys_platform != 'emscripten' and sys_platform != 'win32'
     # via ipython
-pillow==12.2.0
+pillow==12.3.0
     # via
     #   -c requirements.txt
     #   matplotlib
@@ -270,7 +270,7 @@ ptyprocess==0.7.0 ; sys_platform != 'emscripten' and sys_platform != 'win32'
     # via pexpect
 pure-eval==0.2.3
     # via stack-data
-pyasn1==0.6.3
+pyasn1==0.6.4
     # via
     #   -c requirements.txt
     #   pyasn1-modules
@@ -368,7 +368,7 @@ sniffio==1.3.1
     # via
     #   -c requirements.txt
     #   google-genai
-soupsieve==2.8.4
+soupsieve==3.0.3
     # via
     #   -c requirements.txt
     #   beautifulsoup4
@@ -391,7 +391,7 @@ tenacity==9.1.4
     #   -c requirements.txt
     #   -r requirements.in
     #   google-genai
-tornado==6.5.5
+tornado==6.5.10
     # via
     #   ipykernel
     #   jupyter-client
@@ -426,7 +426,7 @@ tzdata==2026.2
     #   -c requirements.txt
     #   -r requirements.in
     #   pandas
-urllib3==2.7.0
+urllib3==2.8.0
     # via
     #   -c requirements.txt
     #   requests
