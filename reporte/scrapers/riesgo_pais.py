@@ -13,7 +13,7 @@ from datetime import date
 
 import httpx
 
-from reporte.scrapers.utils import ScraperError, retry_http
+from reporte.scrapers.utils import ScraperError, cliente_http, retry_http
 
 API_BASE = "https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais"
 API_ULTIMO = f"{API_BASE}/ultimo"
@@ -45,11 +45,8 @@ async def run(client: httpx.AsyncClient | None = None) -> dict:
     pool de conexiones. Si no, abre y cierra uno propio.
     """
     try:
-        if client is not None:
-            payload = await _get_json(client, API_ULTIMO)
-        else:
-            async with httpx.AsyncClient(timeout=TIMEOUT) as own_client:
-                payload = await _get_json(own_client, API_ULTIMO)
+        async with cliente_http(client, TIMEOUT) as c:
+            payload = await _get_json(c, API_ULTIMO)
 
         fecha, valor = _parse(payload)
         if valor <= 0:
@@ -59,19 +56,3 @@ async def run(client: httpx.AsyncClient | None = None) -> dict:
     except Exception as exc:
         raise ScraperError("ArgentinaDatos", "leer último riesgo país", exc) from exc
 
-
-async def fetch_historico(client: httpx.AsyncClient | None = None) -> list[tuple[date, float]]:
-    """Serie completa (fecha, valor) ordenada ascendente. Para backfill."""
-    try:
-        if client is not None:
-            payload = await _get_json(client, API_BASE)
-        else:
-            async with httpx.AsyncClient(timeout=TIMEOUT) as own_client:
-                payload = await _get_json(own_client, API_BASE)
-
-        serie = [_parse(r) for r in payload]
-        serie.sort(key=lambda par: par[0])
-        return serie
-
-    except Exception as exc:
-        raise ScraperError("ArgentinaDatos", "leer histórico de riesgo país", exc) from exc

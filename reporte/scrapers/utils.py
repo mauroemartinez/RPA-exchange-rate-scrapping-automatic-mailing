@@ -1,6 +1,7 @@
 import asyncio
 import sys
 import threading
+from contextlib import asynccontextmanager
 
 import httpx
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
@@ -72,6 +73,20 @@ def retry_http(func):
         wait=wait_exponential(multiplier=1, min=1, max=16),
         reraise=True,
     )(func)
+
+
+@asynccontextmanager
+async def cliente_http(client: httpx.AsyncClient | None, timeout: httpx.Timeout):
+    """El AsyncClient recibido o, si no vino ninguno, uno propio que se cierra al salir.
+
+    El pipeline comparte un cliente entre las fuentes HTTP; los scripts y los
+    tests llaman a cada fuente suelta.
+    """
+    if client is not None:
+        yield client
+        return
+    async with httpx.AsyncClient(timeout=timeout) as propio:
+        yield propio
 
 
 def run_async(coro):

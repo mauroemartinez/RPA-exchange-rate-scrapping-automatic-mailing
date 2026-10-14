@@ -9,8 +9,8 @@ Etapas, en el mismo orden que el notebook:
   scraping      las seis fuentes en paralelo; si una cae, alerta y corta
   validacion    arma la fila del día y la pasa por models.FilaMacro; si no cumple, alerta y corta
   persistencia  INSERT de la fila sin duplicar la fecha
-  ia            párrafo de Gemini, guardado en la misma fila; con la columna ai_secciones,
-                además un comentario por gráfico, en la misma llamada (fase 4)
+  ia            una llamada estructurada a Gemini: el resumen y un comentario por gráfico, guardados
+                en la misma fila; si falla, el párrafo único de siempre
   indicadores   agregados monetarios, inflación y deuda del BCRA, y la deuda bruta de la
                 Secretaría de Finanzas, para sus gráficos; si una fuente falla, es una advertencia
                 y el mail sale sin esos gráficos
@@ -171,14 +171,12 @@ class Dependencias:
     scrapear: Callable = scrapers.run_all_sync
     descargar_btc: Callable = btc.descargar
     generar_parrafo: Callable = ia_generator.procesar_y_guardar_parrafo
-    columna_secciones: Callable = lambda engine: data_access.columna_existe(engine, "ai_secciones")
     generar_secciones: Callable = ia_generator.generar_secciones
     guardar_secciones: Callable = ia_generator.guardar_secciones
     limpiar_secciones: Callable = ia_generator.limpiar_secciones
     enviar_mail: Callable = email_report.enviar
     actualizar_previews: Callable = preview_git.actualizar_previews
     publicar_presentacion: Callable = preview_git.publicar_presentacion
-    tabla_series: Callable = data_access.tabla_existe
     descargar_series: Callable = agregados.descargar
     descargar_deuda: Callable = finanzas.descargar
     guardar_series: Callable = data_access.guardar_series
@@ -453,8 +451,8 @@ def _etapa_ia(
 ) -> tuple[str, str | None, dict]:
     """(párrafo que muestra el mail, texto que queda guardado en la fila, comentarios por gráfico).
 
-    Con la columna ai_secciones, una llamada estructurada (fase 4). Ante cualquier
-    falla de esa llamada, o si no se pudo guardar, se vuelve al párrafo único.
+    Una llamada estructurada: el resumen más un comentario por gráfico. Ante
+    cualquier falla de esa llamada, o si no se pudo guardar, se vuelve al párrafo único.
     """
     if opciones.dry_run:
         parrafo = parrafo_existente or "[dry-run] Acá va el párrafo de Gemini, que en una prueba no se pide."
@@ -479,32 +477,24 @@ def _etapa_ia(
 
     parrafo, texto_ia, comentarios = ia_generator.MENSAJE_FALLA, None, {}
     with registro.etapa("ia", critica=False) as e:
+        secciones, modelo = _pedir_secciones(deps, df_base, btc_df, fwd_oficial)
+        if secciones is not None and _guardar_secciones(deps, engine, fecha, secciones, modelo):
+            e.detalle = f"resumen y comentarios por gráfico con {modelo}"
+            return secciones.resumen, secciones.resumen, ia_generator.comentarios_por_grafico(secciones)
+
+        log.warning("Sin comentarios por gráfico; se vuelve al párrafo único")
+        # Una corrida anterior del día (--forzar) pudo dejar comentarios de otros valores
         try:
-            con_secciones = bool(deps.columna_secciones(engine))
+            deps.limpiar_secciones(engine, fecha)
         except Exception as exc:
-            log.warning("No se pudo consultar la columna ai_secciones (%s); se usa el párrafo único", exc)
-            con_secciones = False
+            log.warning("No se pudieron borrar los comentarios anteriores del día: %s", exc)
 
-        if con_secciones:
-            secciones, modelo = _pedir_secciones(deps, df_base, btc_df, fwd_oficial)
-            if secciones is not None and _guardar_secciones(deps, engine, fecha, secciones, modelo):
-                e.detalle = f"resumen y comentarios por gráfico con {modelo}"
-                return secciones.resumen, secciones.resumen, ia_generator.comentarios_por_grafico(secciones)
-            log.warning("Sin comentarios por gráfico; se vuelve al párrafo único")
-            # Una corrida anterior del día (--forzar) pudo dejar comentarios de otros valores
-            try:
-                deps.limpiar_secciones(engine, fecha)
-            except Exception as exc:
-                log.warning("No se pudieron borrar los comentarios anteriores del día: %s", exc)
-
+        e.estado = ADVERTENCIA
         texto = deps.generar_parrafo(engine, fecha_esperada=fecha)
         if texto and texto != ia_generator.MENSAJE_FALLA:
             parrafo = texto_ia = texto
-            if con_secciones:
-                e.estado = ADVERTENCIA
-                e.detalle = "falló la respuesta estructurada; salió el párrafo único"
+            e.detalle = "falló la respuesta estructurada; salió el párrafo único"
         else:
-            e.estado = ADVERTENCIA
             e.detalle = "Gemini no devolvió párrafo; el mail lleva el mensaje de reemplazo"
     return parrafo, texto_ia, comentarios
 
@@ -792,16 +782,6 @@ def _etapa_series(
         registro.omitir("series", "dry-run")
         return
     with registro.etapa("series", critica=False) as e:
-        try:
-            if not deps.tabla_series(engine):
-                e.estado = OMITIDA
-                e.detalle = f"falta la tabla {data_access.TABLA_SERIES} (sql/06_series_macro.sql)"
-                return
-        except Exception as exc:
-            log.exception("No se pudo consultar la tabla de series")
-            e.estado = ADVERTENCIA
-            e.detalle = f"{type(exc).__name__}: {exc}"
-            return
         if not series:
             e.estado = OMITIDA
             e.detalle = "no hay series para guardar (ver la etapa indicadores)"

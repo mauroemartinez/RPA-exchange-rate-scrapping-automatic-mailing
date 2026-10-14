@@ -9,47 +9,12 @@ Uso:
     engine = create_engine(settings.supabase_db_url.get_secret_value())
 """
 
-import os
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
-
-try:
-    from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
-except ModuleNotFoundError:
-    from dotenv import dotenv_values
-
-    class NoDecode:
-        pass
-
-    SettingsConfigDict = ConfigDict
-
-    class BaseSettings(BaseModel):
-        """Fallback for notebook kernels missing pydantic-settings."""
-
-        model_config = ConfigDict(extra="ignore")
-
-        def __init__(self, **data):
-            cls = type(self)
-            env_values = {}
-            env_file = cls.model_config.get("env_file")
-
-            if env_file:
-                for key, value in dotenv_values(env_file).items():
-                    if value is not None:
-                        env_values[key.lower()] = value
-
-            env_values.update({key.lower(): value for key, value in os.environ.items()})
-
-            settings_data = {
-                name: env_values[name.lower()]
-                for name in cls.model_fields
-                if name.lower() in env_values
-            }
-            settings_data.update(data)
-            super().__init__(**settings_data)
+from pydantic import EmailStr, Field, SecretStr, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # La carpeta del proyecto, deducida de dónde está este archivo. Sirve para
 # resolver rutas relativas del .env sin depender del directorio de trabajo.
@@ -88,8 +53,7 @@ class Settings(BaseSettings):
     ruta_repo: Path
 
     # ── Servicio / despliegue ────────────────────────────────────────────────
-    # Opcionales: hoy ningún módulo las lee, así que su ausencia no debe frenar una corrida.
-    service_route: str | None = None
+    # Solo la lee app.py; su ausencia no frena una corrida
     api_key_easy_panel: SecretStr | None = None
 
     @field_validator("ruta_bbdd", "ruta_repo")

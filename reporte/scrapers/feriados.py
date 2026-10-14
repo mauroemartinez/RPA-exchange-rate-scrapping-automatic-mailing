@@ -11,7 +11,7 @@ from datetime import date
 
 import httpx
 
-from reporte.scrapers.utils import ScraperError, retry_http, run_async
+from reporte.scrapers.utils import ScraperError, cliente_http, retry_http, run_async
 
 API = "https://api.argentinadatos.com/v1/feriados"
 TIMEOUT = httpx.Timeout(20.0, connect=10.0)
@@ -27,11 +27,8 @@ async def _get(client: httpx.AsyncClient, anio: int) -> list[dict]:
 async def fetch(anio: int, client: httpx.AsyncClient | None = None) -> dict[date, str]:
     """{fecha: nombre} de los feriados del año (inamovibles, trasladables y puentes)."""
     try:
-        if client is not None:
-            datos = await _get(client, anio)
-        else:
-            async with httpx.AsyncClient(timeout=TIMEOUT) as propio:
-                datos = await _get(propio, anio)
+        async with cliente_http(client, TIMEOUT) as c:
+            datos = await _get(c, anio)
         return {date.fromisoformat(d["fecha"]): d["nombre"] for d in datos}
     except Exception as exc:
         raise ScraperError("ArgentinaDatos", f"leer feriados de {anio}", exc) from exc

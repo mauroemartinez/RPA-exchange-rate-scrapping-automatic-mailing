@@ -4,7 +4,7 @@ from datetime import date
 
 import httpx
 
-from reporte.scrapers.utils import ScraperError, retry_http
+from reporte.scrapers.utils import ScraperError, cliente_http, retry_http
 
 API_URL = "https://api.stlouisfed.org/fred/series/observations"
 SERIE_EFFR = "EFFR"
@@ -37,11 +37,8 @@ async def run(client: httpx.AsyncClient | None = None, api_key: str | None = Non
         api_key = settings.fed_api_key.get_secret_value()
 
     try:
-        if client is not None:
-            observaciones = await _get_observaciones(client, api_key)
-        else:
-            async with httpx.AsyncClient(timeout=TIMEOUT) as own_client:
-                observaciones = await _get_observaciones(own_client, api_key)
+        async with cliente_http(client, TIMEOUT) as c:
+            observaciones = await _get_observaciones(c, api_key)
 
         # FRED marca los días sin dato (feriados) con "." en vez de un número.
         for obs in observaciones:

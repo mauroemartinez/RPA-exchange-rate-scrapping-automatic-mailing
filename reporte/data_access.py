@@ -161,20 +161,9 @@ series_macro = Table(
 
 
 def tabla_existe(engine: Engine, tabla: str = TABLA_SERIES) -> bool:
+    """Para scripts/agregados_monetarios.py --guardar: avisar antes de intentar la carga histórica."""
     with engine.connect() as conn:
         return conn.execute(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": f'public."{tabla}"'}).scalar()
-
-
-def columna_existe(engine: Engine, columna: str, tabla: str = TABLA) -> bool:
-    """Si la columna ya fue creada. La fase 4 (ai_secciones) se activa sola cuando existe."""
-    with engine.connect() as conn:
-        return bool(conn.execute(
-            text(
-                "SELECT 1 FROM information_schema.columns "
-                "WHERE table_schema = 'public' AND table_name = :t AND column_name = :c"
-            ),
-            {"t": tabla, "c": columna},
-        ).scalar())
 
 
 def sentencia_series():

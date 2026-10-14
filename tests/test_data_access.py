@@ -155,13 +155,6 @@ def test_guardar_series_cuenta_las_filas_devueltas():
     assert data_access.guardar_series(engine, agregados.POR_CLAVE["base_monetaria"], []) == 0
 
 
-def test_columna_existe_mira_solo_el_schema_public():
-    engine = EngineFalso(ConexionFalsa({"information_schema.columns": _Resultado(scalar=1)}))
-    assert data_access.columna_existe(engine, "ai_secciones") is True
-    sql, params = engine.conexion.ejecutado[0]
-    assert "table_schema = 'public'" in sql and params == {"t": "Fact_Mercado_Macro", "c": "ai_secciones"}
-
-
 def test_sin_csv_de_respaldo_llega_el_error_de_la_base(monkeypatch, tmp_path):
     monkeypatch.setattr(data_access.settings, "ruta_bbdd", tmp_path / "no-existe.csv")
     with pytest.raises(ConnectionError, match="caída"):

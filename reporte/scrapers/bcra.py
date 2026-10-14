@@ -12,7 +12,7 @@ from datetime import date
 
 import httpx
 
-from reporte.scrapers.utils import ScraperError, retry_http
+from reporte.scrapers.utils import ScraperError, cliente_http, retry_http
 
 API_BASE = "https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias"
 
@@ -46,11 +46,9 @@ async def run(client: httpx.AsyncClient | None = None) -> dict:
     la lista (fecha, valor) ascendente que el notebook usa para los acumulados.
     """
     try:
-        if client is not None:
-            tea, inflacion = await _ambas(client)
-        else:
-            async with httpx.AsyncClient(timeout=TIMEOUT) as own_client:
-                tea, inflacion = await _ambas(own_client)
+        async with cliente_http(client, TIMEOUT) as c:
+            # Las dos variables en paralelo: son dos requests independientes
+            tea, inflacion = await asyncio.gather(fetch_serie(VAR_TEA, c), fetch_serie(VAR_INFLACION, c))
 
         fecha, valor = tea[-1]
         if valor <= 0:
@@ -60,21 +58,3 @@ async def run(client: httpx.AsyncClient | None = None) -> dict:
     except Exception as exc:
         raise ScraperError("BCRA", "leer variables monetarias", exc) from exc
 
-
-async def _ambas(client: httpx.AsyncClient):
-    """Las dos variables en paralelo: son dos requests independientes."""
-    return await asyncio.gather(
-        fetch_serie(VAR_TEA, client),
-        fetch_serie(VAR_INFLACION, client),
-    )
-
-
-async def fetch_historico_tea(client: httpx.AsyncClient | None = None) -> list[tuple[date, float]]:
-    """Serie completa de BADLAR efectiva anual. Para backfill."""
-    try:
-        if client is not None:
-            return await fetch_serie(VAR_TEA, client)
-        async with httpx.AsyncClient(timeout=TIMEOUT) as own_client:
-            return await fetch_serie(VAR_TEA, own_client)
-    except Exception as exc:
-        raise ScraperError("BCRA", "leer histórico de TEA", exc) from exc

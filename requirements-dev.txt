@@ -66,7 +66,6 @@ cryptography==48.0.0
 curl-cffi==0.15.0
     # via
     #   -c requirements.txt
-    #   -r requirements.in
     #   yfinance
 cycler==0.12.1
     # via
@@ -324,7 +323,6 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
     # via
     #   -c requirements.txt
-    #   -r requirements.in
     #   pydantic-settings
 python-pptx==1.0.2
     # via

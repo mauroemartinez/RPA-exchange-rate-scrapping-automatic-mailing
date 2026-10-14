@@ -28,7 +28,7 @@ from datetime import date
 import httpx
 
 from reporte.scrapers.bcra import API_BASE, TIMEOUT
-from reporte.scrapers.utils import ScraperError, retry_http, run_async
+from reporte.scrapers.utils import ScraperError, cliente_http, retry_http, run_async
 
 # La API devuelve hasta 1000 puntos si no se le pide otra cosa; con limit se
 # pueden pedir más por página (3000 probado) y paginar con offset.
@@ -138,11 +138,8 @@ async def fetch_todas(
         async with limite:
             return await fetch(serie, cliente, desde)
 
-    if client is not None:
-        resultados = await asyncio.gather(*(una(s, client) for s in series), return_exceptions=True)
-    else:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as propio:
-            resultados = await asyncio.gather(*(una(s, propio) for s in series), return_exceptions=True)
+    async with cliente_http(client, TIMEOUT) as c:
+        resultados = await asyncio.gather(*(una(s, c) for s in series), return_exceptions=True)
 
     # Una variable que falla (un 404, una caída puntual) no se lleva puestas a las demás:
     # se devuelven las que llegaron y quien llama ve cuáles faltan. Solo si no llegó

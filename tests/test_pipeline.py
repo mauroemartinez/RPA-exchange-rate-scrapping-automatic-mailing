@@ -71,10 +71,11 @@ def entorno(historico, resultados, btc_crudo, tmp_path, monkeypatch):
         alertar=lambda asunto, cuerpo: hechos["alertas"].append(asunto) or True,
         alertar_scraper=lambda exc: hechos["alertas"].append("scraper") or True,
         alertar_validacion=lambda exc: hechos["alertas"].append("validacion") or True,
-        tabla_series=lambda engine: False,
         descargar_series=lambda desde, claves=None: dict(del_bcra),
         descargar_deuda=lambda: (series[agregados.DEUDA_BRUTA.clave], provisorios),
-        columna_secciones=lambda engine: False,
+        guardar_series=lambda engine, serie, puntos: len(puntos),
+        generar_secciones=lambda prompt: (_secciones(), "gemini-x"),
+        guardar_secciones=lambda engine, fecha, secciones, modelo: 1,
         limpiar_secciones=lambda engine, fecha: hechos["limpiezas"].append(fecha) or 1,
         feriado=lambda fecha: None,
         hoy=lambda: HOY,
@@ -95,17 +96,17 @@ def test_corrida_completa(entorno):
     assert _estados(r) == {
         "historico": "ok", "scraping": "ok", "validacion": "ok", "persistencia": "ok",
         "ia": "ok", "indicadores": "ok", "graficos": "ok", "mail": "ok", "presentacion": "ok",
-        "previews": "omitida", "series": "omitida",
+        "previews": "omitida", "series": "ok",
     }
     fila, sobrescribir = hechos["filas"][0]
     assert fila["Fecha"].iloc[0] == HOY and sobrescribir is False
-    assert hechos["parrafos"] == [HOY]
+    assert hechos["parrafos"] == []  # el camino normal es la llamada estructurada
     assert len(hechos["mails"]) == 2
     assert {p.name for p in salida.glob("*.jpg")} == set(charts.ORDEN_EN_MAIL)
     assert (salida / presentacion.ARCHIVO).exists()
     assert hechos["alertas"] == []
     html = hechos["mails"][0][0].get_payload()[0].get_payload(decode=True).decode()
-    assert "Párrafo de Gemini" in html
+    assert _secciones().resumen in html
 
 
 def test_scraper_caido_alerta_y_corta(entorno):
@@ -216,7 +217,8 @@ def test_si_no_se_guarda_la_fila_no_se_llama_a_gemini(entorno):
 
 def test_gemini_sin_parrafo_es_advertencia(entorno):
     deps, hechos, salida = entorno
-    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, generar_parrafo=lambda e, fecha_esperada: ""))
+    deps = replace(deps, generar_secciones=lambda prompt: (None, None), generar_parrafo=lambda e, fecha_esperada: "")
+    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
     assert _estados(r)["ia"] == "advertencia"
     assert r.estado == "advertencia"
 
@@ -277,7 +279,8 @@ def test_cli_devuelve_1_si_la_corrida_falla(monkeypatch):
 
 def test_el_csv_adjunto_sale_de_supabase_con_el_parrafo_de_hoy(entorno, historico):
     deps, hechos, salida = entorno
-    pipeline.correr(pipeline.Opciones(salida=salida), deps)
+    # Con el párrafo único, que no lleva comas: así la última columna se compara entera
+    pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, generar_secciones=lambda prompt: (None, None)))
 
     con_csv = next(m for m, d in hechos["mails"] if "csv@example.com" in d)
     adjunto = next(p for p in con_csv.walk() if p.get_content_type() == "text/csv")
@@ -300,7 +303,6 @@ def test_series_se_guardan_cuando_existe_la_tabla(entorno):
     guardadas = []
     deps = replace(
         deps,
-        tabla_series=lambda engine: True,
         descargar_series=lambda desde, claves=None: _series_falsas(),
         guardar_series=lambda engine, serie, puntos: guardadas.append(serie.clave) or len(puntos),
     )
@@ -316,7 +318,7 @@ def test_una_falla_en_las_series_no_pone_la_corrida_en_rojo(entorno):
     def descargar(desde, claves=None):
         raise ScraperError("BCRA", "leer agregados monetarios", TimeoutError("timeout"))
 
-    deps = replace(deps, tabla_series=lambda engine: True, descargar_series=descargar,
+    deps = replace(deps, descargar_series=descargar,
                    guardar_series=lambda engine, serie, puntos: len(puntos))
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
     assert _estados(r)["indicadores"] == "advertencia" and _estados(r)["graficos"] == "advertencia"
@@ -341,12 +343,11 @@ def _secciones():
     )
 
 
-def test_con_la_columna_ai_secciones_sale_la_llamada_estructurada(entorno):
+def test_la_llamada_estructurada_es_el_camino_normal(entorno):
     deps, hechos, salida = entorno
     guardadas = []
     deps = replace(
         deps,
-        columna_secciones=lambda engine: True,
         generar_secciones=lambda prompt: (_secciones(), "gemini-x"),
         guardar_secciones=lambda engine, fecha, secciones, modelo: guardadas.append((fecha, modelo)) or 1,
     )
@@ -362,7 +363,7 @@ def test_con_la_columna_ai_secciones_sale_la_llamada_estructurada(entorno):
 
 def test_si_falla_la_estructurada_vuelve_al_parrafo_unico(entorno):
     deps, hechos, salida = entorno
-    deps = replace(deps, columna_secciones=lambda engine: True, generar_secciones=lambda prompt: (None, None))
+    deps = replace(deps, generar_secciones=lambda prompt: (None, None))
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
 
     assert _estados(r)["ia"] == "advertencia"
@@ -520,7 +521,7 @@ def test_una_excepcion_en_la_ia_estructurada_cae_al_parrafo_unico(entorno):
     def generar(prompt):
         raise TimeoutError("Gemini no respondió")
 
-    deps = replace(deps, columna_secciones=lambda engine: True, generar_secciones=generar)
+    deps = replace(deps, generar_secciones=generar)
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
 
     assert _estados(r)["ia"] == "advertencia"
@@ -535,8 +536,7 @@ def test_si_no_se_pueden_guardar_las_secciones_cae_al_parrafo_unico(entorno):
     def guardar(engine, fecha, secciones, modelo):
         raise ConnectionError("Supabase no responde")
 
-    deps = replace(deps, columna_secciones=lambda engine: True,
-                   generar_secciones=lambda prompt: (_secciones(), "gemini-x"), guardar_secciones=guardar)
+    deps = replace(deps, generar_secciones=lambda prompt: (_secciones(), "gemini-x"), guardar_secciones=guardar)
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
     assert _estados(r)["ia"] == "advertencia" and hechos["parrafos"] == [HOY]
 
@@ -546,7 +546,7 @@ def test_una_serie_rota_no_frena_a_las_demas(entorno):
     series = _series_falsas()
     series["m2"] = []  # discontinuada
     guardadas = []
-    deps = replace(deps, tabla_series=lambda engine: True, descargar_series=lambda desde, claves=None: series,
+    deps = replace(deps, descargar_series=lambda desde, claves=None: series,
                    guardar_series=lambda engine, serie, puntos: guardadas.append(serie.clave) or len(puntos))
 
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
@@ -681,21 +681,10 @@ def test_enviar_a_manda_un_solo_mail_con_el_csv(entorno):
 
 def test_secciones_guardadas_en_cero_filas_caen_al_parrafo_unico(entorno):
     deps, hechos, salida = entorno
-    deps = replace(deps, columna_secciones=lambda engine: True,
-                   generar_secciones=lambda prompt: (_secciones(), "gemini-x"),
+    deps = replace(deps, generar_secciones=lambda prompt: (_secciones(), "gemini-x"),
                    guardar_secciones=lambda engine, fecha, secciones, modelo: 0)
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
     assert _estados(r)["ia"] == "advertencia" and hechos["parrafos"] == [HOY]
-
-
-def test_si_no_se_puede_consultar_la_columna_sale_el_parrafo_unico(entorno):
-    deps, hechos, salida = entorno
-
-    def columna(engine):
-        raise ConnectionError("Supabase no responde")
-
-    r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, columna_secciones=columna))
-    assert _estados(r)["ia"] == "ok" and hechos["parrafos"] == [HOY]
 
 
 def test_el_json_de_la_corrida_tiene_lo_que_lee_app(entorno, tmp_path, monkeypatch):
@@ -768,8 +757,7 @@ def test_sin_push_igual_arma_la_presentacion(entorno):
 def test_la_presentacion_lleva_los_textos_de_esta_corrida(entorno):
     """El párrafo y los comentarios salen de la IA de hoy, en memoria: la fila no los tiene."""
     deps, _, salida = entorno
-    deps = replace(deps, columna_secciones=lambda engine: True,
-                   generar_secciones=lambda prompt: (_secciones(), "gemini-x"),
+    deps = replace(deps, generar_secciones=lambda prompt: (_secciones(), "gemini-x"),
                    guardar_secciones=lambda engine, fecha, secciones, modelo: 1)
 
     pipeline.correr(pipeline.Opciones(salida=salida), deps)
@@ -938,8 +926,7 @@ def test_el_dry_run_baja_los_indicadores_pero_no_los_guarda(entorno):
     bajadas, guardadas = [], []
     original = deps.descargar_series
     deps = replace(
-        deps, tabla_series=lambda engine: True,
-        descargar_series=lambda desde, claves=None: bajadas.append(desde) or original(desde),
+        deps, descargar_series=lambda desde, claves=None: bajadas.append(desde) or original(desde),
         guardar_series=lambda engine, serie, puntos: guardadas.append(serie.clave) or len(puntos),
     )
     r = pipeline.correr(pipeline.Opciones(dry_run=True, salida=salida), deps)
@@ -950,8 +937,7 @@ def test_el_dry_run_baja_los_indicadores_pero_no_los_guarda(entorno):
 def test_series_diarias_desde_el_corte_y_mensuales_enteras(entorno):
     deps, hechos, salida = entorno
     guardadas = {}
-    deps = replace(deps, tabla_series=lambda engine: True,
-                   guardar_series=lambda engine, serie, puntos: guardadas.setdefault(serie.clave, puntos) and len(puntos))
+    deps = replace(deps, guardar_series=lambda engine, serie, puntos: guardadas.setdefault(serie.clave, puntos) and len(puntos))
 
     pipeline.correr(pipeline.Opciones(salida=salida), deps)
 

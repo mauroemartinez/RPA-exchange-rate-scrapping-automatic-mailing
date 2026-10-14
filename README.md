@@ -158,7 +158,7 @@ The system automates the ingestion of highly volatile financial variables, ensur
 │   ├── fechas.py            Argentina-time dates and Spanish month names
 │   ├── scrapers/            Ingestion layer: Playwright scrapers + async REST clients
 │   └── templates/           Jinja2 templates: the mail and the PDF macro report
-├── scripts/                 Operational tooling (manual resend, daily control, backfills, deck and PDF report by hand)
+├── scripts/                 Operational tooling (manual resend, daily control, deck and PDF report by hand)
 ├── tests/                   Offline test suite; tests/datos/ pins the mail HTML
 ├── sql/                     SQL applied by hand in Supabase: schema, migrations, cleaning
 ├── notebooks/               The original notebook (retired, reference) and the read-only SQL lab
@@ -213,14 +213,6 @@ python scripts/reenvio_manual.py someone@mail.com --dry-run   # builds it, sends
 ```
 
 It replays the daily run rather than repeating it: no scraping, no row validation, no warehouse writes, no Gemini call, no git push. The report is rebuilt from the newest `Fact_Mercado_Macro` row, the AI texts already stored on it, and the chart assets in `Previews/`, through the same rendering module as the daily run, so its HTML matches the daily mail apart from the performance timing line. The sentences under the aggregates and debt charts are recomputed from the latest published data. A single recipient goes in To; several go in Bcc. The script aborts if the latest row carries no AI paragraph, which means the pipeline did not finish or Gemini returned nothing that day. With the daily run on GitHub Actions, run `git pull` before a resend: it reads the charts from the local `Previews/` and leaves out any older than the report.
-
-**Historical backfill.** Repairs the `riesgo_pais` and `bcra_tea` series against their source APIs after a capture bug. Dry-run by default; writes only with `--apply`:
-
-```bash
-python scripts/backfill.py                    # dry-run, both series
-python scripts/backfill.py --serie bcra_tea   # dry-run, one series
-python scripts/backfill.py --apply            # applies the updates
-```
 
 ---
 

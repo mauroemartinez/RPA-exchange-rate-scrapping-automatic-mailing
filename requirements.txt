@@ -32,9 +32,7 @@ contourpy==1.3.3
 cryptography==48.0.0
     # via google-auth
 curl-cffi==0.15.0
-    # via
-    #   -r requirements.in
-    #   yfinance
+    # via yfinance
 cycler==0.12.1
     # via matplotlib
 distro==1.9.0
@@ -149,9 +147,7 @@ python-dateutil==2.9.0.post0
     #   matplotlib
     #   pandas
 python-dotenv==1.2.2
-    # via
-    #   -r requirements.in
-    #   pydantic-settings
+    # via pydantic-settings
 python-pptx==1.0.2
     # via -r requirements.in
 pytz==2026.2

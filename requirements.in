@@ -26,8 +26,7 @@ tabulate
 # ── Ingesta ──
 httpx            # APIs REST: ArgentinaDatos, BCRA, FED
 playwright       # scraping de BNA, DolarHoy, Ambito
-curl_cffi        # requerido por yfinance
-yfinance         # cotización de BTC
+yfinance         # cotización de BTC (trae curl_cffi)
 tenacity         # reintentos con backoff
 openpyxl         # lee el Excel mensual de deuda de la Secretaría de Finanzas
 
@@ -37,8 +36,7 @@ psycopg2-binary  # driver de PostgreSQL (Supabase)
 
 # ── Configuración y validación ──
 pydantic[email]  # el extra 'email' trae email-validator, que usa EmailStr
-pydantic-settings
-python-dotenv
+pydantic-settings  # lee el .env (trae python-dotenv)
 tzdata           # base de zonas horarias para zoneinfo (fechas.py) donde el sistema no la trae
 
 # ── IA ──
