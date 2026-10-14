@@ -3,13 +3,13 @@
 # pipeline no pueden ver. Cuando falla, GitHub le avisa por mail al dueño del
 # repo: un canal que no depende de la contraseña de Gmail del reporte.
 #
-# Se prende con el mismo interruptor que la corrida: la variable del repo
-# CORRIDA_AUTOMATICA en si. A mano se puede correr siempre y, si no se pide lo
-# contrario, sin mandar el mail de alerta. Corre a las 19:43 de Argentina (22:43
-# UTC), después del último de los tres intentos de la corrida (16:19, 17:07 y
-# 19:12): si a esa hora la fila del día no está, ninguno salió. Si GitHub atrasó
-# mucho el último intento, puede avisar de más: conviene mirar Actions antes de
-# correr nada a mano.
+# Desde el 14/10/2026 lo pide el Worker de Cloudflare de cloudflare/ a las 19:43
+# de Argentina, con la alerta prendida (alertar=true), después del último de los
+# tres intentos de la corrida (16:00, 17:07 y 19:12): si a esa hora la fila del
+# día no está, ninguno salió. El horario de abajo es el respaldo: se prende con el
+# mismo interruptor que la corrida, la variable del repo CORRIDA_AUTOMATICA en si,
+# y hoy está apagado. A mano se puede correr siempre y, si no se pide lo
+# contrario, sin mandar el mail de alerta.
 name: Control diario
 
 on:

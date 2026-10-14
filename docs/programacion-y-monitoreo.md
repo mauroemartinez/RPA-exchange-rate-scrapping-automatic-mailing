@@ -1,8 +1,8 @@
 # Fase 6: ejecución programada y monitoreo
 
-Estado al 7 de octubre de 2026: **el programador elegido es GitHub Actions, en el plan gratis, y todo está listo.** Faltan los pasos de abajo, que se hacen a mano porque usan las credenciales del repo. Nada queda programado por el solo hecho de mergear: el horario se prende con una variable del repo (paso 5).
+Estado al 14 de octubre de 2026: **la corrida corre en GitHub Actions, en el plan gratis, y la orden la da un Worker de Cloudflare** (al final de esta guía). El horario propio de GitHub quedó como último respaldo, apagado, y la tarea de Windows de la PC del mantenedor como respaldo de la orden. Lo que sigue es la guía completa, con la historia de cómo se llegó a eso.
 
-Hoy la corrida se lanza a mano desde el notebook. En los últimos 90 días quedaron tres días hábiles sin fila que no eran feriados: el 19/08, el 24/09 y el 02/10.
+Antes de todo esto la corrida se lanzaba a mano desde el notebook. En los 90 días anteriores al 7 de octubre quedaron tres días hábiles sin fila que no eran feriados: el 19/08, el 24/09 y el 02/10.
 
 ## Qué quedó resuelto
 
@@ -20,7 +20,7 @@ Sobre "formato": el CI verifica el estilo con las reglas de `ruff check`, no con
 
 ## Elegir el programador
 
-Hay dos opciones reales. No hace falta ningún servidor: la API y el `Dockerfile` que el repo traía para ese caso se sacaron en octubre de 2026, porque no había servidor y no iba a haberlo. Si algún día hace falta, alcanza con un cron que llame a `python pipeline.py`.
+Hay dos opciones reales para correrla. No hace falta ningún servidor: la API y el `Dockerfile` que el repo traía para ese caso se sacaron en octubre de 2026, porque no había servidor y no iba a haberlo. Si algún día hace falta, alcanza con un cron que llame a `python pipeline.py`. Quién da la orden es otra decisión, y está al final de la guía.
 
 | | GitHub Actions | Programador de tareas de Windows |
 |---|---|---|
@@ -75,13 +75,28 @@ Y otra a las 19:30 con `venv\Scripts\python.exe scripts\control_diario.py`.
 
 **`SUPABASE_DB_URL` en modo sesión.** El candado dura lo que la sesión de Postgres. Con una conexión directa, una corrida que muere no lo deja puesto, porque la sesión muere con ella; detrás de un pooler en modo sesión tampoco, siempre que el pooler limpie la conexión al recibirla de vuelta (`DISCARD ALL` suelta los advisory locks). Detrás del pooler de Supabase en modo transacción (puerto 6543), tomarlo y soltarlo pueden caer en conexiones distintas del servidor, y el candado quedaría tomado. Por eso la URL tiene que ir al pooler en modo sesión (puerto 5432, como hoy). La conexión directa también serviría en una PC, pero no en GitHub Actions: es solo IPv6 y las máquinas de GitHub no tienen IPv6. Si aun así quedara tomado, cada corrida terminaría como `omitida` sin escribir la fila, y eso es justamente lo que detecta `scripts/control_diario.py`.
 
-## El disparo confiable: el Programador de tareas da la orden
+## El disparo confiable: un Worker de Cloudflare da la orden
 
-El horario propio de GitHub (schedule) es "best effort" en el plan gratis: el 08/10/2026 los disparos llegaron con unas 4 horas de atraso y el 09/10/2026 el de las 16:19 no llegó. Por eso la orden la da la compu del mantenedor: la tarea de Windows **"Reporte macro - disparar corrida"** ejecuta `scripts/disparar_corrida.ps1` de lunes a viernes a las 16:00, que le pide a GitHub la corrida en modo `real` con `gh workflow run`. Esa orden arranca en segundos y la corrida es la de siempre, en la nube de GitHub. Si a esa hora la compu está apagada, la tarea corre apenas se prende.
+El horario propio de GitHub (schedule) es "best effort" en el plan gratis: el 08/10/2026 los disparos llegaron con unas 4 horas de atraso, el 09 y el 10 no llegaron, y el 12 llegaron seis horas tarde (al final). La orden manual (workflow_dispatch), en cambio, arranca en segundos. Desde el 14/10/2026 la manda un Worker de Cloudflare, `cloudflare/disparador.js`, con los horarios de `cloudflare/wrangler.toml`: de lunes a viernes a las 16:00 de Argentina pide la corrida en modo `real`, a las 17:07 y a las 19:12 la repite (si el día ya salió, termina como `omitida` sin mandar nada) y a las 19:43 pide el control, con su alerta. Los horarios de Cloudflare (Cron Triggers) son puntuales, gratis en el plan Free (hasta cinco por Worker, y el tope de 100.000 invocaciones por día ni se acerca) y no dependen de ninguna máquina propia. La corrida es la de siempre, en la nube de GitHub: el Worker solo aprieta el botón, con dos reintentos a 30 s si GitHub no responde.
+
+### Ponerlo en marcha
+
+Hace falta Node.js (trae `npx`) y una cuenta de Cloudflare, gratis y sin tarjeta. Un dominio no hace falta: el Worker no tiene URL pública (`workers_dev = false`), solo horarios. Todo se hace desde la carpeta `cloudflare/`.
+
+1. **El token de GitHub.** En GitHub: Settings > Developer settings > Personal access tokens > Fine-grained tokens > Generate new token. Nombre `reporte-macro-disparador`, vencimiento de un año (anotá la fecha), *Repository access*: Only select repositories, este repo; *Permissions* > Repository permissions > Actions: Read and write (Metadata: Read-only se marca sola). Nada más. Copiá el token: GitHub no lo vuelve a mostrar.
+2. **Entrar a Cloudflare desde la consola**, una vez: `npx wrangler@4 login` abre el navegador y pide autorizar.
+3. **Subir el Worker:** `npx wrangler@4 deploy`. Crea el Worker `reporte-macro-disparador` con sus cuatro horarios. Cada cambio de horario en `wrangler.toml` se sube igual.
+4. **Cargar el token:** `npx wrangler@4 secret put GITHUB_TOKEN` lo pide por consola, sin mostrarlo, y lo guarda cifrado en Cloudflare. También se puede desde el panel: Workers & Pages > reporte-macro-disparador > Settings > Variables and Secrets. El token no va en ningún archivo.
+5. **Verificar, sin efectos.** Un día hábil con el reporte ya salido, el disparo de las 17:07 tiene que aparecer en Actions > Corrida diaria como una corrida `workflow_dispatch` que termina en `omitida`. En Cloudflare, Workers & Pages > reporte-macro-disparador > Logs muestra cada invocación con "disparado" o con el error.
+
+Cuando el token venza (GitHub avisa por mail una semana antes), GitHub responde 401, ninguna orden entra y el control tampoco: el Worker figura fallido en el panel de Cloudflare y, si la tarea de Windows sigue activa, la PC da la orden igual. Se renueva con un token nuevo y `npx wrangler@4 secret put GITHUB_TOKEN`. Para apagar el Worker del todo: `npx wrangler@4 delete`.
+
+### La tarea de Windows, de respaldo
+
+Del 09 al 14/10/2026 la orden la dio la compu del mantenedor: la tarea de Windows **"Reporte macro - disparar corrida"** ejecuta `scripts/disparar_corrida.ps1` de lunes a viernes a las 16:00, que le pide a GitHub la misma corrida en modo `real` con `gh workflow run`. Si a esa hora la compu está apagada, la tarea corre apenas se prende; si está apagada todo el día, no hay orden, y como el control era un horario de GitHub, nadie avisaba: pasó el viernes 10/10/2026. Por eso la orden pasó al Worker. La tarea queda como respaldo: el disparo duplicado de las 16:00 espera al primero (el workflow tiene `concurrency`) y termina como `omitida`.
 
 - Cada disparo deja un renglón en `%LOCALAPPDATA%\reporte_macro\disparos.log`.
-- Repetirlo es seguro: si el día ya salió, la corrida termina como `omitida` sin mandar nada.
-- Los horarios de GitHub (16:19, 17:07, 19:12) están apagados (`CORRIDA_AUTOMATICA` en `no`). Un día con la compu apagada todo el día queda sin reporte, y como el control de las 19:43 también es un horario de GitHub, nadie avisa: pasó el viernes 10/10/2026. Si se vuelven a prender, el horario corre con `--desde 14:00`.
-- Para verla, pausarla o borrarla: Programador de tareas > Biblioteca > "Reporte macro - disparar corrida".
+- Para verla, pausarla o borrarla: Programador de tareas > Biblioteca > "Reporte macro - disparar corrida". Pausarla es razonable después de una semana de disparos del Worker confirmados en Actions.
+- Los horarios de GitHub (16:19, 17:07, 19:12 y el control de las 19:43) están apagados (`CORRIDA_AUTOMATICA` en `no`). Si se vuelven a prender, la corrida va con `--desde 14:00`.
 
 **Por qué el horario de GitHub quedó apagado.** El lunes 12/10/2026, feriado, los tres disparos programados llegaron unas seis horas tarde: 22:25, 22:58 y 00:01. Los dos primeros vieron el feriado y terminaron como `omitida`; el tercero arrancó ya el martes 13, día hábil, y mandó el reporte del 13 a las 00:02 con los valores del cierre anterior (de madrugada ninguna fuente había abierto). La fila se borró a mano y el día se rehízo con una orden manual. Desde entonces el pipeline acepta `--desde HH:MM`: una corrida que arranca antes de esa hora de Argentina termina como `omitida`, igual que un feriado, salvo con `--forzar`. El workflow lo pasa solo en el evento `schedule` (`--desde 14:00`); la orden manual y la de Windows no tienen tope. Es la red de seguridad si el horario se vuelve a prender.

@@ -49,3 +49,8 @@ Assets/arquitectura/*.html
 
 # Salida del informe macro (scripts/informe_macro.py): datos bajados y PDFs, se comparten a mano
 informes/
+
+# Cloudflare Worker (cloudflare/): caché de wrangler, variables locales con el token y paquetes de Node
+cloudflare/.wrangler/
+cloudflare/.dev.vars
+node_modules/

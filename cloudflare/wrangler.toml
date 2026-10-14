@@ -1,0 +1,37 @@
+# El despertador de la corrida diaria: un Worker de Cloudflare (plan Free) que a
+# cada horario le manda a GitHub la orden workflow_dispatch, la misma que manda
+# scripts/disparar_corrida.ps1 desde la PC. La corrida sigue siendo la de siempre,
+# en GitHub Actions; acá solo vive quien aprieta el botón.
+#
+# Cómo se despliega y se prueba: docs/programacion-y-monitoreo.md, "El disparo
+# confiable". En resumen, desde esta carpeta:
+#     npx wrangler@4 login                      # una vez, abre el navegador
+#     npx wrangler@4 deploy                     # sube el Worker y sus horarios
+#     npx wrangler@4 secret put GITHUB_TOKEN    # el fine-grained PAT, pedido por consola
+#
+# El token nunca va en este archivo ni en el repo: es un secreto del Worker.
+
+name = "reporte-macro-disparador"
+main = "disparador.js"
+compatibility_date = "2026-06-01"
+workers_dev = false   # sin URL pública: el Worker solo corre por horario
+
+[triggers]
+# Horarios en UTC. Argentina es UTC-3 todo el año (no tiene horario de verano),
+# así que 19:00 UTC son siempre las 16:00. El plan Free admite hasta 5 horarios.
+crons = [
+  "0 19 * * 1-5",    # 16:00 en Argentina, lunes a viernes: la corrida
+  "7 20 * * 1-5",    # 17:07: reintento (termina como omitida si el día ya salió)
+  "12 22 * * 1-5",   # 19:12: último reintento
+  "43 22 * * 1-5",   # 19:43: el control, avisa si el día hábil quedó sin fila
+]
+
+[vars]
+REPO = "mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing"
+RAMA = "main"
+# El horario que dispara el control en vez de la corrida: tiene que ser uno de los de arriba
+CRON_CONTROL = "43 22 * * 1-5"
+
+[observability]
+# Los logs de cada invocación quedan en el panel de Cloudflare (Workers > el Worker > Logs)
+enabled = true

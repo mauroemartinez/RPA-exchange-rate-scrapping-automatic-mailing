@@ -372,7 +372,7 @@ def opcion_1() -> str:
         f'<div class="barra"><div class="iconos"><img src="{CALENDARIO}">'
         f'<img class="gh" src="{si("github", "#FFFFFF")}"><img class="gha" src="{dev("githubactions")}"></div>'
         '<div><div class="t1">Orchestration · GitHub Actions</div>'
-        '<div class="t2"><b>Free plan:</b> business days at 16:00, triggered by a Windows task on the maintainer PC; skips holidays.'
+        '<div class="t2"><b>Free plan:</b> business days at 16:00, triggered by a Cloudflare Worker cron; skips holidays.'
         '<br>Backup schedules at 16:19, 17:07 and 19:12, off today. Tests every push in CI.</div></div></div>'
     )
 

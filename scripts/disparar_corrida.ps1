@@ -7,9 +7,10 @@
 # de tareas de Windows de lunes a viernes a las 16:00. La corrida es la de
 # siempre, en la nube de GitHub: la compu solo da la orden.
 #
-# Es seguro repetirlo: si el día ya salió, la corrida encuentra la fila y
-# termina sin mandar nada; los feriados los saltea sola. Los horarios de
-# GitHub quedan como respaldo para los días con la compu apagada.
+# Desde el 14/10/2026 la orden principal la da el Worker de Cloudflare de
+# cloudflare/, que no depende de la PC; esta tarea queda de respaldo. Es seguro
+# repetirlo: si el día ya salió, la corrida encuentra la fila y termina sin
+# mandar nada; los feriados los saltea sola.
 #
 # Usa la sesión de gh ya iniciada (gh auth login). Deja un renglón por
 # disparo en %LOCALAPPDATA%\reporte_macro\disparos.log.
