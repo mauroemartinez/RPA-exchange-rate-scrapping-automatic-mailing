@@ -92,7 +92,7 @@ The diagram is generated from `Assets/arquitectura/construir.py`, so it can be u
 | 3 | 🕷️ **scraping** | Six sources at once: three Playwright browsers and three REST calls sharing one `asyncio.gather()` | Alert and stop |
 | 4 | ✅ **validacion** | Builds today's row and validates it with Pydantic before anything is persisted | Alert and stop |
 | 5 | 💾 **persistencia** | One atomic `INSERT ... ON CONFLICT ("Fecha")`; a row that appeared in between stops the run as `omitida` | No duplicate mail, ever |
-| 6 | 🧠 **ia** | One structured Gemini call: the summary plus a comment per chart, validated with Pydantic, with key and model failover | Falls back to the single paragraph |
+| 6 | 🧠 **ia** | One structured Gemini call: the summary plus a comment per chart, validated with Pydantic; seven models from best to worst, both keys, up to three rounds | The mail carries a placeholder and the row is marked as done without AI |
 | 7 | 📈 **indicadores** | Two years of BCRA series and the Treasury's gross debt workbook, each series validated on its own | Warning; the mail goes without that chart |
 | 8 | 🎨 **graficos** | The six charts, each on its own Matplotlib figure; Bitcoin from Yahoo Finance | Warning; the mail goes without Bitcoin |
 | 9 | 📧 **mail** | Renders the Jinja2 template and sends both variants in parallel, with and without the CSV history | Run fails |
@@ -160,7 +160,7 @@ The system automates the ingestion of highly volatile financial variables, ensur
 ├── scripts/                 Operational tooling (manual resend, daily control, deck and PDF report by hand)
 ├── tests/                   Offline test suite; tests/datos/ pins the mail HTML
 ├── sql/                     SQL applied by hand in Supabase: schema, migrations, cleaning
-├── notebooks/               The original notebook (retired, reference) and the read-only SQL lab
+├── notebooks/               The read-only SQL lab
 ├── dashboard/               Streamlit prototype, read-only, with its own requirements
 ├── docs/                    Roadmap evaluations and runbooks (Spanish)
 ├── Assets/                  Architecture diagram, README images and their generators
@@ -224,7 +224,7 @@ The six-phase roadmap is complete. What each phase left in production, and what 
 | 1. Pipeline without the notebook | ✅ | `pipeline.py` with its CLI and the `reporte/` package; the notebook retired |
 | 2. Reliability and diagnostics | ✅ | Per-stage state and duration, failed sends turn the run red, 280+ offline tests, golden HTML, secrets scrubbed from public logs. API caching evaluated and declined: nothing is heavy enough |
 | 3. Monetary aggregates and debt | ✅ | `Fact_Series_Macro` with 14 series, two charts in the mail with plain-language explanations, debt always in USD |
-| 4. Per-chart AI commentary | ✅ | One structured Gemini call, validated with Pydantic, stored as JSON; falls back to the single paragraph |
+| 4. Per-chart AI commentary | ✅ | One structured Gemini call, validated with Pydantic, stored as JSON; walks seven models and both keys before giving up |
 | 5. Analysis and presentations | ✅ | Read-only SQL lab, the daily executive deck, the PDF macro report. Streamlit dashboard: prototype, needs a read-only database role before it is published |
 | 6. Scheduling and monitoring | ✅ | GitHub Actions run, Postgres lock, holiday calendar, time window, daily control, CI on every push, a Cloudflare Worker as the trigger |
 

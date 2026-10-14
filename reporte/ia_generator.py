@@ -1,11 +1,14 @@
-"""Párrafo de análisis de mercado con Gemini.
+"""Los textos del reporte con Gemini: el resumen y un comentario por gráfico.
 
-Lee el historial de Supabase, calcula variaciones de 1 y 25 ruedas, arma el prompt,
-llama a Gemini rotando keys y modelos, y guarda el texto en la fila del día.
+Arma el prompt con cifras ya calculadas, llama a Gemini recorriendo modelos y
+keys hasta que uno responde, valida la respuesta con models.SeccionesIA y la
+guarda en la fila del día. Si nadie responde, la fila queda marcada sin IA y el
+mail lleva el mensaje de reemplazo.
 """
 
 import json
 import logging
+import time
 from datetime import date
 
 import pandas as pd
@@ -21,194 +24,75 @@ from reporte.models import SeccionesIA
 log = logging.getLogger(__name__)
 
 TABLA = "Fact_Mercado_Macro"
-MODELOS = ["gemini-3.5-flash", "gemini-2.5-flash"]
-MAX_INTENTOS = 3
+# De mejor a peor. A la hora de la corrida los Flash grandes suelen devolver 503
+# (saturados) en el nivel gratuito; por eso la lista sigue con los Lite y los 2.5.
+MODELOS = [
+    "gemini-3.8-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3-flash-preview",
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+]
+# Cuántas veces se recorre la lista entera (todos los modelos con todas las keys)
+# antes de seguir sin texto, y cuánto se espera entre una pasada y la siguiente
+RONDAS = 3
+ESPERA_ENTRE_RONDAS_S = 30
+# Tope total de la búsqueda: con 14 combinaciones por ronda, un modelo colgado en
+# cada una se comería la hora de la corrida (el workflow la mata a los 30 minutos)
+PRESUPUESTO_S = 8 * 60
 MENSAJE_FALLA = "No se pudo generar el análisis automatizado de mercado."
 
 # Por defecto google-genai espera sin límite: un Gemini colgado dejaba la corrida
 # esperando hasta que el timeout del workflow la mataba, con la fila guardada y sin mail.
 TIMEOUT_MS = 120_000
 
-# 25 ruedas hacia atrás más la de hoy
-FILAS_MINIMAS = 26
+# Para que los tests no esperen de verdad
+_esperar = time.sleep
+_reloj = time.monotonic
 
 
-def generar_con_failover(prompt, config=None):
-    """
-    Rota a la siguiente key si recibe error 429.
-
-    Las keys vienen de config.py, que las lee una sola vez al importarse. Antes
-    esta función hacía su propio load_dotenv(override=True) en cada llamada, lo
-    que permitía rotar keys sin reiniciar; a cambio había dos lugares leyendo el
-    .env. Como el pipeline corre una vez por día en un proceso nuevo, la lectura
-    única alcanza y deja una sola fuente de verdad.
-
-    Devuelve (texto, modelo, intentos). Si no hubo respuesta, (None, None, intentos).
-    `config` se pasa tal cual a generate_content (por ejemplo, un esquema de salida).
-    """
-    api_keys = settings.gemini_keys
-
-    if not api_keys:
-        raise Exception("No hay API keys de Gemini en el .env (GEMINI_API_KEY_1 / GEMINI_API_KEY_2).")
-
-    attempts = 0
-    for i, key in enumerate(api_keys):
-        for model in MODELOS:
-            attempts += 1
-            try:
-                client = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=TIMEOUT_MS))
-                response = client.models.generate_content(model=model, contents=prompt, config=config)
-                return response.text, model, attempts
-
-            except Exception as e:
-                error_text = str(e).lower()
-                if "429" in error_text or "quota" in error_text or "resource exhausted" in error_text:
-                    log.warning("Gemini: key %d agotada (cuota excedida)", i + 1)
-                    # No se prueban más modelos con esta key: se pasa a la siguiente
-                    break
-
-                if "503" in error_text or "unavailable" in error_text:
-                    if model == MODELOS[0]:
-                        log.warning("Gemini: %s saturado, se intenta %s", MODELOS[0], MODELOS[1])
-                        continue
-                    log.error("Gemini: %s también está indisponible", model)
-                    return None, None, attempts
-
-                log.error("Gemini: error técnico con %s: %s", model, e)
-                return None, None, attempts
-
-        if i == len(api_keys) - 1:
-            log.error("Gemini: se agotaron todas las API keys (429)")
-            return None, None, attempts
-        log.info("Gemini: se reintenta con la siguiente API key")
-
-
-def leer_historial(engine) -> pd.DataFrame:
-    """Las últimas FILAS_MINIMAS filas con las columnas que usa el prompt, de más vieja a más nueva.
-
-    El prompt solo mira la última, la anterior y la de 25 ruedas atrás: no hace
-    falta traer las siete mil filas de la tabla.
-    """
-    df = pd.read_sql(
-        text(
-            'SELECT "Fecha", "TCV_MEP", "TCV_Blue", "TCV_Billete", "riesgo_pais", "bcra_tea", "fed_tea" '
-            f'FROM "{TABLA}" ORDER BY "Fecha" DESC LIMIT :n'
-        ),
-        con=engine,
-        params={"n": FILAS_MINIMAS},
-    ).iloc[::-1].reset_index(drop=True)
-    df.columns = df.columns.str.strip()
-    df["Fecha"] = pd.to_datetime(df["Fecha"])
-    if len(df) < FILAS_MINIMAS:
-        raise ValueError(f"Historial insuficiente: {len(df)} registros.")
-    return df
-
-
-def armar_prompt(df: pd.DataFrame) -> str:
-    """El prompt del párrafo diario, con las variaciones de la última fila."""
-    hoy = df.iloc[-1]
-    ayer = df.iloc[-2]
-    mes = df.iloc[-FILAS_MINIMAS]
-
-    blue = hoy["TCV_Blue"]
-    mep = hoy["TCV_MEP"]
-    billete = hoy["TCV_Billete"]
-    rp = hoy["riesgo_pais"]
-    tea = hoy["bcra_tea"]
-    fed = hoy["fed_tea"]
-    brecha = abs(((blue / mep) - 1) * 100)
-    barato = "Blue" if blue < mep else "MEP"
-
-    def var(a, b):
-        return ((a / b) - 1) * 100
-
-    tea_cambio = abs(var(tea, ayer["bcra_tea"])) > 0.2
-    fed_cambio = abs(var(fed, ayer["fed_tea"])) > 0
-
-    return f"""
-Actuá como analista financiero Senior. Redactá un párrafo de 3-4 líneas.
-DATOS REALES AL {hoy['Fecha'].strftime('%d/%m/%Y')}:
-- Blue: ${blue} (Día: {var(blue, ayer['TCV_Blue']):+.2f}% | Mes: {var(blue, mes['TCV_Blue']):+.2f}%)
-- MEP: ${mep}
-- Brecha: {brecha:.2f}% entre el Blue (${blue}) y el MEP (${mep})
-- Más barato: {barato}, siendo la opción más económica de las dos
-- Billete: ${billete} (Día: {var(billete, ayer['TCV_Billete']):+.2f}% | Mes: {var(billete, mes['TCV_Billete']):+.2f}%)
-- Riesgo País: {rp:.0f} pts (Día: {rp - ayer['riesgo_pais']:+.0f} pts | Mes: {rp - mes['riesgo_pais']:+.0f} pts)
-{f"- TEA BCRA: {tea:.2f}% (Día: {var(tea, ayer['bcra_tea']):+.2f}% | Mes: {var(tea, mes['bcra_tea']):+.2f}%)" if tea_cambio else ""}
-{f"- TEA FED: {fed:.2f}% (Día: {var(fed, ayer['fed_tea']):+.2f}%)" if fed_cambio else ""}
-
-Instrucciones:
-1. Mencioná la brecha con los valores explícitos de Blue y MEP.
-2. Usá la frase "siendo la opción más económica de las dos" al comparar.
-3. Analizá tendencia mensual para Blue, Billete y Riesgo País cuando sea relevante.
-4. Tono seco, profesional. No somos asesores financieros.
-"""
+def _resumen_error(exc: Exception) -> str:
+    """La primera línea del error, que es la que trae el código (429, 503, 404) y el motivo."""
+    return str(exc).strip().splitlines()[0][:160] if str(exc).strip() else type(exc).__name__
 
 
 def generar_parrafo(prompt: str, config=None) -> tuple[str | None, str | None]:
-    """(texto, modelo), o (None, None) si no hubo caso.
+    """(texto, modelo) del primer modelo que responde, o (None, None) si ninguno lo hizo.
 
-    Reintenta mientras se hayan consumido menos de MAX_INTENTOS intentos. Cada
-    vuelta de generar_con_failover puede gastar hasta tres (una key agotada pasa a
-    la siguiente, un modelo saturado al otro), así que en el peor caso son cinco
-    llamadas, no tres. Los 429 y 503 vuelven al instante; lo que acota el tiempo
-    es el TIMEOUT_MS de cada llamada. Es la lógica que tenía el notebook.
+    Recorre MODELOS de mejor a peor y, para cada uno, las keys del .env; cualquier
+    error (429 de cuota, 503 de saturación, 404 de un modelo que la cuenta no tiene)
+    pasa a la combinación siguiente. Si la lista entera falla, espera
+    ESPERA_ENTRE_RONDAS_S y la vuelve a recorrer, hasta RONDAS veces. Lo que acota
+    el tiempo es PRESUPUESTO_S: pasado, se sigue sin texto aunque queden intentos.
+    `config` se pasa tal cual a generate_content (por ejemplo, un esquema de salida).
     """
-    total = 0
-    while total < MAX_INTENTOS:
-        respuesta, modelo, usados = generar_con_failover(prompt, config=config)
-        total += usados
-        if respuesta is not None:
-            return respuesta, modelo
-        if total >= MAX_INTENTOS:
-            log.error("Gemini: se alcanzó el máximo de %d intentos; se sigue sin párrafo", MAX_INTENTOS)
-            break
-        log.warning("Gemini: intentos consumidos %d de %d, se reintenta", total, MAX_INTENTOS)
+    api_keys = settings.gemini_keys
+    if not api_keys:
+        raise Exception("No hay API keys de Gemini en el .env (GEMINI_API_KEY_1 / GEMINI_API_KEY_2).")
+
+    limite = _reloj() + PRESUPUESTO_S
+    for ronda in range(1, RONDAS + 1):
+        for model in MODELOS:
+            for i, key in enumerate(api_keys):
+                if _reloj() > limite:
+                    log.error("Gemini: se agotaron los %d s de presupuesto; se sigue sin texto", PRESUPUESTO_S)
+                    return None, None
+                try:
+                    client = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=TIMEOUT_MS))
+                    response = client.models.generate_content(model=model, contents=prompt, config=config)
+                except Exception as exc:
+                    log.warning("Gemini: %s con la key %d no respondió (ronda %d): %s", model, i + 1, ronda, _resumen_error(exc))
+                    continue
+                if ronda > 1 or model != MODELOS[0]:
+                    log.info("Gemini: respondió %s con la key %d en la ronda %d", model, i + 1, ronda)
+                return response.text, model
+        if ronda < RONDAS:
+            log.warning("Gemini: ningún modelo respondió en la ronda %d de %d; se espera %d s", ronda, RONDAS, ESPERA_ENTRE_RONDAS_S)
+            _esperar(ESPERA_ENTRE_RONDAS_S)
+    log.error("Gemini: ningún modelo respondió en %d rondas; se sigue sin texto", RONDAS)
     return None, None
-
-
-def guardar_parrafo(engine, fecha: date, texto: str, modelo: str | None) -> int:
-    """UPDATE de ai_paragraph y ai_model en la fila de `fecha`. Devuelve las filas afectadas."""
-    with engine.begin() as conn:
-        result = conn.execute(
-            text(f'UPDATE "{TABLA}" SET "ai_paragraph" = :p, "ai_model" = :m WHERE "Fecha" = :f'),
-            {"p": texto, "m": modelo, "f": fecha},
-        )
-    log.info("Gemini: párrafo del %s guardado con %s (filas afectadas: %d)", fecha, modelo, result.rowcount)
-    return result.rowcount
-
-
-def procesar_y_guardar_parrafo(engine, fecha_esperada: date | None = None) -> str:
-    """
-    Extrae historial de Supabase, calcula variaciones, genera párrafo con Gemini,
-    guarda en la DB y retorna el texto.
-
-    Con `fecha_esperada`, se niega a seguir si la última fila de la base no es de
-    esa fecha. Sin ese control, una fila del día que no llegó a insertarse hacía
-    que el párrafo de ayer se reescribiera con un análisis de los datos de ayer.
-    """
-    try:
-        log.info("Gemini: leyendo el historial de Supabase")
-        df = leer_historial(engine)
-        fecha = df["Fecha"].iloc[-1].date()
-
-        if fecha_esperada is not None and fecha != fecha_esperada:
-            raise ValueError(
-                f"la última fila de {TABLA} es del {fecha} y se esperaba la del {fecha_esperada}; "
-                "no se genera el párrafo para no pisar el de otro día"
-            )
-
-        log.info("Gemini: analizando los datos del %s", fecha.strftime("%d/%m/%Y"))
-        reporte, modelo = generar_parrafo(armar_prompt(df))
-        if reporte is None:
-            reporte, modelo = "", None
-
-        guardar_parrafo(engine, fecha, reporte, modelo)
-        return reporte
-
-    except Exception as e:
-        log.error("Gemini: proceso interrumpido: %s", e)
-        return MENSAJE_FALLA
 
 
 # ── Fase 4: un comentario por gráfico en una sola llamada ────────────────────
@@ -379,15 +263,19 @@ def guardar_secciones(engine, fecha: date, secciones: SeccionesIA, modelo: str |
     return result.rowcount
 
 
-def limpiar_secciones(engine, fecha: date) -> int:
-    """Borra los comentarios por gráfico de la fila de `fecha`.
+def marcar_sin_ia(engine, fecha: date) -> int:
+    """Deja la fila de `fecha` con el párrafo vacío y sin comentarios: el día salió sin IA.
 
-    Si una corrida repetida (--forzar) terminó en el párrafo único, los comentarios
-    de la corrida anterior describirían otros valores.
+    El párrafo vacío, y no NULL, es lo que distingue "Gemini no respondió" de "la
+    corrida murió antes de la IA": una fila con ai_paragraph NULL se lee como un
+    día a medio hacer (pipeline, control diario) y pediría rehacerlo con --forzar.
+    También borra los comentarios que una corrida anterior del día (--forzar) pudo
+    dejar: describirían otros valores.
     """
     with engine.begin() as conn:
         return conn.execute(
-            text(f'UPDATE "{TABLA}" SET "ai_secciones" = NULL WHERE "Fecha" = :f'), {"f": fecha}
+            text(f'UPDATE "{TABLA}" SET "ai_paragraph" = \'\', "ai_model" = NULL, "ai_secciones" = NULL WHERE "Fecha" = :f'),
+            {"f": fecha},
         ).rowcount
 
 

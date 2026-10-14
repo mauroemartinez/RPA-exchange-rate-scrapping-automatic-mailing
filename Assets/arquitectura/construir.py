@@ -148,10 +148,10 @@ PLANILLA = _uri(
 
 CSS_BASE = """
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { width: %(W)spx; height: %(H)spx; background: #000; overflow: hidden; }
+html, body { width: %(W)spx; height: %(H)spx; background: #0d1117; overflow: hidden; }
 body { -webkit-font-smoothing: antialiased; color: #F4F4F5; font-family: 'Barlow', sans-serif; }
 #lienzo { position: relative; width: %(W)spx; height: %(H)spx;
-  background: radial-gradient(ellipse 70%% 55%% at 50%% 40%%, #070912 0%%, #000 70%%); }
+  background: radial-gradient(ellipse 70%% 55%% at 50%% 40%%, #131a2b 0%%, #0d1117 70%%); }
 h1 { position: absolute; top: 12px; left: 0; width: 100%%; text-align: center;
   font: 600 50px/1.1 'Oswald', sans-serif; letter-spacing: 1.2px; color: #fff; }
 h1 .c { color: #23AEF5; text-shadow: 0 0 16px rgba(35,174,245,.35); }
@@ -232,8 +232,8 @@ COLUMNAS = [
             "Structured JSON output",
             "Summary + per-chart comments",
             "Validated with Pydantic",
-            "Multi-key &amp; model failover",
-            "Single-paragraph fallback",
+            "7 models, 2 keys, 3 rounds",
+            "Placeholder if none answers",
             "Daily + 25-session context",
         ],
     },

@@ -10,7 +10,7 @@ Etapas, en el mismo orden que el notebook:
   validacion    arma la fila del día y la pasa por models.FilaMacro; si no cumple, alerta y corta
   persistencia  INSERT de la fila sin duplicar la fecha
   ia            una llamada estructurada a Gemini: el resumen y un comentario por gráfico, guardados
-                en la misma fila; si falla, el párrafo único de siempre
+                en la misma fila; si nadie responde, el mail lleva el mensaje de reemplazo
   indicadores   agregados monetarios, inflación y deuda del BCRA, y la deuda bruta de la
                 Secretaría de Finanzas, para sus gráficos; si una fuente falla, es una advertencia
                 y el mail sale sin esos gráficos
@@ -170,10 +170,9 @@ class Dependencias:
     candado: Callable = data_access.candado_corrida
     scrapear: Callable = scrapers.run_all_sync
     descargar_btc: Callable = btc.descargar
-    generar_parrafo: Callable = ia_generator.procesar_y_guardar_parrafo
     generar_secciones: Callable = ia_generator.generar_secciones
     guardar_secciones: Callable = ia_generator.guardar_secciones
-    limpiar_secciones: Callable = ia_generator.limpiar_secciones
+    marcar_sin_ia: Callable = ia_generator.marcar_sin_ia
     enviar_mail: Callable = email_report.enviar
     actualizar_previews: Callable = preview_git.actualizar_previews
     publicar_presentacion: Callable = preview_git.publicar_presentacion
@@ -451,8 +450,9 @@ def _etapa_ia(
 ) -> tuple[str, str | None, dict]:
     """(párrafo que muestra el mail, texto que queda guardado en la fila, comentarios por gráfico).
 
-    Una llamada estructurada: el resumen más un comentario por gráfico. Ante
-    cualquier falla de esa llamada, o si no se pudo guardar, se vuelve al párrafo único.
+    Una llamada estructurada: el resumen más un comentario por gráfico. Si falla
+    la llamada, la validación o el guardado, el mail lleva el mensaje de reemplazo
+    y la fila queda marcada como día hecho sin IA.
     """
     if opciones.dry_run:
         parrafo = parrafo_existente or "[dry-run] Acá va el párrafo de Gemini, que en una prueba no se pide."
@@ -482,20 +482,12 @@ def _etapa_ia(
             e.detalle = f"resumen y comentarios por gráfico con {modelo}"
             return secciones.resumen, secciones.resumen, ia_generator.comentarios_por_grafico(secciones)
 
-        log.warning("Sin comentarios por gráfico; se vuelve al párrafo único")
-        # Una corrida anterior del día (--forzar) pudo dejar comentarios de otros valores
         try:
-            deps.limpiar_secciones(engine, fecha)
+            deps.marcar_sin_ia(engine, fecha)
         except Exception as exc:
-            log.warning("No se pudieron borrar los comentarios anteriores del día: %s", exc)
-
+            log.warning("No se pudo marcar la fila como día sin IA: %s", exc)
         e.estado = ADVERTENCIA
-        texto = deps.generar_parrafo(engine, fecha_esperada=fecha)
-        if texto and texto != ia_generator.MENSAJE_FALLA:
-            parrafo = texto_ia = texto
-            e.detalle = "falló la respuesta estructurada; salió el párrafo único"
-        else:
-            e.detalle = "Gemini no devolvió párrafo; el mail lleva el mensaje de reemplazo"
+        e.detalle = "Gemini no devolvió secciones válidas; el mail lleva el mensaje de reemplazo"
     return parrafo, texto_ia, comentarios
 
 

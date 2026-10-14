@@ -33,8 +33,7 @@ def entorno(historico, resultados, btc_crudo, tmp_path, monkeypatch):
     ahí y no en el Previews/ del repo, que se commitea y se pushea solo.
     """
     monkeypatch.setattr(pipeline, "PREVIEWS", tmp_path / "Previews")
-    hechos = {"filas": [], "parrafos": [], "mails": [], "alertas": [], "previews": [], "limpiezas": [],
-              "presentaciones": []}
+    hechos = {"filas": [], "mails": [], "alertas": [], "previews": [], "sin_ia": [], "presentaciones": []}
 
     # Los datos de agregados y deuda se preparan de verdad; solo se saltea el dibujo
     def jpg(carpeta, nombre):
@@ -51,10 +50,6 @@ def entorno(historico, resultados, btc_crudo, tmp_path, monkeypatch):
         hechos["filas"].append((fila, sobrescribir))
         return True
 
-    def generar_parrafo(engine, fecha_esperada=None):
-        hechos["parrafos"].append(fecha_esperada)
-        return "Párrafo de Gemini"
-
     deps = pipeline.Dependencias(
         crear_engine=EngineFalso,
         leer_historico=lambda engine: (historico.copy(), "supabase"),
@@ -63,7 +58,6 @@ def entorno(historico, resultados, btc_crudo, tmp_path, monkeypatch):
         scrapear=lambda: (resultados.bna, resultados.dolarhoy, resultados.ambito,
                           resultados.riesgo_pais, resultados.bcra, resultados.fed),
         descargar_btc=lambda desde, hasta: btc_crudo.copy(),
-        generar_parrafo=generar_parrafo,
         enviar_mail=lambda mensaje, destinatarios: hechos["mails"].append((mensaje, destinatarios)),
         actualizar_previews=lambda repo, archivos=None: hechos["previews"].append(repo) or (True, "ok"),
         publicar_presentacion=lambda repo, archivo, mensaje=None: hechos["presentaciones"].append((archivo, mensaje))
@@ -76,7 +70,7 @@ def entorno(historico, resultados, btc_crudo, tmp_path, monkeypatch):
         guardar_series=lambda engine, serie, puntos: len(puntos),
         generar_secciones=lambda prompt: (_secciones(), "gemini-x"),
         guardar_secciones=lambda engine, fecha, secciones, modelo: 1,
-        limpiar_secciones=lambda engine, fecha: hechos["limpiezas"].append(fecha) or 1,
+        marcar_sin_ia=lambda engine, fecha: hechos["sin_ia"].append(fecha) or 1,
         feriado=lambda fecha: None,
         hoy=lambda: HOY,
         ahora=lambda: datetime(2026, 10, 6, 16, 43),
@@ -100,7 +94,7 @@ def test_corrida_completa(entorno):
     }
     fila, sobrescribir = hechos["filas"][0]
     assert fila["Fecha"].iloc[0] == HOY and sobrescribir is False
-    assert hechos["parrafos"] == []  # el camino normal es la llamada estructurada
+    assert hechos["sin_ia"] == []  # el camino normal es la llamada estructurada
     assert len(hechos["mails"]) == 2
     assert {p.name for p in salida.glob("*.jpg")} == set(charts.ORDEN_EN_MAIL)
     assert (salida / presentacion.ARCHIVO).exists()
@@ -208,19 +202,22 @@ def test_si_no_se_guarda_la_fila_no_se_llama_a_gemini(entorno):
 
     assert _estados(r)["persistencia"] == "error"
     assert _estados(r)["ia"] == "omitida"
-    assert hechos["parrafos"] == []
+    assert hechos["sin_ia"] == []
     assert len(hechos["mails"]) == 2  # el reporte sale igual, con el mensaje de reemplazo
     html = hechos["mails"][0][0].get_payload()[0].get_payload(decode=True).decode()
     assert ia_generator.MENSAJE_FALLA in html
     assert r.estado == "error"
 
 
-def test_gemini_sin_parrafo_es_advertencia(entorno):
+def test_gemini_sin_respuesta_es_advertencia_y_la_fila_queda_sin_ia(entorno):
     deps, hechos, salida = entorno
-    deps = replace(deps, generar_secciones=lambda prompt: (None, None), generar_parrafo=lambda e, fecha_esperada: "")
+    deps = replace(deps, generar_secciones=lambda prompt: (None, None))
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
     assert _estados(r)["ia"] == "advertencia"
     assert r.estado == "advertencia"
+    assert hechos["sin_ia"] == [HOY]
+    html = hechos["mails"][0][0].get_payload()[0].get_payload(decode=True).decode()
+    assert ia_generator.MENSAJE_FALLA in html and "comentario-ia" not in html
 
 
 def test_dry_run_no_escribe_ni_manda_nada(entorno):
@@ -231,7 +228,7 @@ def test_dry_run_no_escribe_ni_manda_nada(entorno):
     assert _estados(r)["persistencia"] == "omitida"
     assert _estados(r)["ia"] == "omitida"
     assert _estados(r)["mail"] == "omitida"
-    assert hechos["filas"] == [] and hechos["parrafos"] == [] and hechos["mails"] == [] and hechos["previews"] == []
+    assert hechos["filas"] == [] and hechos["sin_ia"] == [] and hechos["mails"] == [] and hechos["previews"] == []
     assert (salida / "mail.eml").exists() and (salida / "mail_preview.html").exists()
 
 
@@ -279,14 +276,15 @@ def test_cli_devuelve_1_si_la_corrida_falla(monkeypatch):
 
 def test_el_csv_adjunto_sale_de_supabase_con_el_parrafo_de_hoy(entorno, historico):
     deps, hechos, salida = entorno
-    # Con el párrafo único, que no lleva comas: así la última columna se compara entera
-    pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, generar_secciones=lambda prompt: (None, None)))
+    # Un resumen sin comas: así la última columna se compara entera
+    secciones = _secciones().model_copy(update={"resumen": "Resumen del día sin comas para que la última columna del CSV se lea entera."})
+    pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, generar_secciones=lambda prompt: (secciones, "gemini-x")))
 
     con_csv = next(m for m, d in hechos["mails"] if "csv@example.com" in d)
     adjunto = next(p for p in con_csv.walk() if p.get_content_type() == "text/csv")
     lineas = adjunto.get_payload(decode=True).decode("utf-8").splitlines()
     assert lineas[0].startswith("Fecha,TCC_Blue,TCV_Blue") and lineas[0].endswith(",bcra_tea,ai_paragraph")
-    assert lineas[1].startswith("2026-10-06,1535.0,1555.0") and lineas[1].endswith("Párrafo de Gemini")
+    assert lineas[1].startswith("2026-10-06,1535.0,1555.0") and lineas[1].endswith(secciones.resumen)
     assert lineas[2].startswith(historico["Fecha"].iloc[0])
     assert len(lineas) == len(historico) + 2
 
@@ -355,21 +353,10 @@ def test_la_llamada_estructurada_es_el_camino_normal(entorno):
 
     assert _estados(r)["ia"] == "ok"
     assert guardadas == [(HOY, "gemini-x")]
-    assert hechos["parrafos"] == []  # no hizo falta el párrafo único
+    assert hechos["sin_ia"] == []
     html = hechos["mails"][0][0].get_payload()[0].get_payload(decode=True).decode()
     assert "Resumen estructurado del día" in html
     assert "Comentario sobre las cotizaciones paralelas." in html and "Comentario sobre BTC" in html
-
-
-def test_si_falla_la_estructurada_vuelve_al_parrafo_unico(entorno):
-    deps, hechos, salida = entorno
-    deps = replace(deps, generar_secciones=lambda prompt: (None, None))
-    r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
-
-    assert _estados(r)["ia"] == "advertencia"
-    assert hechos["parrafos"] == [HOY]
-    html = hechos["mails"][0][0].get_payload()[0].get_payload(decode=True).decode()
-    assert "Párrafo de Gemini" in html and "comentario-ia" not in html
 
 
 def test_dry_run_con_ia_prueba_los_comentarios_sin_guardar(entorno):
@@ -512,10 +499,10 @@ def test_si_el_insert_encuentra_la_fila_no_se_manda_otro_mail(entorno):
     deps, hechos, salida = entorno
     r = pipeline.correr(pipeline.Opciones(salida=salida), replace(deps, guardar_fila=lambda e, f, sobrescribir=False: False))
     assert r.estado == "omitida" and r.exitosa
-    assert hechos["mails"] == [] and hechos["parrafos"] == []
+    assert hechos["mails"] == [] and hechos["sin_ia"] == []
 
 
-def test_una_excepcion_en_la_ia_estructurada_cae_al_parrafo_unico(entorno):
+def test_una_excepcion_en_la_ia_estructurada_no_frena_el_mail(entorno):
     deps, hechos, salida = entorno
 
     def generar(prompt):
@@ -524,13 +511,13 @@ def test_una_excepcion_en_la_ia_estructurada_cae_al_parrafo_unico(entorno):
     deps = replace(deps, generar_secciones=generar)
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
 
-    assert _estados(r)["ia"] == "advertencia"
-    assert hechos["parrafos"] == [HOY] and hechos["limpiezas"] == [HOY]
+    assert _estados(r)["ia"] == "advertencia" and hechos["sin_ia"] == [HOY]
+    assert len(hechos["mails"]) == 2
     html = hechos["mails"][0][0].get_payload()[0].get_payload(decode=True).decode()
-    assert "Párrafo de Gemini" in html
+    assert ia_generator.MENSAJE_FALLA in html
 
 
-def test_si_no_se_pueden_guardar_las_secciones_cae_al_parrafo_unico(entorno):
+def test_si_no_se_pueden_guardar_las_secciones_la_fila_queda_sin_ia(entorno):
     deps, hechos, salida = entorno
 
     def guardar(engine, fecha, secciones, modelo):
@@ -538,7 +525,7 @@ def test_si_no_se_pueden_guardar_las_secciones_cae_al_parrafo_unico(entorno):
 
     deps = replace(deps, generar_secciones=lambda prompt: (_secciones(), "gemini-x"), guardar_secciones=guardar)
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
-    assert _estados(r)["ia"] == "advertencia" and hechos["parrafos"] == [HOY]
+    assert _estados(r)["ia"] == "advertencia" and hechos["sin_ia"] == [HOY]
 
 
 def test_una_serie_rota_no_frena_a_las_demas(entorno):
@@ -679,12 +666,12 @@ def test_enviar_a_manda_un_solo_mail_con_el_csv(entorno):
     assert any(p.get_content_type() == "text/csv" for p in mensaje.walk())
 
 
-def test_secciones_guardadas_en_cero_filas_caen_al_parrafo_unico(entorno):
+def test_secciones_guardadas_en_cero_filas_dejan_la_fila_sin_ia(entorno):
     deps, hechos, salida = entorno
     deps = replace(deps, generar_secciones=lambda prompt: (_secciones(), "gemini-x"),
                    guardar_secciones=lambda engine, fecha, secciones, modelo: 0)
     r = pipeline.correr(pipeline.Opciones(salida=salida), deps)
-    assert _estados(r)["ia"] == "advertencia" and hechos["parrafos"] == [HOY]
+    assert _estados(r)["ia"] == "advertencia" and hechos["sin_ia"] == [HOY]
 
 
 def test_el_json_de_la_corrida_tiene_estado_y_etapas(entorno, tmp_path, monkeypatch):
