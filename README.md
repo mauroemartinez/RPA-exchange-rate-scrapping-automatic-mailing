@@ -7,6 +7,8 @@
 [![pandas](https://img.shields.io/badge/pandas-150458?style=flat&logo=pandas&logoColor=white)](https://pandas.pydata.org)
 [![Supabase](https://img.shields.io/badge/Supabase_PostgreSQL-3FCF8E?style=flat&logo=supabase&logoColor=white)](https://supabase.com)
 [![Gemini API](https://img.shields.io/badge/Gemini_API-1A73E8?style=flat&logo=google&logoColor=white)](https://ai.google.dev/)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-cron_trigger-F38020?style=flat&logo=cloudflareworkers&logoColor=white)](https://workers.cloudflare.com)
+[![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-daily_run-2088FF?style=flat&logo=githubactions&logoColor=white)](https://github.com/features/actions)
 
 [![Pydantic](https://img.shields.io/badge/Pydantic-validated-E92063?style=flat&logo=pydantic&logoColor=white)](https://docs.pydantic.dev)
 [![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-D71F00?style=flat&logo=sqlalchemy&logoColor=white)](https://www.sqlalchemy.org)
@@ -122,7 +124,7 @@ Every value is stored in its source unit and with its source date; conversions t
 
 This repository features a robust, portfolio-grade Robotic Process Automation (RPA) and Data Engineering pipeline tailored to track, store, and analyze the complex Argentine economic and exchange rate landscape.
 
-The system automates the ingestion of highly volatile financial variables, ensures data integrity within a centralized data warehouse, runs mathematical macro-projections, and distributes dynamic, highly-styled financial reports to a private subscriber list. The same data feeds an executive PowerPoint deck. The whole run works unattended on GitHub Actions' free plan.
+The system automates the ingestion of highly volatile financial variables, ensures data integrity within a centralized data warehouse, runs mathematical macro-projections, and distributes dynamic, highly-styled financial reports to a private subscriber list. The same data feeds an executive PowerPoint deck. The whole run works unattended: a Cloudflare Worker cron gives the order and GitHub Actions executes it, both on free plans.
 
 ### 🛠️ Core Tech Stack & Frameworks
 * **Data Ingestion (ETL):** httpx (REST APIs), Playwright (async Web Scraping), openpyxl (the Treasury's monthly debt workbook).
@@ -132,7 +134,7 @@ The system automates the ingestion of highly volatile financial variables, ensur
 * **Data Warehouse:** **Supabase PostgreSQL** for cloud-hosted analytics and persistency. Before Supabase, I used Microsoft SQL Server 2022, Microsoft SQL Server 2019.
 * **Generative AI:** Google Gemini Flash models with structured JSON output, validated with Pydantic, with multi-key and model failover (Contextual Macro Narrative Generation).
 * **Data Visualization & Delivery:** Matplotlib, Seaborn, Jinja2 HTML/CSS templates, tabulate, python-pptx (executive deck), SMTP Service.
-* **Orchestration & CI:** GitHub Actions on the free plan: the daily run, a daily control and the test suite on every push.
+* **Orchestration & CI:** a Cloudflare Worker (cron triggers, free plan) dispatches the daily run and the daily control at exact times; GitHub Actions (free plan) executes them and runs the test suite on every push. Dependencies are locked with uv from `.in` manifests; ruff lints every push.
 
 ---
 

@@ -22,6 +22,7 @@ pedidos = {
     "dev_githubactions": [DEVICON.format(n="githubactions", v="original")],
     "dev_pandas": [DEVICON.format(n="pandas", v="original")],
     "dev_pytest": [DEVICON.format(n="pytest", v="original")],
+    "dev_cloudflareworkers": [DEVICON.format(n="cloudflareworkers", v="original")],
     # simple-icons: monocromos, se colorean al armar la página
     "si_github": [SIMPLE.format(s="github")],
     "si_githubactions": [SIMPLE.format(s="githubactions")],
@@ -37,6 +38,7 @@ pedidos = {
     "si_pandas": [SIMPLE.format(s="pandas")],
     "si_microsoftpowerpoint": [SIMPLE.format(s="microsoftpowerpoint")],
     "si_python": [SIMPLE.format(s="python")],
+    "si_cloudflareworkers": [SIMPLE.format(s="cloudflareworkers")],
 }
 
 with httpx.Client(timeout=20, follow_redirects=True) as c:

@@ -320,6 +320,7 @@ li::before { content: ""; position: absolute; left: 1px; top: 8px; width: 5px; h
 .barra .iconos img { width: 64px; filter: drop-shadow(0 0 8px rgba(196,107,255,.6)); }
 .barra .iconos img.gh { width: 54px; filter: drop-shadow(0 0 8px rgba(255,255,255,.35)); }
 .barra .iconos img.gha { width: 58px; filter: drop-shadow(0 0 8px rgba(32,136,255,.7)); }
+.barra .iconos img.cf { width: 60px; filter: drop-shadow(0 0 8px rgba(246,130,31,.7)); }
 .barra .t1 { font: 600 26px/1.15 'Barlow Condensed', sans-serif; letter-spacing: 1.2px; color: #D27BFF;
   text-transform: uppercase; text-shadow: 0 0 10px rgba(196,107,255,.45); }
 .barra .t2 { font: 400 17.5px/1.35 'Barlow', sans-serif; color: #E4E4E7; margin-top: 4px; }
@@ -370,10 +371,11 @@ def opcion_1() -> str:
 
     barra = (
         f'<div class="barra"><div class="iconos"><img src="{CALENDARIO}">'
-        f'<img class="gh" src="{si("github", "#FFFFFF")}"><img class="gha" src="{dev("githubactions")}"></div>'
-        '<div><div class="t1">Orchestration · GitHub Actions</div>'
-        '<div class="t2"><b>Free plan:</b> business days at 16:00, triggered by a Cloudflare Worker cron; skips holidays.'
-        '<br>Backup schedules at 16:19, 17:07 and 19:12, off today. Tests every push in CI.</div></div></div>'
+        f'<img class="cf" src="{dev("cloudflareworkers")}"><img class="gh" src="{si("github", "#FFFFFF")}">'
+        f'<img class="gha" src="{dev("githubactions")}"></div>'
+        '<div><div class="t1">Orchestration · Cloudflare Workers + GitHub Actions</div>'
+        '<div class="t2"><b>Free plans:</b> a Cloudflare Worker cron gives the order on business days at 16:00; GitHub Actions runs it.'
+        '<br>Retries at 17:07 and 19:12, control at 19:43, holidays skipped. Tests every push in CI.</div></div></div>'
     )
 
     return (
