@@ -111,6 +111,7 @@ All of these are declared and validated in `reporte/config.py`. A missing or mal
 
 ```
 EMAIL_SENDER, EMAIL_PASSWORD, EMAIL_RECEIVER, EMAIL_RECEIVER_CSV
+EMAIL_LOGIN              # The Gmail account used to log in when EMAIL_SENDER is one of its "send as" aliases (optional; empty means EMAIL_SENDER)
 EMAIL_ALERTAS            # Who gets the technical alerts (optional; empty means EMAIL_RECEIVER_CSV)
 SUPABASE_DB_URL          # PostgreSQL connection string, in session mode (see "Important constraints")
 RUTA_BBDD                # Path to the CSV read when Supabase is down (relative paths resolve against the repo root)

@@ -69,6 +69,18 @@ venv\Scripts\python.exe pipeline.py --log-archivo logs\pipeline.log
 
 Y otra a las 19:30 con `venv\Scripts\python.exe scripts\control_diario.py`.
 
+## Mandar el reporte desde una casilla del dominio
+
+El remitente (`EMAIL_SENDER`) puede ser un alias del dominio propio, por ejemplo `reporte@globalaize.com`, sin cambiar de proveedor: Gmail sigue mandando, con su contraseña de aplicación, y el alias va en el From. Para eso hay una variable aparte, `EMAIL_LOGIN`, con la cuenta de Gmail con la que se entra al SMTP; vacía, se entra con `EMAIL_SENDER` como siempre.
+
+Pasos, una sola vez:
+
+1. **Recibir.** En Cloudflare, Email Routing (el dominio ya lo usa para `mauro@`): crear la dirección `reporte@globalaize.com` con destino la casilla de Gmail. Las respuestas al reporte llegan ahí, y hace falta para el paso 2.
+2. **Enviar como.** En Gmail: Configuración > Cuentas e importación > "Enviar como" > Agregar otra dirección: `reporte@globalaize.com`, con "Tratar como un alias" marcado; servidor SMTP `smtp.gmail.com`, puerto 587, usuario la cuenta de Gmail y una contraseña de aplicación. Gmail manda un código a `reporte@`, que llega por el paso 1.
+3. **DNS, para que no caiga en spam.** En Cloudflare, el registro TXT de SPF de `globalaize.com` tiene que incluir a Google además de a Cloudflare: `v=spf1 include:_spf.mx.cloudflare.net include:_spf.google.com ~all`. Y un registro `_dmarc.globalaize.com` TXT `v=DMARC1; p=none; rua=mailto:mauro@globalaize.com` para recibir los informes sin rechazar nada todavía.
+4. **El pipeline.** En Settings > Secrets and variables > Actions: `EMAIL_SENDER` pasa a `reporte@globalaize.com` y se crea `EMAIL_LOGIN` con la cuenta de Gmail. Lo mismo en el `.env` local. `EMAIL_PASSWORD` no cambia.
+5. **Probar sin la lista.** Actions > Corrida diaria > Run workflow, modo `dry-run` con *probar_mail*: manda el reporte de prueba solo a `EMAIL_ALERTAS`. Si llega con el From nuevo y sin aviso de spam, listo.
+
 ## Dos reglas para cualquier programador
 
 **Reintentos, solo los del horario.** En GitHub Actions, los dos reintentos (17:07 y 19:12) son la misma corrida sin `--forzar`: omiten un día terminado y frenan con alerta en uno a medio hacer. No actives ningún otro (ni "Re-run failed jobs" en GitHub ni, en el Programador de tareas, "Si la tarea no se ejecuta correctamente, reiniciar cada"). Una corrida que falló después de insertar la fila no se puede repetir a ciegas: una de las dos variantes del mail puede haber salido. Con la alerta en la mano, el día se rehace con `--forzar` o se reenvía con `scripts/reenvio_manual.py`. Repetir sin `--forzar` es seguro en el otro sentido: omite un día terminado y frena con error en uno a medio hacer.

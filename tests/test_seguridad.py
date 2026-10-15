@@ -3,6 +3,8 @@
 import json
 import smtplib
 
+from email.mime.text import MIMEText
+
 import httpx
 import pytest
 
@@ -122,3 +124,44 @@ def test_se_tapan_el_usuario_y_el_host_de_la_base(monkeypatch):
     texto = config.redactar("no conecta postgres.abcdefproyecto en aws-0-sa-east-1.pooler.supabase.com")
     assert "abcdefproyecto" not in texto and "pooler.supabase.com" not in texto
     assert config.redactar("PostgreSQL y postgres siguen legibles") == "PostgreSQL y postgres siguen legibles"
+
+
+def test_el_login_smtp_puede_ser_otra_cuenta_que_el_remitente(monkeypatch):
+    from pydantic import SecretStr
+
+    logins, sobres = [], []
+
+    class SMTPFalso:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def ehlo(self):
+            pass
+
+        def starttls(self, context=None):
+            pass
+
+        def login(self, usuario, clave):
+            logins.append(usuario)
+
+        def sendmail(self, de, para, mensaje):
+            sobres.append(de)
+            return {}
+
+    monkeypatch.setattr(smtplib, "SMTP", SMTPFalso)
+    monkeypatch.setattr(mailer.settings, "email_sender", "reporte@example.com")
+    monkeypatch.setattr(mailer.settings, "email_password", SecretStr("clave"))
+    monkeypatch.setattr(mailer.settings, "email_login", "cuenta@gmail.com")
+    mailer.enviar_smtp(MIMEText("hola"), ["uno@example.com"])
+    assert logins == ["cuenta@gmail.com"] and sobres == ["reporte@example.com"]
+
+    monkeypatch.setattr(mailer.settings, "email_login", None)
+    mailer.enviar_smtp(MIMEText("hola"), ["uno@example.com"])
+    assert logins[-1] == "reporte@example.com"
+    assert config.Settings(email_login="").email_login is None

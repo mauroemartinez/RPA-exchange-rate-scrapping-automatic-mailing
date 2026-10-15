@@ -66,6 +66,8 @@ jobs:
     env:
       TZ: America/Argentina/Buenos_Aires
       EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+      # Opcional: la cuenta de Gmail cuando el remitente es un alias suyo; sin el secreto llega vacía
+      EMAIL_LOGIN: ${{ secrets.EMAIL_LOGIN }}
       EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
       EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
       EMAIL_RECEIVER_CSV: ${{ secrets.EMAIL_RECEIVER_CSV }}

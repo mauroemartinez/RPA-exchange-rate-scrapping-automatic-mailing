@@ -35,6 +35,9 @@ class Settings(BaseSettings):
 
     # ── Envío de mail ────────────────────────────────────────────────────────
     email_sender: EmailStr
+    # Con qué cuenta se entra al SMTP cuando el remitente es un alias (reporte@globalaize.com
+    # mandado por la cuenta de Gmail). Vacía, se entra con EMAIL_SENDER, como siempre.
+    email_login: EmailStr | None = None
     email_password: SecretStr
     email_receiver: CommaEmails
     email_receiver_csv: CommaEmails
@@ -63,13 +66,13 @@ class Settings(BaseSettings):
         """
         return v if v.is_absolute() else (RAIZ_PROYECTO / v).resolve()
 
-    @field_validator("gemini_api_key_2", mode="before")
+    @field_validator("gemini_api_key_2", "email_login", mode="before")
     @classmethod
     def _key_vacia_es_sin_key(cls, v):
-        """GEMINI_API_KEY_2= (vacía) cuenta como no configurada.
+        """GEMINI_API_KEY_2= o EMAIL_LOGIN= (vacías) cuentan como no configuradas.
 
-        pydantic-settings la leería como SecretStr(""), y una key vacía
-        entraría a la rotación de Gemini como si fuera una key más.
+        pydantic-settings las leería como SecretStr("") o como un mail inválido; una
+        key vacía entraría a la rotación de Gemini como si fuera una key más.
         """
         if v is None:
             return None
@@ -94,6 +97,11 @@ class Settings(BaseSettings):
         if not v:
             raise ValueError("EMAIL_RECEIVER no puede estar vacío: el reporte no tendría a quién ir")
         return v
+
+    @property
+    def usuario_smtp(self) -> str:
+        """La cuenta con la que se entra a Gmail: EMAIL_LOGIN si está, si no el remitente."""
+        return str(self.email_login or self.email_sender)
 
     @property
     def destinatarios_alertas(self) -> list[str]:

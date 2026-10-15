@@ -30,7 +30,7 @@ def enviar_smtp(mensaje, destinatarios: list[str]) -> None:
         smtp.ehlo()
         smtp.starttls(context=context)
         smtp.ehlo()
-        smtp.login(settings.email_sender, settings.email_password.get_secret_value())
+        smtp.login(settings.usuario_smtp, settings.email_password.get_secret_value())
         rechazados = smtp.sendmail(settings.email_sender, destinatarios, mensaje.as_string())
     if rechazados:
         raise smtplib.SMTPRecipientsRefused(rechazados)
