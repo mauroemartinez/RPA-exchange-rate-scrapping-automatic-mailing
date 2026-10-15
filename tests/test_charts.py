@@ -40,14 +40,16 @@ def test_los_cuatro_graficos_se_generan(df, inflacion_12, btc_crudo, tmp_path):
     data = charts.preparar_datos(df)
     rutas = [
         charts.grafico_tipos_de_cambio(data, tmp_path),
+        charts.grafico_riesgo_pais(data, tmp_path),
         charts.grafico_variaciones(charts.preparar_variaciones(data, inflacion_12, "2026-08-01"), tmp_path),
         charts.grafico_inflacion(charts.preparar_inflacion(inflacion_12), tmp_path),
         charts.grafico_btc(charts.preparar_btc(btc_crudo, AHORA), tmp_path),
     ]
-    assert [r.name for r in rutas] == [charts.TIPOS_DE_CAMBIO, charts.VARIACIONES, charts.INFLACION, charts.BTC]
+    assert [r.name for r in rutas] == [charts.TIPOS_DE_CAMBIO, charts.RIESGO_PAIS, charts.VARIACIONES, charts.INFLACION, charts.BTC]
 
     tamanios = {r.name: Image.open(r).size for r in rutas}
-    assert tamanios[charts.TIPOS_DE_CAMBIO] == (1000, 1400)
+    assert tamanios[charts.TIPOS_DE_CAMBIO] == (1000, 950)
+    assert tamanios[charts.RIESGO_PAIS] == (1000, 500)
     assert tamanios[charts.VARIACIONES] == (1000, 500)
     assert tamanios[charts.INFLACION] == (1000, 700)
     assert all(Image.open(r).format == "JPEG" for r in rutas)

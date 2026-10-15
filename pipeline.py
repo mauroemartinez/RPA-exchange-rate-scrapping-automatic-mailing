@@ -14,7 +14,7 @@ Etapas, en el mismo orden que el notebook:
   indicadores   agregados monetarios, inflación y deuda del BCRA, y la deuda bruta de la
                 Secretaría de Finanzas, para sus gráficos; si una fuente falla, es una advertencia
                 y el mail sale sin esos gráficos
-  graficos      los seis .jpg; si Yahoo no responde, el mail sale sin el de BTC
+  graficos      los siete .jpg; si Yahoo no responde, el mail sale sin el de BTC
   mail          las dos variantes del reporte (con y sin CSV)
   presentacion  el PowerPoint del día (presentacion.ARCHIVO), en la carpeta de los gráficos;
                 si falla, es una advertencia: el mail ya salió
@@ -586,6 +586,7 @@ def _etapa_graficos(
         data = charts.preparar_datos(df)
         pendientes = [
             (charts.TIPOS_DE_CAMBIO, lambda: charts.grafico_tipos_de_cambio(data, carpeta)),
+            (charts.RIESGO_PAIS, lambda: charts.grafico_riesgo_pais(data, carpeta)),
             (charts.VARIACIONES, lambda: charts.grafico_variaciones(charts.preparar_variaciones(data, inflacion), carpeta)),
             (charts.INFLACION, lambda: charts.grafico_inflacion(charts.preparar_inflacion(inflacion_12), carpeta)),
         ]

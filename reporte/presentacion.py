@@ -2,8 +2,8 @@
 
 1. Portada blanca con el logo de GlobalAIze, los links del autor y las tecnologías del proyecto.
 2. Tablero: blue, MEP, billete, riesgo país, BADLAR y el forward de Fisher.
-3. Tipos de cambio: el análisis de IA del día y los paneles de paralelas y oficiales.
-4. Riesgo país.
+3. Tipos de cambio: el análisis de IA del día y los dos paneles del gráfico del mail (paralelas y oficiales).
+4. Riesgo país: el gráfico propio del mail, con el resumen del día y el comentario de Gemini.
 5. Inflación y variaciones acumuladas.
 6 y 7. Agregados monetarios y deuda, con el resumen del día y lo ideal.
 8. Bitcoin, en fondo negro.
@@ -585,7 +585,7 @@ def armar(
            "Verde: bajó contra la rueda anterior; rojo: subió. Desde la macro, que el dólar y el riesgo país bajen "
            "es la buena noticia.", 15, GRIS)
 
-    # 3 y 4. Tipos de cambio y riesgo país, con los paneles por separado
+    # 3. Tipos de cambio: los dos paneles del gráfico del mail, uno al lado del otro
     paneles = []
     with tempfile.TemporaryDirectory() as temporal:
         if charts.TIPOS_DE_CAMBIO in imagenes:
@@ -612,13 +612,14 @@ def armar(
         else:
             _texto(cambio, Inches(0.6), Inches(4), Inches(12), Inches(1), "Gráfico no disponible para este día.", 18, GRIS)
 
-        riesgo = _encabezado(prs, "Riesgo país", fecha, next(numero), emoji="🌎")
-        if paneles:
-            _imagen(riesgo, paneles[2], Inches(0.45), Inches(1.25), Inches(7.9), Inches(5.6))
-        else:
-            _texto(riesgo, Inches(0.6), Inches(3), Inches(8), Inches(1), "Gráfico no disponible para este día.", 18, GRIS)
-        _bloques(riesgo, Inches(8.6), Inches(1.2), Inches(4.35), Inches(5.75),
-                 [("Resumen del día", frase_riesgo(df)), ("🤖 Análisis IA", _comentario(comentarios, charts.cid(charts.TIPOS_DE_CAMBIO), "riesgo"))])
+    # 4. Riesgo país: el mismo gráfico del mail (apaisado), con el resumen y el análisis a la derecha
+    riesgo = _encabezado(prs, "Riesgo país", fecha, next(numero), emoji="🌎")
+    if charts.RIESGO_PAIS in imagenes:
+        _imagen(riesgo, imagenes[charts.RIESGO_PAIS], Inches(0.45), Inches(1.25), Inches(8.3), Inches(5.6))
+    else:
+        _texto(riesgo, Inches(0.6), Inches(3), Inches(8), Inches(1), "Gráfico no disponible para este día.", 18, GRIS)
+    _bloques(riesgo, Inches(9.0), Inches(1.2), Inches(3.95), Inches(5.75),
+             [("Resumen del día", frase_riesgo(df)), ("🤖 Análisis IA", _comentario(comentarios, charts.cid(charts.RIESGO_PAIS), "riesgo"))])
 
     # 5. Inflación
     inflacion_slide = _encabezado(prs, "Inflación y variaciones acumuladas", fecha, next(numero), emoji="📈")

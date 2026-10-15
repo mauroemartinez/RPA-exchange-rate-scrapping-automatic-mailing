@@ -102,8 +102,8 @@ VENTANA = 25
 
 # Qué sección va debajo de qué gráfico del mail (cid) y con qué título
 SECCIONES_POR_GRAFICO = {
-    charts.cid(charts.TIPOS_DE_CAMBIO): [("Cotizaciones paralelas", "paralelas"), ("Cotizaciones oficiales", "oficiales"),
-                                         ("Riesgo país", "riesgo_pais")],
+    charts.cid(charts.TIPOS_DE_CAMBIO): [("Cotizaciones paralelas", "paralelas"), ("Cotizaciones oficiales", "oficiales")],
+    charts.cid(charts.RIESGO_PAIS): [("Riesgo país", "riesgo_pais")],
     charts.cid(charts.BTC): [("Bitcoin", "btc")],
 }
 

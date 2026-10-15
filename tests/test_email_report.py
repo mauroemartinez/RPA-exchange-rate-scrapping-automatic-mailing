@@ -70,12 +70,12 @@ def test_el_template_sin_la_variable_graficos_muestra_los_cuatro(df, inflacion_1
 
 
 def test_cids_disponibles(imagenes):
-    assert er.cids_disponibles(imagenes) == [f"image{i}" for i in range(1, 7)]
+    assert er.cids_disponibles(imagenes) == [f"image{i}" for i in range(1, 8)]
     del imagenes[charts.BTC]
-    # Los cid son fijos por gráfico: BTC es el último (image6) y sin él no se corre nada
-    assert er.cids_disponibles(imagenes) == ["image1", "image2", "image3", "image4", "image5"]
+    # Los cid son fijos por gráfico: BTC es el último (image7) y sin él no se corre nada
+    assert er.cids_disponibles(imagenes) == ["image1", "image2", "image3", "image4", "image5", "image6"]
     del imagenes[charts.AGREGADOS]
-    assert er.cids_disponibles(imagenes) == ["image1", "image2", "image3", "image5"]
+    assert er.cids_disponibles(imagenes) == ["image1", "image2", "image3", "image4", "image6"]
 
 
 def test_armar_mensaje(imagenes):
@@ -84,9 +84,9 @@ def test_armar_mensaje(imagenes):
                           cco=["a@example.com", "b@example.com"], csv="Fecha,TCV_Blue\n")
     msg = message_from_string(em.as_string())
     partes = [(p.get_content_type(), p.get("Content-ID")) for p in msg.walk() if not p.is_multipart()]
-    assert partes == [("text/html", None), ("image/jpeg", "<image1>"), ("image/jpeg", "<image3>"),
+    assert partes == [("text/html", None), ("image/jpeg", "<image1>"), ("image/jpeg", "<image2>"),
                       ("image/jpeg", "<image4>"), ("image/jpeg", "<image5>"), ("image/jpeg", "<image6>"),
-                      ("image/png", "<logo>"), ("text/csv", None)]
+                      ("image/jpeg", "<image7>"), ("image/png", "<logo>"), ("text/csv", None)]
     assert msg["Bcc"] == "a@example.com, b@example.com"
     assert msg["To"] == "remitente@example.com"
 

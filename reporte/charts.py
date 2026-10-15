@@ -39,13 +39,14 @@ log = logging.getLogger(__name__)
 # Nombres de archivo y orden en el mail: el template los referencia como
 # cid:image1 .. cid:image6, en este orden. Los dos nuevos van al final para que
 # los cid de los cuatro de siempre no cambien.
-TIPOS_DE_CAMBIO = "Gráficos Tipos de Cambios y Riesgo País.jpg"
+TIPOS_DE_CAMBIO = "Tipos de Cambio.jpg"
+RIESGO_PAIS = "Riesgo País.jpg"
 INFLACION = "Gráficos Inflación.jpg"
 VARIACIONES = "Variaciones.jpg"
 BTC = "Gráfico BTC.jpg"
 AGREGADOS = "Agregados Monetarios.jpg"
 DEUDA = "Deuda en Dólares.jpg"
-ORDEN_EN_MAIL = (TIPOS_DE_CAMBIO, INFLACION, VARIACIONES, AGREGADOS, DEUDA, BTC)
+ORDEN_EN_MAIL = (TIPOS_DE_CAMBIO, RIESGO_PAIS, INFLACION, VARIACIONES, AGREGADOS, DEUDA, BTC)
 
 
 def cid(nombre: str) -> str:
@@ -119,16 +120,16 @@ def _step_riesgo_pais(valor_max: float) -> tuple[float, float]:
         return 500, 200
 
 
-PANELES_TIPOS_DE_CAMBIO = ("Paralelas.png", "Oficiales.png", "Riesgo País.png")
+PANELES_TIPOS_DE_CAMBIO = ("Paralelas.png", "Oficiales.png")
 
 
 def grafico_tipos_de_cambio(data: pd.DataFrame, carpeta: Path, n: int = COTIZACIONES_A_MOSTRAR) -> Path:
-    """Cotizaciones paralelas, oficiales y riesgo país de las últimas n ruedas (celda 40)."""
+    """Cotizaciones paralelas y oficiales de las últimas n ruedas, un panel arriba del otro."""
     return _dibujar_tipos_de_cambio(data, n, lambda fig, ax: _guardar(fig, carpeta, TIPOS_DE_CAMBIO))
 
 
 def paneles_tipos_de_cambio(data: pd.DataFrame, carpeta: Path, n: int = COTIZACIONES_A_MOSTRAR) -> list[Path]:
-    """Los tres paneles del gráfico de tipos de cambio, cada uno en su imagen, para la presentación.
+    """Los dos paneles del gráfico de tipos de cambio, cada uno en su imagen, para la presentación.
 
     Es el mismo dibujo que el del mail: cada panel se recorta con su título y su
     leyenda, sin el título general. Quedan en PANELES_TIPOS_DE_CAMBIO, en ese orden.
@@ -145,17 +146,29 @@ def paneles_tipos_de_cambio(data: pd.DataFrame, carpeta: Path, n: int = COTIZACI
     return _dibujar_tipos_de_cambio(data, n, guardar)
 
 
+def _eje_de_fechas(axis, fechas: list[str]) -> None:
+    """Una fecha cada dos ruedas y sin el año ('02/09' y no '02/09/26'): con el año, en el ancho del mail se enciman.
+
+    El eje es por posición (0, 1, 2...), como lo dejan seaborn y las fechas en texto.
+    """
+    sin_anio = FuncFormatter(lambda x, _: fechas[int(round(x))][:5] if 0 <= int(round(x)) < len(fechas) else "")
+    axis.set_xlabel("")
+    axis.xaxis.set_major_locator(MultipleLocator(2))
+    axis.xaxis.set_minor_locator(MultipleLocator(1))
+    axis.xaxis.set_major_formatter(sin_anio)
+    axis.grid(color="silver", linestyle="--", linewidth=0.5)
+
+
 def _dibujar_tipos_de_cambio(data: pd.DataFrame, n: int, al_terminar):
-    """Arma la figura de tres paneles y se la pasa, con sus ejes, a `al_terminar`, dentro del estilo base."""
+    """Arma la figura de dos paneles (paralelas y oficiales) y se la pasa, con sus ejes, a `al_terminar`."""
     with _estilo_base():
-        fig = Figure(figsize=(10, 14))
-        ax = fig.subplots(3, 1, sharex=False)
+        fig = Figure(figsize=(10, 9.5))
+        ax = fig.subplots(2, 1, sharex=False)
         ultimos = data.tail(n)
 
-        titulos = ["Cotizaciones Paralelas", "Cotizaciones Oficiales", "Evolución del Riesgo País"]
-        fig.suptitle(f"Tipos de cambio y riesgo país - últimas {n} cotizaciones", fontweight="bold", fontsize=18)
-        for i, titulo in enumerate(titulos):
-            ax[i].set_title(titulo, fontweight="bold", fontsize=12)
+        fig.suptitle(f"Tipos de cambio - últimas {n} cotizaciones", fontweight="bold", fontsize=18)
+        ax[0].set_title("Cotizaciones Paralelas", fontweight="bold", fontsize=12)
+        ax[1].set_title("Cotizaciones Oficiales", fontweight="bold", fontsize=12)
 
         # Cotizaciones paralelas
         ax0_palette = sns.color_palette("dark")
@@ -190,7 +203,31 @@ def _dibujar_tipos_de_cambio(data: pd.DataFrame, n: int, al_terminar):
                         bbox=dict(boxstyle="round", alpha=0.4, edgecolor=ax1_palette[i], facecolor="white"),
                     )
 
-        # Riesgo país: barras con el máximo y el mínimo de la ventana resaltados
+        fechas = ultimos["Fecha"].tolist()
+        for axis, mayor, menor in ((ax[0], 50, 250), (ax[1], 10, 25)):
+            _eje_de_fechas(axis, fechas)
+            axis.yaxis.set_major_formatter(FuncFormatter("{:,.2f}".format))
+            axis.set_ylabel("ARS / USD", fontsize=12, fontweight="bold")
+            axis.yaxis.set_major_locator(MultipleLocator(mayor))
+            axis.yaxis.set_minor_locator(MultipleLocator(menor))
+            axis.legend(prop={"size": 8}, loc="upper left", shadow=True)
+
+        fig.tight_layout(pad=1)
+        return al_terminar(fig, ax)
+
+
+def grafico_riesgo_pais(data: pd.DataFrame, carpeta: Path, n: int = COTIZACIONES_A_MOSTRAR) -> Path:
+    """Riesgo país de las últimas n ruedas: barras con el máximo y el mínimo de la ventana resaltados.
+
+    Era el tercer panel del gráfico de tipos de cambio; va solo porque se lee
+    mejor y así el mail y la presentación le ponen su propio comentario debajo.
+    """
+    with _estilo_base():
+        fig = Figure(figsize=(10, 5))
+        ax = fig.subplots()
+        ultimos = data.tail(n)
+        ax.set_title(f"Riesgo país - últimas {n} cotizaciones", fontweight="bold", fontsize=18)
+
         df_riesgo = ultimos.copy()
         max_riesgo = df_riesgo["riesgo_pais"].max()
         min_riesgo = df_riesgo["riesgo_pais"].min()
@@ -212,12 +249,12 @@ def _dibujar_tipos_de_cambio(data: pd.DataFrame, n: int, al_terminar):
         sns.barplot(
             x="Fecha", y="riesgo_pais", data=df_riesgo, hue="Categoria",
             palette={"Máximo": "red", "Mínimo": "green", "Normal": "silver"},
-            legend=False, width=0.8, edgecolor="none", linewidth=0, ax=ax[2],
+            legend=False, width=0.8, edgecolor="none", linewidth=0, ax=ax,
         )
 
         valores_riesgo = df_riesgo["riesgo_pais"].tolist()
         variaciones_riesgo = df_riesgo["var_pct"].tolist()
-        for bar in ax[2].patches:
+        for bar in ax.patches:
             height = bar.get_height()
             if not height:
                 continue
@@ -234,7 +271,7 @@ def _dibujar_tipos_de_cambio(data: pd.DataFrame, n: int, al_terminar):
 
             # Recuadro sin borde: un fondo blanco translúcido para leer el número
             # por encima de la grilla.
-            ax[2].annotate(
+            ax.annotate(
                 f"{height:,.0f}", xy=(centro, height + 2.25), xytext=(0, 22), textcoords="offset points",
                 ha="center", va="bottom", fontproperties=fm.FontProperties(weight="bold", size=font_size),
                 bbox=dict(boxstyle="round", alpha=0.4, edgecolor="none", facecolor="white"),
@@ -254,45 +291,22 @@ def _dibujar_tipos_de_cambio(data: pd.DataFrame, n: int, al_terminar):
             else:
                 etiqueta_var, color_var = f"▼{abs(variacion):.1f}%", VAR_BAJA
 
-            ax[2].annotate(
+            ax.annotate(
                 etiqueta_var, xy=(centro, height), xytext=(0, 8), textcoords="offset points",
                 ha="center", va="bottom", fontproperties=fm.FontProperties(weight="bold", size=7.5),
                 color=color_var,
             )
 
-        # Una fecha cada dos ruedas y sin el año ('02/09' y no '02/09/26'): con el
-        # año, en el ancho del mail se enciman. El eje es por posición (0, 1, 2...)
-        fechas = ultimos["Fecha"].tolist()
-        sin_anio = FuncFormatter(lambda x, _: fechas[int(round(x))][:5] if 0 <= int(round(x)) < len(fechas) else "")
-        for axis in ax:
-            axis.set_xlabel("")
-            axis.xaxis.set_major_locator(MultipleLocator(2))
-            axis.xaxis.set_minor_locator(MultipleLocator(1))
-            axis.xaxis.set_major_formatter(sin_anio)
-
-        for i in range(2):
-            ax[i].yaxis.set_major_formatter(FuncFormatter("{:,.2f}".format))
-
+        _eje_de_fechas(ax, ultimos["Fecha"].tolist())
         rp_major_step, rp_minor_step = _step_riesgo_pais(max_riesgo)
-        y_labels = ["ARS / USD", "ARS / USD", "Puntos Base"]
-        y_major_locators = [MultipleLocator(50), MultipleLocator(10), MultipleLocator(rp_major_step)]
-        y_minor_locators = [MultipleLocator(250), MultipleLocator(25), MultipleLocator(rp_minor_step)]
-        for i in range(3):
-            ax[i].set_ylabel(y_labels[i], fontsize=12, fontweight="bold")
-            ax[i].yaxis.set_major_locator(y_major_locators[i])
-            ax[i].yaxis.set_minor_locator(y_minor_locators[i])
-
+        ax.set_ylabel("Puntos Base", fontsize=12, fontweight="bold")
+        ax.yaxis.set_major_locator(MultipleLocator(rp_major_step))
+        ax.yaxis.set_minor_locator(MultipleLocator(rp_minor_step))
         # 1.22 y no 1.1: hay dos renglones de etiqueta sobre cada barra
-        ax[2].set_ylim([0, ultimos.riesgo_pais.max() * 1.22])
-
-        for axis in ax:
-            axis.grid(color="silver", linestyle="--", linewidth=0.5)
-
-        ax[0].legend(prop={"size": 8}, loc="upper left", shadow=True)
-        ax[1].legend(prop={"size": 8}, loc="upper left", shadow=True)
+        ax.set_ylim([0, ultimos.riesgo_pais.max() * 1.22])
 
         fig.tight_layout(pad=1)
-        return al_terminar(fig, ax)
+        return _guardar(fig, carpeta, RIESGO_PAIS)
 
 
 # ── Variaciones acumuladas ───────────────────────────────────────────────────

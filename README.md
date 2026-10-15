@@ -20,7 +20,7 @@
 [![Top language](https://img.shields.io/github/languages/top/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing?style=flat&color=6c757d)](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing)
 [![Repo size](https://img.shields.io/github/repo-size/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing?style=flat&color=6c757d)](https://github.com/mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing)
 
-<p align="center">
+<p align="left">
   <a href="#-what-lands-in-the-inbox-every-business-day">📬 The mail</a> ·
   <a href="#-todays-executive-deck">📊 Today's deck</a> ·
   <a href="#%EF%B8%8F-system-architecture--data-pipeline-blueprint">🏗️ Architecture</a> ·
@@ -41,10 +41,11 @@ At 16:00 Argentina time, a private subscriber list receives one HTML mail: the d
 </p>
 
 | | |
-|:---:|:---:|
-| **FX rates and country risk, last 25 sessions**<br>parallel and official panels, with Gemini's comment under each<br><img src="Previews/Gr%C3%A1ficos%20Tipos%20de%20Cambios%20y%20Riesgo%20Pa%C3%ADs.jpg" width="420" alt="FX rates and country risk"> | **Accumulated variations since July 2025**<br>blue, official, MEP and inflation on the same axis<br><img src="Previews/Variaciones.jpg" width="420" alt="Accumulated variations"><br><br>**Inflation, monthly and year on year**<br><img src="Previews/Gr%C3%A1ficos%20Inflaci%C3%B3n.jpg" width="420" alt="Inflation"> |
+|:---|:---|
+| **FX rates, last 25 sessions**<br>parallel and official panels, with Gemini's comment under each<br><img src="Previews/Tipos%20de%20Cambio.jpg" width="420" alt="FX rates"> | **Country risk, last 25 sessions**<br>daily bars with the window's maximum and minimum, and its own AI comment<br><img src="Previews/Riesgo%20Pa%C3%ADs.jpg" width="420" alt="Country risk"> |
+| **Inflation, monthly and year on year**<br>the last twelve months, with the accumulated two, three and twelve months<br><img src="Previews/Gr%C3%A1ficos%20Inflaci%C3%B3n.jpg" width="420" alt="Inflation"> | **Accumulated variations since July 2025**<br>blue, official, MEP and inflation on the same axis<br><img src="Previews/Variaciones.jpg" width="420" alt="Accumulated variations"> |
 | **Monetary aggregates**<br>base, M2 and M3 against inflation, with a plain-language explanation<br><img src="Previews/Agregados%20Monetarios.jpg" width="420" alt="Monetary aggregates"> | **Public and private debt, always in USD**<br>Treasury gross debt, bank loans, BCRA letters and advances<br><img src="Previews/Deuda%20en%20D%C3%B3lares.jpg" width="420" alt="Debt in dollars"> |
-| **Bitcoin**<br>price, volatility and moving averages, with its own AI comment<br><img src="Previews/Gr%C3%A1fico%20BTC.jpg" width="420" alt="Bitcoin"> | **In numbers**<br><br>6 charts, rebuilt every run<br>5 AI texts per day, from one structured Gemini call<br>14 macro series stored with their source dates and units<br>9-slide executive deck, replaced daily<br>2 mail variants, with and without the CSV history<br>280+ offline tests, run on every push |
+| **Bitcoin**<br>price, volatility and moving averages, with its own AI comment<br><img src="Previews/Gr%C3%A1fico%20BTC.jpg" width="420" alt="Bitcoin"> | **In numbers**<br><br>7 charts, rebuilt every run<br>5 AI texts per day, from one structured Gemini call<br>14 macro series stored with their source dates and units<br>9-slide executive deck, replaced daily<br>2 mail variants, with and without the CSV history<br>260+ offline tests, run on every push |
 
 The charts above are the real ones: the pipeline commits them to `Previews/` after every run, so this page always shows the latest report.
 
@@ -110,10 +111,10 @@ Two closer views, drawn with the [diagram-design](https://github.com/cathrynlave
 | 5 | 💾 **persistencia** | One atomic `INSERT ... ON CONFLICT ("Fecha")`; a row that appeared in between stops the run as `omitida` | No duplicate mail, ever |
 | 6 | 🧠 **ia** | One structured Gemini call: the summary plus a comment per chart, validated with Pydantic; seven models from best to worst, both keys, up to three rounds | The mail carries a placeholder and the row is marked as done without AI |
 | 7 | 📈 **indicadores** | Two years of BCRA series and the Treasury's gross debt workbook, each series validated on its own | Warning; the mail goes without that chart |
-| 8 | 🎨 **graficos** | The six charts, each on its own Matplotlib figure; Bitcoin from Yahoo Finance | Warning; the mail goes without Bitcoin |
+| 8 | 🎨 **graficos** | The seven charts, each on its own Matplotlib figure; the FX rates and the country risk are separate images; Bitcoin from Yahoo Finance | Warning; the mail goes without Bitcoin |
 | 9 | 📧 **mail** | Renders the Jinja2 template and sends both variants in parallel, with and without the CSV history | Run fails |
 | 10 | 📊 **presentacion** | Builds the nine-slide executive deck from the same in-memory data | Warning; the mail is already out |
-| 11 | 🔁 **previews** | Commits the charts to `Previews/` on `main` and publishes the deck as the single commit of its branch | Warning |
+| 11 | 🔁 **previews** | Commits the seven charts to `Previews/` on `main` and publishes the deck as the single commit of its branch | Warning |
 | 12 | 🧮 **series** | Upserts the downloaded series into `Fact_Series_Macro`, rewriting only values that changed | Warning |
 
 ---
@@ -163,7 +164,7 @@ The system automates the ingestion of highly volatile financial variables, ensur
 │   ├── models.py            Row-level validation schema (Pydantic) and the AI answer's schema
 │   ├── data_access.py       Supabase reads, idempotent insert, run lock, series upsert
 │   ├── transformations.py   Today's row, validation, spreads, Fisher forwards, inflation
-│   ├── charts.py            The six report charts
+│   ├── charts.py            The seven report charts
 │   ├── indicadores.py       Plain-language explanations of the aggregates and debt charts
 │   ├── ia_generator.py      Gemini narrative layer
 │   ├── email_report.py      HTML rendering, MIME assembly and sending
@@ -199,7 +200,7 @@ python pipeline.py --dry-run --enviar-a me@mail.com   # same, but the report rea
 python pipeline.py                                    # the real run
 ```
 
-A dry run leaves the six charts, the executive deck, a browser preview and an `.eml` of the report in a temp folder. The exit code is 1 when any stage fails, so schedulers can alert on it. Other flags: `--sin-mail`, `--sin-push`, `--forzar` (redo a day), `--desde HH:MM` (refuse a run that starts earlier, for late crons), `--json FILE`.
+A dry run leaves the seven charts, the executive deck, a browser preview and an `.eml` of the report in a temp folder. The exit code is 1 when any stage fails, so schedulers can alert on it. Other flags: `--sin-mail`, `--sin-push`, `--forzar` (redo a day), `--desde HH:MM` (refuse a run that starts earlier, for late crons), `--json FILE`.
 
 **Scheduling.** The run itself happens on GitHub Actions. The order comes from a Cloudflare Worker (`cloudflare/`, free plan): its cron triggers send a `workflow_dispatch` at 16:00 Argentina time, Monday to Friday, repeat it at 17:07 and 19:12 (a finished day ends as `omitida`) and ask for the daily control at 19:43; a dispatch starts in seconds. GitHub's own cron schedules stay in the workflows, switched on and off with the `CORRIDA_AUTOMATICA` repository variable, and are off: on the free plan they arrived hours late, and once crossed midnight. The full guide, in Spanish, is `docs/programacion-y-monitoreo.md`.
 
@@ -238,7 +239,7 @@ The six-phase roadmap is complete. What each phase left in production, and what 
 | Phase | Status | In production |
 |---|:-:|---|
 | 1. Pipeline without the notebook | ✅ | `pipeline.py` with its CLI and the `reporte/` package; the notebook retired |
-| 2. Reliability and diagnostics | ✅ | Per-stage state and duration, failed sends turn the run red, 280+ offline tests, golden HTML, secrets scrubbed from public logs. API caching evaluated and declined: nothing is heavy enough |
+| 2. Reliability and diagnostics | ✅ | Per-stage state and duration, failed sends turn the run red, 260+ offline tests, golden HTML, secrets scrubbed from public logs. API caching evaluated and declined: nothing is heavy enough |
 | 3. Monetary aggregates and debt | ✅ | `Fact_Series_Macro` with 14 series, two charts in the mail with plain-language explanations, debt always in USD |
 | 4. Per-chart AI commentary | ✅ | One structured Gemini call, validated with Pydantic, stored as JSON; walks seven models and both keys before giving up |
 | 5. Analysis and presentations | ✅ | Read-only SQL lab, the daily executive deck, the PDF macro report. Streamlit dashboard: prototype, needs a read-only database role before it is published |
@@ -281,6 +282,7 @@ Since its inception in 2022, this infrastructure evolved from a single scraping 
 * **Monetary Aggregates & Public Debt in Dollars (2026):** Added two charts to the daily report. The monetary aggregates (monetary base, M2, M3) show how much money circulates and how it grows against inflation. The debt chart tracks, always in US dollars, the Treasury's gross debt, private-sector bank loans, the Central Bank's letters and its transitory advances to the Treasury: BCRA series published in pesos are converted with the official wholesale rate of each day, and the Treasury's monthly workbook is read by its labels, with provisional months flagged. Each chart carries a plain-language explanation plus one sentence computed in Python from the latest figures, so the AI never writes the numbers.
 * **Executive PowerPoint, Replaced Daily (2026):** Every run builds a nine-slide executive deck with the indicators, the AI summary and the charts, and publishes it as the single commit of a dedicated branch. GitHub always holds the latest deck while old versions never pile up in the history.
 * **Cloud Scheduling on GitHub Actions (2026):** The daily run and a daily control run on GitHub Actions' free plan, switched on and off with a repository variable. A Postgres advisory lock prevents duplicate runs, the national holiday calendar skips non-business days, an unfinished day is detected and flagged, every log line is scrubbed of secrets and recipient addresses before it reaches the public log, and automated commits carry the owner's identity.
+* **Country Risk on Its Own Chart (2026):** the three-panel FX chart was split: the parallel and official panels stay together on one image and country risk gets its own, each with its Gemini comment right under it, in the mail and on the deck.
 * **Cloud Trigger on Cloudflare Workers (2026):** GitHub's free-plan schedules proved best effort: hours late on busy days, skipped on others, and once across midnight, mailing the list at 00:02 with stale values. The order now comes from a Cloudflare Worker on the free plan, whose cron triggers send the `workflow_dispatch` at exact times and ask for the daily control afterwards, with retries and a failed invocation visible in Cloudflare's panel. The run itself stays on GitHub Actions, and GitHub's own schedules remain as a switched-off last resort.
 * **Deployment Hardening (2026):** Reworked the container and service layer. Added a `.dockerignore`, the image previously built with `COPY . .` and no exclusions, baking the `.env` file into a layer where credentials remain readable via `docker history` regardless of later deletion. Unified the runtime on **Python 3.14-slim** to match the development environment, moved `fastapi`/`uvicorn`/`nbconvert` out of an unpinned inline `pip install` into pinned `requirements.txt` entries, and introduced a `requirements.in` manifest separating direct dependencies from the resolved lock. The container now runs as a non-root user with a shared Playwright browser path and reports liveness through a `HEALTHCHECK`. `app.py` was hardened in turn: authentication now fails **closed** (the previous `if API_KEY and ...` guard left `/run` publicly callable whenever the variable was unset), concurrent invocations are rejected with HTTP 409 via a non-blocking lock instead of running the pipeline twice in parallel, subprocess output no longer leaks into HTTP responses, and the hardcoded `/app` working directory is derived from the module path so the service is runnable locally.
 

@@ -64,7 +64,19 @@ def test_con_comentarios_por_grafico_de_la_fila(historico, imagenes, tmp_path):
                                        "riesgo_pais": "Comentario de riesgo.", "btc": "Comentario de BTC."}
     prs = Presentation(presentacion.armar(historico, imagenes, tmp_path))
     assert "Comentario de paralelas." in _textos(prs.slides[2])
+    assert "Comentario de riesgo." in _textos(prs.slides[3])
     assert "Comentario de BTC." in _textos(prs.slides[7])
+
+
+def test_riesgo_pais_lleva_el_grafico_del_mail(historico, imagenes, tmp_path):
+    prs = Presentation(presentacion.armar(historico, imagenes, tmp_path))
+    riesgo = prs.slides[3]
+    assert any(s.shape_type == 13 for s in riesgo.shapes)  # 13 = imagen
+    assert "Gráfico no disponible" not in _textos(riesgo)
+
+    del imagenes[charts.RIESGO_PAIS]
+    prs = Presentation(presentacion.armar(historico, imagenes, tmp_path))
+    assert "Gráfico no disponible" in _textos(prs.slides[3])
 
 
 def test_los_textos_de_la_corrida_le_ganan_a_la_fila(historico, imagenes, tmp_path):
