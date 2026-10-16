@@ -8,6 +8,12 @@ sobre blanco): se ven nítidos a cualquier tamaño, se les puede cambiar el esti
 BTC siguen como imagen: su detalle (paneles, anotaciones, medias móviles) no se
 replica bien con un gráfico nativo.
 
+Los ejes llevan formatos numéricos ("#,##0", '0.0"%"', "mmm-yy") y no texto, así que
+PowerPoint los muestra con la configuración regional de quien abre el archivo: en
+una PC en español de Argentina, 1.500 y sep-26; en una en inglés, 1,500 y Sep-26.
+Es lo esperable. Solo las etiquetas escritas como texto (el último valor de la
+inflación interanual) salen siempre en formato argentino.
+
 Cada función recibe la diapositiva, la caja (x, y, ancho, alto) y los datos como
 los tiene presentacion.armar. Si algo falla, levanta: presentacion.armar pone la
 imagen del mail en su lugar.

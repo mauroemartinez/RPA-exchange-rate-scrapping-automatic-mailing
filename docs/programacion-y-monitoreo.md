@@ -107,6 +107,40 @@ El Worker tiene tests sin red en `cloudflare/disparador.test.js` (los dos workfl
 
 **Si un día hábil el Worker no aparece en sus logs**, revisar los días de sus horarios. En Cloudflare el 1 es el domingo, no el lunes como en el cron clásico (y en los workflows de GitHub): con `1-5`, el Worker disparaba de domingo a jueves, y el viernes 16/10/2026 no hubo corrida a las 16:00. Ese día el reporte salió a las 16:14 con `gh workflow run corrida-diaria.yml --ref main -f modo=real`, y los horarios pasaron a `MON-FRI`, que no deja lugar a dudas. Para ver qué disparó y qué no, además del panel, la API de analítica de Cloudflare (`workersInvocationsScheduled`) lista cada invocación programada con su horario y su estado.
 
+### Diagnosticar el Worker desde la consola
+
+Tres preguntas cubren casi todo: si los horarios están registrados, si el Worker corrió y si GitHub recibió la orden. Desde `cloudflare/`, con la sesión de wrangler (el login del paso 2):
+
+```bash
+npx wrangler@4 whoami        # además de mostrar la cuenta, renueva el token de la sesión, que vence cada hora
+```
+
+Ese token queda en `%APPDATA%\xdg.config\.wrangler\config\default.toml` (`oauth_token`). Con él, en Git Bash:
+
+```bash
+TOKEN=$(grep -E '^oauth_token' "$APPDATA/xdg.config/.wrangler/config/default.toml" | sed 's/.*= *"//;s/".*//')
+CUENTA=2ff3e0a845fbe4619a9305300671790b
+
+# 1. Los horarios registrados: tienen que decir MON-FRI
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "https://api.cloudflare.com/client/v4/accounts/$CUENTA/workers/scripts/reporte-macro-disparador/schedules"
+
+# 2. Las invocaciones programadas desde una fecha, con su estado (success o error)
+curl -s -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  https://api.cloudflare.com/client/v4/graphql -d '{"query":"query { viewer { accounts(filter:{accountTag:\"'$CUENTA'\"}) { workersInvocationsScheduled(limit: 20, filter:{datetime_geq:\"2026-10-16T00:00:00Z\"}, orderBy:[datetime_DESC]) { cron status datetime } } } }"}'
+```
+
+Y la tercera, en GitHub: `gh run list --workflow corrida-diaria.yml --limit 5` tiene que mostrar una corrida `workflow_dispatch` por cada invocación con `success`. Cómo leer las respuestas:
+
+| Lo que se ve | Qué pasó | Qué hacer |
+|---|---|---|
+| Ninguna invocación un día hábil | Los horarios no incluyen ese día (el caso del 16/10/2026) o no están registrados | Revisar los horarios del punto 1 y redesplegar con `npx wrangler@4 deploy` |
+| Invocación con `error` | GitHub rechazó la orden: 401 es un token vencido o borrado, 403 un token sin el repo o sin permiso de Actions | En el panel, Workers > reporte-macro-disparador > Observability, el mensaje dice cuál; ver los párrafos de arriba |
+| Invocación con `success` y ninguna corrida en GitHub | No debería pasar: el Worker solo marca éxito con un 204 de GitHub | Mirar la pestaña Actions del repo y el estado de GitHub |
+| Corrida en GitHub que termina `omitida` | La orden llegó y la corrida decidió no hacer nada: el día ya estaba hecho, era feriado o fin de semana | Nada |
+
+Si el día quedó sin reporte, primero el reporte y después el diagnóstico: `gh workflow run corrida-diaria.yml --ref main -f modo=real` lo manda en un par de minutos.
+
 Si el token tuviera vencimiento y venciera (GitHub avisa por mail una semana antes), GitHub respondería 401, ninguna orden entraría y el control tampoco: el Worker figura fallido en el panel de Cloudflare y el día queda sin reporte hasta que alguien lo dispare a mano (`gh workflow run corrida-diaria.yml --ref main -f modo=real`). Se renueva con un token nuevo y `npx wrangler@4 secret put GITHUB_TOKEN`. Para apagar el Worker del todo: `npx wrangler@4 delete`.
 
 ### Por qué tres disparos de la corrida
