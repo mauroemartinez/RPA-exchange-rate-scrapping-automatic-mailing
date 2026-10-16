@@ -68,15 +68,66 @@ def test_con_comentarios_por_grafico_de_la_fila(historico, imagenes, tmp_path):
     assert "Comentario de BTC." in _textos(prs.slides[7])
 
 
-def test_riesgo_pais_lleva_el_grafico_del_mail(historico, imagenes, tmp_path):
-    prs = Presentation(presentacion.armar(historico, imagenes, tmp_path))
-    riesgo = prs.slides[3]
-    assert any(s.shape_type == 13 for s in riesgo.shapes)  # 13 = imagen
-    assert "Gráfico no disponible" not in _textos(riesgo)
+def _inflacion():
+    from reporte import transformations
 
+    return transformations.serie_inflacion([(date(2024 + (m - 1) // 12, (m - 1) % 12 + 1, 1), 2.0 + (m % 5) / 10)
+                                            for m in range(1, 34)])
+
+
+def _graficos(slide) -> list:
+    return [s.chart for s in slide.shapes if s.has_chart]
+
+
+def test_los_graficos_simples_son_nativos(historico, imagenes, tmp_path):
+    prs = Presentation(presentacion.armar(historico, imagenes, tmp_path, inflacion=_inflacion()))
+    cambio, riesgo, inflacion = prs.slides[2], prs.slides[3], prs.slides[4]
+
+    assert [len(g.plots[0].series) for g in _graficos(cambio)] == [5, 4]  # paralelas y oficiales
+    (barras,) = _graficos(riesgo)
+    assert len(barras.plots[0].series[0].values) == charts.COTIZACIONES_A_MOSTRAR
+    combinado, acumuladas = _graficos(inflacion)
+    # Barras de la mensual y la interanual como línea, sobre su propio eje a la derecha
+    assert [type(p).__name__ for p in combinado.plots] == ["BarPlot", "LinePlot"]
+    assert combinado._chartSpace.xpath('.//c:valAx/c:axPos[@val="r"]')
+    assert len(acumuladas.plots[0].series) == 3
+    # Los gráficos nativos reemplazan a las imágenes del mail en esas diapositivas
+    assert not any(s.shape_type == 13 for slide in (cambio, riesgo, inflacion) for s in slide.shapes)
+
+
+def test_si_un_grafico_nativo_falla_va_la_imagen_del_mail(historico, imagenes, tmp_path, monkeypatch):
+    from reporte import graficos_pptx
+
+    def a_medio_armar(slide, x, y, ancho, alto, df):
+        graficos_pptx.paralelas(slide, x, y, ancho, alto, df)  # deja un gráfico entero en la diapositiva...
+        raise ValueError("...y falla después")
+
+    monkeypatch.setattr(graficos_pptx, "riesgo_pais", a_medio_armar)
+    ruta = presentacion.armar(historico, imagenes, tmp_path)
+    riesgo = Presentation(ruta).slides[3]
+    assert not _graficos(riesgo) and any(s.shape_type == 13 for s in riesgo.shapes)
+    # El gráfico que quedó a medias no viaja en el archivo
+    with zipfile.ZipFile(ruta) as pptx:
+        partes = [n for n in pptx.namelist() if n.startswith("ppt/charts/chart")]
+    assert len(partes) == sum(len(_graficos(s)) for s in Presentation(ruta).slides)
+
+    # Sin la imagen tampoco, lo dice
     del imagenes[charts.RIESGO_PAIS]
-    prs = Presentation(presentacion.armar(historico, imagenes, tmp_path))
-    assert "Gráfico no disponible" in _textos(prs.slides[3])
+    assert "Gráfico no disponible" in _textos(Presentation(presentacion.armar(historico, imagenes, tmp_path)).slides[3])
+
+
+def test_sin_la_serie_de_inflacion_van_las_imagenes(historico, imagenes, tmp_path):
+    """El script manual no baja la inflación: esa diapositiva lleva las imágenes de Previews/."""
+    inflacion = Presentation(presentacion.armar(historico, imagenes, tmp_path)).slides[4]
+    assert not _graficos(inflacion) and sum(s.shape_type == 13 for s in inflacion.shapes) == 2
+
+
+def test_los_vacios_van_como_celdas_vacias():
+    """PowerPoint no acepta 'nan' en los datos de un gráfico y pide reparar el archivo."""
+    from reporte import graficos_pptx
+
+    assert graficos_pptx._valores([1.5, float("nan"), None, 2]) == [1.5, None, None, 2.0]
+    assert graficos_pptx._escala([1523.4, 2010.0]) == (1500, 2100, 100)
 
 
 def test_los_textos_de_la_corrida_le_ganan_a_la_fila(historico, imagenes, tmp_path):
@@ -127,12 +178,16 @@ def test_el_script_manual_usa_el_mismo_armado(historico, imagenes, tmp_path, mon
     monkeypatch.setattr(presentacion_ejecutiva.data_access, "crear_engine", Engine)
     monkeypatch.setattr(presentacion_ejecutiva.data_access, "leer_historico",
                         lambda engine, respaldo_csv=True: (historico.copy(), "supabase"))
+    mensual = [(date(2024 + (m - 1) // 12, (m - 1) % 12 + 1, 1), 2.0) for m in range(1, 34)]
+    monkeypatch.setattr(presentacion_ejecutiva.data_access, "leer_serie", lambda engine, clave: mensual)
 
     ruta = presentacion_ejecutiva.main(["--salida", str(tmp_path / "manual"), "--graficos", str(tmp_path)])
 
     assert ruta == tmp_path / "manual" / presentacion.ARCHIVO
     prs = Presentation(ruta)
     assert len(prs.slides) == 9 and historico["ai_paragraph"].iloc[0] in _textos(prs.slides[2])
+    # Con la inflación guardada, la diapositiva 5 también va con gráficos nativos
+    assert len(_graficos(prs.slides[4])) == 2
 
 
 def test_agregados_y_deuda_llevan_su_explicacion(historico, imagenes, tmp_path, series_indicadores):

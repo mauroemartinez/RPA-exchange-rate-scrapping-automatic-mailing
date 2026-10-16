@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 import worker from "./disparador.js";
 
-const env = { REPO: "alguien/repo", RAMA: "main", CRON_CONTROL: "43 22 * * 1-5", GITHUB_TOKEN: "token-de-prueba" };
+const env = { REPO: "alguien/repo", RAMA: "main", CRON_CONTROL: "43 22 * * MON-FRI", GITHUB_TOKEN: "token-de-prueba" };
 
 function conRespuestas(...estados) {
   const pedidos = [];
@@ -21,7 +21,7 @@ globalThis.setTimeout = (seguir) => seguir();
 
 test("el horario de la corrida pide corrida-diaria.yml en modo real", async () => {
   const pedidos = conRespuestas(204);
-  await worker.scheduled({ cron: "0 19 * * 1-5" }, env);
+  await worker.scheduled({ cron: "0 19 * * MON-FRI" }, env);
   assert.equal(pedidos.length, 1);
   assert.equal(pedidos[0].url, "https://api.github.com/repos/alguien/repo/actions/workflows/corrida-diaria.yml/dispatches");
   assert.equal(pedidos[0].opciones.method, "POST");
@@ -38,18 +38,18 @@ test("el horario del control pide control-diario.yml con la alerta prendida", as
 
 test("un 5xx se reintenta y la invocación termina bien si GitHub se recupera", async () => {
   const pedidos = conRespuestas(502, 204);
-  await worker.scheduled({ cron: "0 19 * * 1-5" }, env);
+  await worker.scheduled({ cron: "0 19 * * MON-FRI" }, env);
   assert.equal(pedidos.length, 2);
 });
 
 test("un 401 no se reintenta y la invocación falla con el motivo", async () => {
   const pedidos = conRespuestas(401);
-  await assert.rejects(worker.scheduled({ cron: "0 19 * * 1-5" }, env), /HTTP 401/);
+  await assert.rejects(worker.scheduled({ cron: "0 19 * * MON-FRI" }, env), /HTTP 401/);
   assert.equal(pedidos.length, 1);
 });
 
 test("sin el secreto no se llama a GitHub", async () => {
   const pedidos = conRespuestas(204);
-  await assert.rejects(worker.scheduled({ cron: "0 19 * * 1-5" }, { ...env, GITHUB_TOKEN: undefined }), /GITHUB_TOKEN/);
+  await assert.rejects(worker.scheduled({ cron: "0 19 * * MON-FRI" }, { ...env, GITHUB_TOKEN: undefined }), /GITHUB_TOKEN/);
   assert.equal(pedidos.length, 0);
 });

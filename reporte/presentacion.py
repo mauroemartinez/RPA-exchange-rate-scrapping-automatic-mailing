@@ -2,12 +2,16 @@
 
 1. Portada blanca con el logo de GlobalAIze, los links del autor y las tecnologías del proyecto.
 2. Tablero: blue, MEP, billete, riesgo país, BADLAR y el forward de Fisher.
-3. Tipos de cambio: el análisis de IA del día y los dos paneles del gráfico del mail (paralelas y oficiales).
-4. Riesgo país: el gráfico propio del mail, con el resumen del día y el comentario de Gemini.
-5. Inflación y variaciones acumuladas.
+3. Tipos de cambio: el análisis de IA del día y dos gráficos nativos, paralelas y oficiales.
+4. Riesgo país: gráfico nativo, con el resumen del día y el comentario de Gemini.
+5. Inflación y variaciones acumuladas, también nativos.
 6 y 7. Agregados monetarios y deuda, con el resumen del día y lo ideal.
 8. Bitcoin, en fondo negro.
 9. Fuentes y contacto, como el pie del mail.
+
+Los gráficos de las diapositivas 3 a 5 son gráficos de PowerPoint, con sus datos
+adentro (reporte/graficos_pptx.py); si alguno no se puede armar, va la imagen del
+mail en su lugar. Los de agregados, deuda y BTC son las imágenes del mail.
 
 Cada gráfico lleva su frase: la de Gemini cuando la hay y, si no, un resumen
 calculado acá con los datos del día. Los colores siguen el criterio del mail,
@@ -22,8 +26,8 @@ del último reporte sin acumular versiones. Para rearmarla a mano desde Supabase
 está scripts/presentacion_ejecutiva.py.
 """
 
+import logging
 import os
-import tempfile
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -36,8 +40,10 @@ from pptx.opc.constants import RELATIONSHIP_TYPE
 from pptx.oxml.ns import qn
 from pptx.util import Inches, Pt
 
-from reporte import charts, email_report, ia_generator, indicadores, transformations
+from reporte import charts, email_report, graficos_pptx, ia_generator, indicadores, transformations
 from reporte.scrapers import ambito, bcra, bna, dolarhoy, fed, finanzas, riesgo_pais
+
+log = logging.getLogger(__name__)
 
 ARCHIVO = "Reporte Ejecutivo.pptx"
 
@@ -283,6 +289,34 @@ def _imagen(slide, ruta: Path, x, y, ancho_max, alto_max, centrar: bool = True, 
     else:
         x, y = x + margen, y + margen
     return slide.shapes.add_picture(str(ruta), x, y, ancho, alto)
+
+
+def _grafico(slide, x, y, ancho, alto, dibujar, imagen: Path | None = None) -> None:
+    """El gráfico nativo sobre su tarjeta; si no se puede armar, la imagen del mail; si tampoco, el aviso.
+
+    `dibujar(slide, x, y, ancho, alto)` es una función de graficos_pptx con sus datos ya
+    puestos, o None cuando no hay datos para armarlo (va directo la imagen).
+    """
+    if dibujar is not None:
+        antes = len(slide.shapes)
+        try:
+            _tarjeta_fondo(slide, x, y, ancho, alto)
+            margen = Inches(0.08)
+            dibujar(slide, x + margen, y + margen, ancho - 2 * margen, alto - 2 * margen)
+            return
+        except Exception:
+            log.exception("No se pudo armar un gráfico nativo de la presentación; va la imagen del mail")
+            # Lo que alcanzó a dibujarse se saca entero, también el gráfico a medio armar
+            for forma in list(slide.shapes)[antes:]:
+                rId = forma._element.chart_rId if forma.has_chart else None
+                forma._element.getparent().remove(forma._element)
+                if rId:
+                    slide.part.drop_rel(rId)
+    if imagen is not None:
+        _imagen(slide, imagen, x, y, ancho, alto)
+    else:
+        _texto(slide, x + Inches(0.15), y + alto // 2 - Inches(0.3), ancho - Inches(0.3), Inches(0.6),
+               "Gráfico no disponible para este día.", 18, GRIS)
 
 
 def _con_link(forma, url: str):
@@ -585,50 +619,37 @@ def armar(
            "Verde: bajó contra la rueda anterior; rojo: subió. Desde la macro, que el dólar y el riesgo país bajen "
            "es la buena noticia.", 15, GRIS)
 
-    # 3. Tipos de cambio: los dos paneles del gráfico del mail, uno al lado del otro
-    paneles = []
-    with tempfile.TemporaryDirectory() as temporal:
-        if charts.TIPOS_DE_CAMBIO in imagenes:
-            try:
-                paneles = charts.paneles_tipos_de_cambio(charts.preparar_datos(df), Path(temporal))
-            except Exception:
-                paneles = []  # sin paneles, va el gráfico entero como en el mail
+    # 3. Tipos de cambio: paralelas y oficiales, nativos, uno al lado del otro
+    cambio = _encabezado(prs, "Tipos de cambio", fecha, next(numero), emoji="💵")
+    _caja_ia(cambio, Inches(0.45), Inches(1.12), Inches(12.43), Inches(1.25), parrafo)
+    cambio.notes_slide.notes_text_frame.text = parrafo
+    for j, (dibujar, clave, frase) in enumerate([
+        (graficos_pptx.paralelas, "paralela", frase_paralelas(hoy, ayer)),
+        (graficos_pptx.oficiales, "oficial", frase_oficiales(hoy, ayer)),
+    ]):
+        x = Inches(0.45) + j * Inches(6.33)
+        _grafico(cambio, x, Inches(2.5), Inches(6.1), Inches(2.55),
+                 lambda s, *caja, f=dibujar: f(s, *caja, df), imagenes.get(charts.TIPOS_DE_CAMBIO))
+        texto = _comentario(comentarios, charts.cid(charts.TIPOS_DE_CAMBIO), clave)
+        _bloques(cambio, x, Inches(5.15), Inches(6.1), Inches(1.8),
+                 [("🤖 Análisis IA" if texto else "Resumen del día", texto or frase)], maximo=15)
 
-        cambio = _encabezado(prs, "Tipos de cambio", fecha, next(numero), emoji="💵")
-        _caja_ia(cambio, Inches(0.45), Inches(1.12), Inches(12.43), Inches(1.25), parrafo)
-        cambio.notes_slide.notes_text_frame.text = parrafo
-        if paneles:
-            for j, (ruta, clave, frase) in enumerate([
-                (paneles[0], "paralela", frase_paralelas(hoy, ayer)),
-                (paneles[1], "oficial", frase_oficiales(hoy, ayer)),
-            ]):
-                x = Inches(0.45) + j * Inches(6.33)
-                _imagen(cambio, ruta, x, Inches(2.5), Inches(6.1), Inches(2.35))
-                texto = _comentario(comentarios, charts.cid(charts.TIPOS_DE_CAMBIO), clave)
-                _bloques(cambio, x, Inches(4.95), Inches(6.1), Inches(2.0),
-                         [("🤖 Análisis IA" if texto else "Resumen del día", texto or frase)], maximo=15)
-        elif charts.TIPOS_DE_CAMBIO in imagenes:
-            _imagen(cambio, imagenes[charts.TIPOS_DE_CAMBIO], Inches(0.45), Inches(2.5), Inches(12.43), Inches(4.45))
-        else:
-            _texto(cambio, Inches(0.6), Inches(4), Inches(12), Inches(1), "Gráfico no disponible para este día.", 18, GRIS)
-
-    # 4. Riesgo país: el mismo gráfico del mail (apaisado), con el resumen y el análisis a la derecha
+    # 4. Riesgo país: nativo, con el resumen y el análisis a la derecha
     riesgo = _encabezado(prs, "Riesgo país", fecha, next(numero), emoji="🌎")
-    if charts.RIESGO_PAIS in imagenes:
-        _imagen(riesgo, imagenes[charts.RIESGO_PAIS], Inches(0.45), Inches(1.25), Inches(8.3), Inches(5.6))
-    else:
-        _texto(riesgo, Inches(0.6), Inches(3), Inches(8), Inches(1), "Gráfico no disponible para este día.", 18, GRIS)
+    _grafico(riesgo, Inches(0.45), Inches(1.25), Inches(8.3), Inches(5.6),
+             lambda s, *caja: graficos_pptx.riesgo_pais(s, *caja, df), imagenes.get(charts.RIESGO_PAIS))
     _bloques(riesgo, Inches(9.0), Inches(1.2), Inches(3.95), Inches(5.75),
              [("Resumen del día", frase_riesgo(df)), ("🤖 Análisis IA", _comentario(comentarios, charts.cid(charts.RIESGO_PAIS), "riesgo"))])
 
-    # 5. Inflación
+    # 5. Inflación y variaciones acumuladas, nativos; sin la serie de inflación, las imágenes del mail
     inflacion_slide = _encabezado(prs, "Inflación y variaciones acumuladas", fecha, next(numero), emoji="📈")
-    for j, nombre in enumerate([charts.INFLACION, charts.VARIACIONES]):
-        x = Inches(0.45) + j * Inches(6.33)
-        if nombre in imagenes:
-            _imagen(inflacion_slide, imagenes[nombre], x, Inches(1.1), Inches(6.1), Inches(4.0))
-        else:
-            _texto(inflacion_slide, x, Inches(3), Inches(6), Inches(1), "Gráfico no disponible para este día.", 18, GRIS)
+    hay_inflacion = inflacion is not None and not inflacion.empty
+    for j, (nombre, dibujar) in enumerate([
+        (charts.INFLACION, lambda s, *caja: graficos_pptx.inflacion(s, *caja, inflacion)),
+        (charts.VARIACIONES, lambda s, *caja: graficos_pptx.variaciones(s, *caja, df, inflacion)),
+    ]):
+        _grafico(inflacion_slide, Inches(0.45) + j * Inches(6.33), Inches(1.1), Inches(6.1), Inches(4.0),
+                 dibujar if hay_inflacion else None, imagenes.get(nombre))
     frase = frase_inflacion(inflacion, df)
     if frase:
         _bloques(inflacion_slide, Inches(0.45), Inches(5.2), Inches(12.43), Inches(1.85), [("Resumen del día", frase)])

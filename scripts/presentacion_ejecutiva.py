@@ -3,8 +3,10 @@
 La corrida diaria ya la genera sola (etapa `presentacion` de pipeline.py) y la
 deja en Previews/. Este script sirve para rearmarla desde Supabase: lee la última
 fila de Fact_Mercado_Macro (SELECT, solo lectura), su párrafo y sus comentarios
-de IA, y los gráficos de Previews/. No scrapea, no llama a Gemini y no escribe
-nada salvo el .pptx, que por defecto va a una carpeta temporal.
+de IA, la inflación mensual guardada en Fact_Series_Macro (para los gráficos
+nativos de inflación y variaciones) y los gráficos de Previews/. No scrapea, no
+llama a Gemini y no escribe nada salvo el .pptx, que por defecto va a una carpeta
+temporal.
 
 El armado está en reporte/presentacion.py, el mismo código que usa el pipeline.
 
@@ -24,7 +26,7 @@ sys.path.insert(0, str(RAIZ))
 
 import pandas as pd
 
-from reporte import charts, data_access, presentacion, preview_git
+from reporte import charts, data_access, presentacion, preview_git, transformations
 
 
 def main(argv: list[str] | None = None) -> Path:
@@ -36,8 +38,14 @@ def main(argv: list[str] | None = None) -> Path:
     engine = data_access.crear_engine()
     try:
         df, _ = data_access.leer_historico(engine, respaldo_csv=False)
+        try:
+            puntos = data_access.leer_serie(engine, "inflacion_mensual")
+        except Exception as exc:
+            print(f"  Sin la inflación de Fact_Series_Macro ({type(exc).__name__}): la diapositiva 5 va con las imágenes")
+            puntos = []
     finally:
         engine.dispose()
+    inflacion = transformations.serie_inflacion(puntos) if puntos else None
 
     # Como en el reenvío manual: un gráfico más viejo que el reporte es de otro día
     # (ese día falló) y no tiene que entrar en esta presentación
@@ -52,7 +60,8 @@ def main(argv: list[str] | None = None) -> Path:
                   "(si la corrida es en GitHub Actions, hacé git pull antes)")
             continue
         imagenes[nombre] = ruta
-    ruta = presentacion.armar(df, imagenes, args.salida or Path(tempfile.mkdtemp(prefix="presentacion_")))
+    ruta = presentacion.armar(df, imagenes, args.salida or Path(tempfile.mkdtemp(prefix="presentacion_")),
+                              inflacion=inflacion)
     print(f"Presentación: {ruta}")
     return ruta
 

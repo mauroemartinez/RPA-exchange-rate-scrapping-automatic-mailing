@@ -26,7 +26,6 @@ import matplotlib.patheffects as pe
 import pandas as pd
 import seaborn as sns
 from matplotlib.artist import setp
-from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 
@@ -120,32 +119,6 @@ def _step_riesgo_pais(valor_max: float) -> tuple[float, float]:
         return 500, 200
 
 
-PANELES_TIPOS_DE_CAMBIO = ("Paralelas.png", "Oficiales.png")
-
-
-def grafico_tipos_de_cambio(data: pd.DataFrame, carpeta: Path, n: int = COTIZACIONES_A_MOSTRAR) -> Path:
-    """Cotizaciones paralelas y oficiales de las últimas n ruedas, un panel arriba del otro."""
-    return _dibujar_tipos_de_cambio(data, n, lambda fig, ax: _guardar(fig, carpeta, TIPOS_DE_CAMBIO))
-
-
-def paneles_tipos_de_cambio(data: pd.DataFrame, carpeta: Path, n: int = COTIZACIONES_A_MOSTRAR) -> list[Path]:
-    """Los dos paneles del gráfico de tipos de cambio, cada uno en su imagen, para la presentación.
-
-    Es el mismo dibujo que el del mail: cada panel se recorta con su título y su
-    leyenda, sin el título general. Quedan en PANELES_TIPOS_DE_CAMBIO, en ese orden.
-    """
-    def guardar(fig: Figure, ax) -> list[Path]:
-        fig.suptitle("")  # el título general no va: cada panel tiene el suyo
-        renderer = FigureCanvasAgg(fig).get_renderer()
-        rutas = []
-        for eje, nombre in zip(ax, PANELES_TIPOS_DE_CAMBIO):
-            caja = eje.get_tightbbox(renderer).transformed(fig.dpi_scale_trans.inverted()).padded(0.08)
-            rutas.append(_guardar(fig, carpeta, nombre, bbox_inches=caja, dpi=150))
-        return rutas
-
-    return _dibujar_tipos_de_cambio(data, n, guardar)
-
-
 def _eje_de_fechas(axis, fechas: list[str]) -> None:
     """Una fecha cada dos ruedas y sin el año ('02/09' y no '02/09/26'): con el año, en el ancho del mail se enciman.
 
@@ -159,8 +132,8 @@ def _eje_de_fechas(axis, fechas: list[str]) -> None:
     axis.grid(color="silver", linestyle="--", linewidth=0.5)
 
 
-def _dibujar_tipos_de_cambio(data: pd.DataFrame, n: int, al_terminar):
-    """Arma la figura de dos paneles (paralelas y oficiales) y se la pasa, con sus ejes, a `al_terminar`."""
+def grafico_tipos_de_cambio(data: pd.DataFrame, carpeta: Path, n: int = COTIZACIONES_A_MOSTRAR) -> Path:
+    """Cotizaciones paralelas y oficiales de las últimas n ruedas, un panel arriba del otro."""
     with _estilo_base():
         fig = Figure(figsize=(10, 9.5))
         ax = fig.subplots(2, 1, sharex=False)
@@ -213,7 +186,7 @@ def _dibujar_tipos_de_cambio(data: pd.DataFrame, n: int, al_terminar):
             axis.legend(prop={"size": 8}, loc="upper left", shadow=True)
 
         fig.tight_layout(pad=1)
-        return al_terminar(fig, ax)
+        return _guardar(fig, carpeta, TIPOS_DE_CAMBIO)
 
 
 def grafico_riesgo_pais(data: pd.DataFrame, carpeta: Path, n: int = COTIZACIONES_A_MOSTRAR) -> Path:

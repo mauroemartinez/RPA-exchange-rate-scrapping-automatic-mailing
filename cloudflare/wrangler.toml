@@ -19,18 +19,21 @@ workers_dev = false   # sin URL pública: el Worker solo corre por horario
 [triggers]
 # Horarios en UTC. Argentina es UTC-3 todo el año (no tiene horario de verano),
 # así que 19:00 UTC son siempre las 16:00. El plan Free admite hasta 5 horarios.
+# Los días van con nombre: en Cloudflare el 1 es el DOMINGO, no el lunes como en el
+# cron clásico, y "1-5" corría de domingo a jueves (el viernes 16/10/2026 no hubo
+# disparo). MON-FRI no deja lugar a dudas.
 crons = [
-  "0 19 * * 1-5",    # 16:00 en Argentina, lunes a viernes: la corrida
-  "7 20 * * 1-5",    # 17:07: reintento (termina como omitida si el día ya salió)
-  "12 22 * * 1-5",   # 19:12: último reintento
-  "43 22 * * 1-5",   # 19:43: el control, avisa si el día hábil quedó sin fila
+  "0 19 * * MON-FRI",    # 16:00 en Argentina, lunes a viernes: la corrida
+  "7 20 * * MON-FRI",    # 17:07: reintento (termina como omitida si el día ya salió)
+  "12 22 * * MON-FRI",   # 19:12: último reintento
+  "43 22 * * MON-FRI",   # 19:43: el control, avisa si el día hábil quedó sin fila
 ]
 
 [vars]
 REPO = "mauroemartinez/RPA-exchange-rate-scrapping-automatic-mailing"
 RAMA = "main"
 # El horario que dispara el control en vez de la corrida: tiene que ser uno de los de arriba
-CRON_CONTROL = "43 22 * * 1-5"
+CRON_CONTROL = "43 22 * * MON-FRI"
 
 [observability]
 # Los logs de cada invocación quedan en el panel de Cloudflare (Workers > el Worker > Logs)

@@ -21,6 +21,7 @@ from sqlalchemy import (
     Text,
     create_engine,
     func,
+    select,
     text,
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -164,6 +165,14 @@ def tabla_existe(engine: Engine, tabla: str = TABLA_SERIES) -> bool:
     """Para scripts/agregados_monetarios.py --guardar: avisar antes de intentar la carga histórica."""
     with engine.connect() as conn:
         return conn.execute(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": f'public."{tabla}"'}).scalar()
+
+
+def leer_serie(engine: Engine, clave: str) -> list[tuple[date, float]]:
+    """Los puntos guardados de una serie de Fact_Series_Macro, de más viejo a más nuevo. Solo lee."""
+    consulta = (select(series_macro.c.Fecha, series_macro.c.valor)
+                .where(series_macro.c.serie == clave).order_by(series_macro.c.Fecha))
+    with engine.connect() as conn:
+        return [(fecha, float(valor)) for fecha, valor in conn.execute(consulta).all()]
 
 
 def sentencia_series():

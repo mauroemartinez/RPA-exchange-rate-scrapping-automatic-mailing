@@ -105,6 +105,8 @@ Hace falta Node.js (trae `npx`) y una cuenta de Cloudflare, gratis y sin tarjeta
 
 El Worker tiene tests sin red en `cloudflare/disparador.test.js` (los dos workflows, el reintento ante un 5xx, el 401 que no se reintenta, el secreto ausente): `node --test` desde `cloudflare/`, o `npm test`; el CI los corre en cada push.
 
+**Si un día hábil el Worker no aparece en sus logs**, revisar los días de sus horarios. En Cloudflare el 1 es el domingo, no el lunes como en el cron clásico (y en los workflows de GitHub): con `1-5`, el Worker disparaba de domingo a jueves, y el viernes 16/10/2026 no hubo corrida a las 16:00. Ese día el reporte salió a las 16:14 con `gh workflow run corrida-diaria.yml --ref main -f modo=real`, y los horarios pasaron a `MON-FRI`, que no deja lugar a dudas. Para ver qué disparó y qué no, además del panel, la API de analítica de Cloudflare (`workersInvocationsScheduled`) lista cada invocación programada con su horario y su estado.
+
 Si el token tuviera vencimiento y venciera (GitHub avisa por mail una semana antes), GitHub respondería 401, ninguna orden entraría y el control tampoco: el Worker figura fallido en el panel de Cloudflare y el día queda sin reporte hasta que alguien lo dispare a mano (`gh workflow run corrida-diaria.yml --ref main -f modo=real`). Se renueva con un token nuevo y `npx wrangler@4 secret put GITHUB_TOKEN`. Para apagar el Worker del todo: `npx wrangler@4 delete`.
 
 ### Por qué tres disparos de la corrida
